@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: quotedesk
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: DATA_DIR
+        value: /opt/render/project/data
+    disk:
+      name: quotedesk-data
+      mountPath: /opt/render/project/data
+      sizeGB: 1
