@@ -9,6 +9,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap"
     rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <style>
     :root {
       --ink: #1b2a2f;
@@ -1927,7 +1928,8 @@
 
     const STATES = ['Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'];
     const STATUS = { draft: 'Draft', pending: 'Awaiting approval', approved: 'Approved', rejected: 'Rejected', sent: 'Sent', won: 'Won', lost: 'Lost' };
-    const ROLES = { master: 'Master Admin', admin: 'Company Admin', manager: 'Manager', sales: 'Sales Executive' };
+    const ROLES = { master: 'Master Admin', admin: 'Company Admin', md: 'Managing Director (MD)', manager: 'Manager', accounts: 'Accounts & Finance', sales: 'Sales Executive' };
+    const ACCESS_LEVELS = { rw: 'Read & Write', ro: 'Only Read', wo: 'Only Write / Create' };
     const MASTER_PASS = 'Rafiq@24';
     const GLYPHS = { slider: 'Sliding window', casement: 'Casement / hinged', fixed: 'Fixed glass', door: 'Door', facade: 'Facade / glazing', partition: 'Partition' };
     const UNIT_FT = { mm: 1 / 304.8, ft: 1, in: 1 / 12, m: 3.28084 };
@@ -1987,8 +1989,16 @@
       catch (e) { return 'c' + cyrb(s) }
     }
     async function checkPw(u, p) { const h = await hashPw(p, u.salt); return u.pass === h || u.pass === 'c' + cyrb(u.salt + ':' + p) }
-    const isMgr = () => !!me && (me.role === 'admin' || me.role === 'manager' || me.role === 'master' || me.username === 'master');
-    const isAdmin = () => !!me && (me.role === 'admin' || me.role === 'master' || me.username === 'master');
+    const isMaster = () => !!me && (me.role === 'master' || me.username === 'master');
+    const isAdmin = () => !!me && (me.role === 'admin' || me.role === 'master' || me.role === 'md' || me.username === 'master');
+    const isMD = () => !!me && (me.role === 'md' || me.role === 'master');
+    const isAccounts = () => !!me && (me.role === 'accounts' || !!me.canPayments || isAdmin());
+    const canApprove = () => !!me && (['master', 'admin', 'md', 'manager'].includes(me.role) || !!me.canApprove);
+    const canEditRates = () => !!me && (['master', 'admin', 'md', 'manager'].includes(me.role) || !!me.canRates);
+    const canViewMargin = () => !!me && (['master', 'admin', 'md', 'manager'].includes(me.role) || !!me.canMargin);
+    const canManagePayments = () => !!me && (['master', 'admin', 'md', 'manager', 'accounts'].includes(me.role) || !!me.canPayments);
+    const canWrite = () => !me || me.access !== 'ro';
+    const isMgr = () => !!me && (['admin', 'manager', 'md', 'master'].includes(me.role) || me.username === 'master' || (me.access === 'rw' && !!me.canApprove));
 
     /* ========== seed ========== */
     const DEF_TERMS = [
@@ -2142,7 +2152,7 @@
       return e;
     }
     const visibleQuote = q => isMgr() || q.createdBy === me.id;
-    const canEdit = q => ['draft', 'rejected'].includes(q.status) && (isMgr() || q.createdBy === me.id);
+    const canEdit = q => canWrite() && ['draft', 'rejected'].includes(q.status) && (isMgr() || q.createdBy === me.id);
     const userName = id => { const u = db.users.find(x => x.id === id); return u ? u.name : '(removed user)' };
     const quoteTotal = q => calcTotals(q).grand;
 
@@ -2193,7 +2203,6 @@
       db.companies = db.companies || [];
       db.profiles = db.profiles || [];
       const nav = [['dash', 'Dashboard'], ['quotes', 'Quotes'], ['customers', 'Customers'], ['rates', 'Rate library']];
-      if (isMaster()) { nav.push(['companies', 'Companies']) }
       if (isAdmin() || isMaster()) { nav.push(['users', 'Users'], ['settings', 'Settings']) }
       const name = r.name === 'quote' ? 'quotes' : r.name;
       const coName = (db && db.settings && db.settings.company) || 'Quote Desk';
@@ -2343,7 +2352,9 @@
     const liveQuotes = () => db.quotes.filter(q => !q.superseded && visibleQuote(q));
     const statusBadge = s => `<span class="bd ${s}">${STATUS[s]}</span>`;
     function quoteRow(q) {
-      return `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button></td></tr>`;
+      const shared = q.shareToken ? `<span title="Viewed ${q.viewCount||0}×" style="font-size:0.75rem;color:var(--ok)">${q.viewCount ? '👁' + q.viewCount : '🔗'}</span>` : '';
+      const accepted = q.acceptedBy ? `<span title="Accepted by ${q.acceptedBy}" style="font-size:0.75rem;color:var(--ok)">✅</span>` : '';
+      return `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)} ${shared}${accepted}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="shareLink" data-id="${q.id}" title="Client share link + track" style="color:var(--glass)">🔗</button></td></tr>`;
     }
     function viewDash() {
       const qs = liveQuotes(), m = $('#main');
@@ -2368,9 +2379,62 @@
     <div class="card"><div class="card-h"><h3>Recent quotes</h3><a href="#/quotes">View all</a></div>
     ${recent.length ? `<div class="scx"><table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Status</th><th class="r">Actions</th></tr></thead><tbody>${recent.map(quoteRow).join('')}</tbody></table></div>` : `<div class="empty">No quotes yet. Create your first quotation.</div>`}</div></div>
    <div><div class="card"><h3>Value by status</h3><div class="bars">${order.map(s => `<span>${STATUS[s]} (${cnt([s])})</span><div><div class="bar" style="width:${sum([s]) / mx * 100}%"></div></div><span class="nowrap">${rs(sum([s]), 0)}</span>`).join('')}</div></div>
-   <div class="card"><h3>Follow up</h3>${stale.length ? `<div class="mute sm" style="margin-bottom:8px">Sent more than 7 days ago with no answer.</div>${stale.map(q => `<div style="padding:6px 0;border-bottom:1px solid var(--line2)"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a> ${esc(q.cust.name)}<div class="mute sm">Sent ${fmtDate(new Date(q.sentAt).toISOString().slice(0, 10))}, ${rs(quoteTotal(q), 0)}</div></div>`).join('')}` : '<div class="mute">Nothing to chase right now.</div>'}</div></div></div>`;
+    <div class="card" id="followupCard"><h3>Follow up</h3><div class="mute sm" id="followupBody"><span class="mute">Loading...</span></div></div>
+    <div class="card" id="paymentsCard"><h3>💳 Outstanding Payments</h3><div class="mute sm" id="paymentsBody"><span class="mute">Loading...</span></div></div></div></div>`;
+      // Render outstanding payments card
+      const wonQuotes = qs.filter(q => q.status === 'won');
+      const payEl = $('#paymentsCard');
+      if (payEl) {
+        if (!wonQuotes.length) {
+          payEl.innerHTML = `<h3>💳 Outstanding Payments</h3><div class="mute sm">No won quotes yet. Projects won will show here for payment tracking.</div>`;
+        } else {
+          payEl.innerHTML = `<h3>💳 Outstanding Payments <span class="bd approved" style="font-size:0.8rem">${wonQuotes.length} won</span></h3>
+          <div class="mute sm" style="margin-bottom:8px">Track customer balances and record milestone receipts:</div>
+          <div class="scx" style="max-height:240px;overflow-y:auto">
+            ${wonQuotes.slice(0, 10).map(q => {
+              const t = calcTotals(q);
+              return `<div style="padding:7px 0;border-bottom:1px solid var(--line2);display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <div style="min-width:0;flex:1">
+                  <a class="rl" href="#/quote/${q.id}"><b>${esc(q.no)}</b></a> · ${esc(q.cust && q.cust.name || 'Customer')}
+                  <div class="mute sm">Total: <b>${rs(t.grand, 0)}</b> · ${esc(q.project || '')}</div>
+                </div>
+                <div class="nowrap">
+                  ${canManagePayments() ? `<button class="btn sm pri" data-act="recordPayment" data-id="${q.id}">+ Pay</button>` : `<a href="#/quote/${q.id}" class="btn sm">View</a>`}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`;
+        }
+      }
+      // Load rich follow-up data from API
+      if (CLOUD) {
+        apiGet('/api/followups').then(rows => {
+          const el = $('#followupCard');
+          if (!el) return;
+          if (!rows || !rows.length) {
+            el.innerHTML = `<h3>Follow up</h3><div class="mute">Nothing to chase right now. 🎉</div>`;
+            return;
+          }
+          el.innerHTML = `<h3>Follow up <span class="bd sent" style="font-size:0.8rem">${rows.length}</span></h3>
+            <div class="mute sm" style="margin-bottom:8px">Sent more than 3 days ago — no answer yet.</div>
+            ${rows.map(r => `<div style="padding:8px 0;border-bottom:1px solid var(--line2)">
+              <a class="rl" href="#/quote/${r.id}"><b>${esc(r.no)}</b></a> · ${esc(r.customerName)}
+              <div class="mute sm">${r.daysSince} days ago · ${r.viewCount ? '<b style="color:var(--ok)">' + r.viewCount + '× viewed</b>' : '<span style="color:var(--warn)">not opened yet</span>'}</div>
+              <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
+                ${r.phone ? `<a href="https://wa.me/${r.phone.replace(/\D/g,'').replace(/^(\d{10})$/, '91$1')}?text=${encodeURIComponent('Hi, following up on our Quotation ' + r.no + '. Please let us know your decision.')}" target="_blank" class="btn sm" style="color:#128c7e;font-size:0.8rem">📱 WhatsApp</a>` : ''}
+                ${r.shareToken ? `<a href="/q/${r.shareToken}" target="_blank" class="btn sm" style="font-size:0.8rem">🔗 View client link</a>` : ''}
+              </div>
+            </div>`).join('')}`;
+        }).catch(() => {
+          const el = $('#followupCard');
+          if (el) el.innerHTML = `<h3>Follow up</h3>${stale.length ? `<div class="mute sm" style="margin-bottom:8px">Sent more than 7 days ago with no answer.</div>${stale.map(q => `<div style="padding:6px 0;border-bottom:1px solid var(--line2)"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a> ${esc(q.cust.name)}<div class="mute sm">Sent ${fmtDate(new Date(q.sentAt).toISOString().slice(0, 10))}, ${rs(quoteTotal(q), 0)}</div></div>`).join('')}` : '<div class="mute">Nothing to chase right now.</div>'}`;
+        });
+      } else {
+        const el = $('#followupCard');
+        if (el) el.innerHTML = `<h3>Follow up</h3>${stale.length ? `<div class="mute sm" style="margin-bottom:8px">Sent more than 7 days ago with no answer.</div>${stale.map(q => `<div style="padding:6px 0;border-bottom:1px solid var(--line2)"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a> ${esc(q.cust.name)}<div class="mute sm">Sent ${fmtDate(new Date(q.sentAt).toISOString().slice(0, 10))}, ${rs(quoteTotal(q), 0)}</div></div>`).join('')}` : '<div class="mute">Nothing to chase right now.</div>'}`;
+      }
     }
-    ACT.newQuote = () => { const q = newQuote(); logq(q, 'Created quotation'); db.quotes.push(q); persist(true); go('#/quote/' + q.id) };
+    ACT.newQuote = () => { if (!canWrite()) { toast('Your account is set to Only Read. You cannot create quotations.', 'bad'); return; } const q = newQuote(); logq(q, 'Created quotation'); db.quotes.push(q); persist(true); go('#/quote/' + q.id) };
 
     /* ========== quotes list ========== */
     const qf = { status: 'all', q: '', showRev: false, fy: 'all' };
@@ -2486,11 +2550,60 @@
     };
     ACT.shareWhatsapp = b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
-      const t = calcTotals(q);
-      const msg = encodeURIComponent(`*QUOTATION SUMMARY*\n\n*Company:* ${db.settings.company}\n*Quote No:* ${q.no}\n*Date:* ${fmtDate(q.date)}\n*Customer:* ${q.cust.name || '-'}\n*Project:* ${q.project || '-'}\n*Grand Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}\n\n*Prepared By:* ${userName(q.createdBy)}\n*Contact:* ${q.cust.phone || '-'}\n\nThank you for choosing ${db.settings.company}!`);
-      const phone = (q.cust.phone || '').replace(/\D/g, '');
-      const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
-      window.open(url, '_blank');
+      // Use server-side share API for token-based link + tracking (cloud mode)
+      if (CLOUD && ['approved', 'sent', 'won'].includes(q.status)) {
+        apiPost('/api/quotes/' + q.id + '/share', {}).then(d => {
+          if (d.error) { toast(d.error, 'bad'); return; }
+          // Copy link to clipboard
+          if (navigator.clipboard) navigator.clipboard.writeText(d.url).catch(() => {});
+          // Open WhatsApp
+          window.open(d.whatsapp, '_blank');
+          // Update local quote status if changed
+          if (q.status === 'approved') { q.status = 'sent'; q.sentAt = Date.now(); }
+          if (!q.shareToken) q.shareToken = d.token;
+          toast('📱 WhatsApp opened! Client link copied to clipboard.');
+        }).catch(() => {
+          // fallback to basic WhatsApp
+          const t = calcTotals(q);
+          const msg = encodeURIComponent(`*QUOTATION*\n*Quote No:* ${q.no}\n*Customer:* ${q.cust.name || '-'}\n*Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}`);
+          const phone = (q.cust.phone || '').replace(/\D/g, '');
+          window.open(phone ? `https://wa.me/${phone.length === 10 ? '91'+phone : phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`, '_blank');
+        });
+      } else {
+        const t = calcTotals(q);
+        const msg = encodeURIComponent(`*QUOTATION SUMMARY*\n\n*Company:* ${db.settings.company}\n*Quote No:* ${q.no}\n*Date:* ${fmtDate(q.date)}\n*Customer:* ${q.cust.name || '-'}\n*Project:* ${q.project || '-'}\n*Grand Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}\n\n*Prepared By:* ${userName(q.createdBy)}\nThank you for choosing ${db.settings.company}!`);
+        const phone = (q.cust.phone || '').replace(/\D/g, '');
+        const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
+        window.open(url, '_blank');
+      }
+    };
+    // Share link (copy shareable client link)
+    ACT.shareLink = b => {
+      const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
+      if (!CLOUD) { toast('Share links require cloud mode.', 'bad'); return; }
+      if (!['approved', 'sent', 'won'].includes(q.status)) { toast('Approve the quote first.', 'bad'); return; }
+      apiPost('/api/quotes/' + q.id + '/share', {}).then(d => {
+        if (d.error) { toast(d.error, 'bad'); return; }
+        if (!q.shareToken) { q.shareToken = d.token; }
+        if (q.status === 'approved') { q.status = 'sent'; q.sentAt = Date.now(); }
+        modal({
+          title: '🔗 Client Share Link',
+          noFooter: true,
+          body: `<div style="margin:12px 0">
+            <div class="mute sm" style="margin-bottom:8px">Send this link to your client. They can view and accept the quotation online:</div>
+            <div style="display:flex;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:12px">
+              <code style="flex:1;word-break:break-all;font-size:0.85rem">${esc(d.url)}</code>
+              <button class="btn sm pri" onclick="navigator.clipboard&&navigator.clipboard.writeText('${d.url}').then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Copy'},1500)}).catch(()=>{})">Copy</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a href="${d.whatsapp}" target="_blank" class="btn pri" style="color:#fff;text-decoration:none">📱 Open in WhatsApp</a>
+              <a href="${d.url}" target="_blank" class="btn" style="text-decoration:none">👁 Preview client view</a>
+            </div>
+            <div class="mute sm" style="margin-top:12px">✅ View count and acceptance status will appear on the quote page and dashboard.</div>
+          </div>`
+        });
+        toast('Client link ready!');
+      }).catch(() => toast('Could not generate share link.', 'bad'));
     };
 
     /* ========== customers ========== */
@@ -2536,15 +2649,15 @@
     /* ========== rate library ========== */
     let rateTab = 'products';
     function viewRates() {
-      const m = $('#main'), ed = isMgr();
-      m.innerHTML = `<div class="ph"><div><h1>Rate library</h1><div class="mute">${ed ? 'Rates and profiles set here are copied into new quotes. Changing them later does not alter existing quotes.' : 'Read only. A manager or admin can change rates and profiles.'}</div></div></div>
+      const m = $('#main'), ed = canEditRates() && canWrite();
+      m.innerHTML = `<div class="ph"><div><h1>Rate library</h1><div class="mute">${ed ? 'Rates and profiles set here are copied into new quotes. Changing them later does not alter existing quotes.' : 'Read only. Manager, MD or authorised roles can change rates and profiles.'}</div></div></div>
   <div class="note" style="margin-bottom:14px">The products, items, profiles and rates here are sample entries. Replace them with your own rates before sending quotations.</div>
   <div class="chips" style="margin-bottom:14px">${[['products', 'Windows, doors and facades'], ['items', 'BOQ items'], ['profiles', 'Profiles (Aluminium & uPVC)'], ['options', 'Glass and finish options']].map(([k, t]) => `<button class="chip ${rateTab === k ? 'on' : ''}" data-act="rtab" data-t="${k}">${t}</button>`).join('')}</div><div id="rbody"></div>`;
       drawRates();
     }
     ACT.rtab = b => { rateTab = b.dataset.t; viewRates() };
     function drawRates() {
-      const ed = isMgr(), b = $('#rbody');
+      const ed = canEditRates() && canWrite(), b = $('#rbody');
       if (rateTab === 'products') {
         b.innerHTML = `<div class="card"><div class="card-h"><h3>Size-based products (rate per sq ft)</h3>${ed ? '<button class="btn pri sm" data-act="prodEdit">Add product</button>' : ''}</div><div class="scx"><table class="tbl"><thead><tr><th>Product</th><th>Type</th><th class="r">Rate / sq ft</th><th class="r">Min area</th>${ed ? '<th class="r">Cost / sq ft</th><th></th>' : ''}</tr></thead><tbody>${db.products.map(p => `<tr><td><b>${esc(p.name)}</b><div class="mute sm">${esc(p.desc)}</div></td><td>${esc(GLYPHS[p.glyph] || '')}</td><td class="r">${rs(p.rate)}</td><td class="r">${p.minArea ? inr(p.minArea) + ' sq ft' : '-'}</td>${ed ? `<td class="r">${p.cost ? rs(p.cost) : '-'}</td><td class="r nowrap"><button class="btn sm" data-act="prodEdit" data-id="${p.id}">Edit</button> <button class="btn sm bad" data-act="prodDel" data-id="${p.id}">Delete</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="6"><div class="empty">No products yet.</div></td></tr>`}</tbody></table></div></div>`;
       } else if (rateTab === 'items') {
@@ -2678,31 +2791,211 @@
     /* ========== users ========== */
     function viewUsers() {
       const m = $('#main');
-      m.innerHTML = `<div class="ph"><div><h1>Users</h1><div class="mute">Admin: everything. Manager: approves quotes, edits rates, sees all quotes. Sales: creates quotes and sees only their own.</div></div><div class="acts"><button class="btn pri" data-act="userEdit">Add user</button></div></div>
-  <div class="card" style="padding:6px 10px"><div class="scx"><table class="tbl"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>${db.users.map(u => `<tr><td><b>${esc(u.name)}</b></td><td>${esc(u.username)}</td><td>${ROLES[u.role]}</td><td>${u.active ? 'Active' : '<span class="mute">Switched off</span>'}</td><td class="r nowrap"><button class="btn sm" data-act="userEdit" data-id="${u.id}">Edit</button> <button class="btn sm" data-act="userPw" data-id="${u.id}">Reset password</button></td></tr>`).join('')}</tbody></table></div></div>`;
+      m.innerHTML = `<div class="ph">
+        <div>
+          <h1>Team &amp; Job Roles</h1>
+          <div class="mute">Configure user job roles (MD, Manager, Accounts, Sales, Admin) and permissions (Read &amp; Write, Only Read, Only Write).</div>
+        </div>
+        <div class="acts">
+          <button class="btn pri" data-act="userEdit">+ Add User</button>
+        </div>
+      </div>
+      <div class="card" style="padding:6px 10px">
+        <div class="scx">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Username</th>
+                <th>Job Role</th>
+                <th>Access Level</th>
+                <th>Permissions</th>
+                <th>Status</th>
+                <th class="r">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${db.users.map(u => {
+                const roleBadge = u.role === 'md' ? '<span class="bd" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d">🎖️ MD</span>' :
+                                  u.role === 'manager' ? '<span class="bd" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd">👔 Manager</span>' :
+                                  u.role === 'accounts' ? '<span class="bd" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0">💳 Accounts</span>' :
+                                  u.role === 'admin' ? '<span class="bd" style="background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff">⚙️ Admin</span>' :
+                                  u.role === 'master' ? '<span class="bd" style="background:#ffe4e6;color:#9f1239;border:1px solid #fecdd3">👑 Master</span>' :
+                                  '<span class="bd" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1">💼 Sales</span>';
+
+                const access = u.access || (u.role === 'sales' ? 'wo' : 'rw');
+                const accessBadge = access === 'rw' ? '<span class="bd approved" style="font-size:0.75rem">✏️ Read &amp; Write</span>' :
+                                    access === 'ro' ? '<span class="bd" style="background:#fef3c7;color:#b45309;font-size:0.75rem">👁️ Only Read</span>' :
+                                    '<span class="bd" style="background:#e0e7ff;color:#4338ca;font-size:0.75rem">📝 Only Write</span>';
+
+                const perms = [];
+                if (u.role === 'master' || u.role === 'admin' || u.role === 'md') perms.push('All Access');
+                else {
+                  if (u.canApprove || u.role === 'manager') perms.push('Approve');
+                  if (u.canPayments || u.role === 'accounts') perms.push('Payments');
+                  if (u.canRates || u.role === 'manager') perms.push('Rates');
+                  if (u.canMargin || u.role === 'manager') perms.push('Margins');
+                  if (u.canSettings) perms.push('Settings');
+                }
+                const permsHtml = perms.length ? perms.map(p => `<span class="chip on" style="font-size:0.72rem;padding:2px 7px;margin:1px">${p}</span>`).join(' ') : '<span class="mute sm">Standard</span>';
+
+                return `<tr>
+                  <td><b>${esc(u.name)}</b></td>
+                  <td><code>${esc(u.username)}</code></td>
+                  <td>${roleBadge}</td>
+                  <td>${accessBadge}</td>
+                  <td>${permsHtml}</td>
+                  <td>${u.active ? '<span class="bd approved">Active</span>' : '<span class="mute">Switched off</span>'}</td>
+                  <td class="r nowrap">
+                    <button class="btn sm" data-act="userEdit" data-id="${u.id}">Edit</button>
+                    <button class="btn sm" data-act="userPw" data-id="${u.id}">Password</button>
+                    ${u.id !== me.id ? `<button class="btn sm bad" data-act="userDel" data-id="${u.id}">Delete</button>` : ''}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
     }
     ACT.userPw = b => pwModal(db.users.find(x => x.id === b.dataset.id), false);
+    ACT.userDel = b => {
+      const u = db.users.find(x => x.id === b.dataset.id);
+      if (!u) return;
+      if (u.id === me.id) { toast('You cannot delete your own account.', 'bad'); return; }
+      confirmBox(`Delete user ${esc(u.name)} (${esc(u.username)})?`, () => {
+        db.users = db.users.filter(x => x.id !== u.id);
+        persist(true);
+        viewUsers();
+        toast('User deleted.');
+      }, 'Delete', 'bad');
+    };
     ACT.userEdit = b => {
-      const u = b.dataset.id ? db.users.find(x => x.id === b.dataset.id) : { name: '', username: '', role: 'sales', active: true }, isNew = !b.dataset.id;
+      const u = b.dataset.id ? db.users.find(x => x.id === b.dataset.id) : {
+        name: '',
+        username: '',
+        role: 'sales',
+        access: 'rw',
+        canApprove: false,
+        canPayments: false,
+        canRates: false,
+        canMargin: false,
+        canSettings: false,
+        active: true
+      }, isNew = !b.dataset.id;
+
+      const curRole = u.role || 'sales';
+      const curAccess = u.access || 'rw';
+
       modal({
-        title: isNew ? 'Add user' : 'Edit user', body: `<div class="grid"><label class="f"><span>Name</span><input name="name" value="${esc(u.name)}"></label>
-   <label class="f"><span>Username</span><input name="username" value="${esc(u.username)}" autocapitalize="none"></label>
-   ${isNew ? '<label class="f"><span>Password (at least 6 characters)</span><input name="pw" type="password"></label>' : ''}
-   <label class="f"><span>Role</span><select name="role">${opt(Object.keys(ROLES), u.role, k => [k, ROLES[k]])}</select></label>
-   <label class="chk"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}> Account is active</label></div>`,
+        title: isNew ? '👤 Add User &amp; Assign Permissions' : '👤 Edit User &amp; Permissions',
+        wide: true,
+        body: `<div class="grid g2">
+          <label class="f" style="grid-column:1/-1"><span>Full Name *</span><input name="name" value="${esc(u.name)}" placeholder="e.g. Rajesh Kumar" required></label>
+          <label class="f"><span>Username *</span><input name="username" value="${esc(u.username)}" autocapitalize="none" placeholder="e.g. rajesh" required></label>
+          ${isNew ? '<label class="f"><span>Password (min 6 characters) *</span><input name="pw" type="password" placeholder="••••••" required></label>' : '<label class="f"><span>Password</span><input type="text" value="(Unchanged - use Reset Password to modify)" disabled></label>'}
+          
+          <label class="f"><span>Job Role *</span>
+            <select name="role" id="userRoleSelect">
+              <option value="md" ${curRole === 'md' ? 'selected' : ''}>🎖️ Managing Director (MD)</option>
+              <option value="manager" ${curRole === 'manager' ? 'selected' : ''}>👔 Manager</option>
+              <option value="accounts" ${curRole === 'accounts' ? 'selected' : ''}>💳 Accounts &amp; Finance</option>
+              <option value="sales" ${curRole === 'sales' ? 'selected' : ''}>💼 Sales Executive</option>
+              <option value="admin" ${curRole === 'admin' ? 'selected' : ''}>⚙️ Company Admin</option>
+            </select>
+          </label>
+
+          <label class="f"><span>Permission Access Level *</span>
+            <select name="access" id="userAccessSelect">
+              <option value="rw" ${curAccess === 'rw' ? 'selected' : ''}>✏️ Read &amp; Write (Full create &amp; edit)</option>
+              <option value="ro" ${curAccess === 'ro' ? 'selected' : ''}>👁️ Only Read (View-only mode)</option>
+              <option value="wo" ${curAccess === 'wo' ? 'selected' : ''}>📝 Only Write (Draft creation only)</option>
+            </select>
+          </label>
+
+          <div style="grid-column:1/-1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:6px">
+            <div style="font-weight:600;font-size:0.95rem;margin-bottom:8px">🔐 Granular Permission Capabilities</div>
+            <div class="grid g2">
+              <label class="chk"><input type="checkbox" name="canApprove" id="p_canApprove" ${u.canApprove || ['md', 'manager', 'admin'].includes(curRole) ? 'checked' : ''}> <b>Can Finalise &amp; Approve Quotes</b><div class="mute sm" style="margin-left:22px">Authorise quotes exceeding discount limits</div></label>
+              <label class="chk"><input type="checkbox" name="canPayments" id="p_canPayments" ${u.canPayments || ['md', 'manager', 'accounts', 'admin'].includes(curRole) ? 'checked' : ''}> <b>Can Record &amp; Manage Payments</b><div class="mute sm" style="margin-left:22px">Enter receipts, milestones &amp; track balances</div></label>
+              <label class="chk"><input type="checkbox" name="canRates" id="p_canRates" ${u.canRates || ['md', 'manager', 'admin'].includes(curRole) ? 'checked' : ''}> <b>Can Edit Rate Library &amp; Profiles</b><div class="mute sm" style="margin-left:22px">Change square foot rates, profiles &amp; hardware</div></label>
+              <label class="chk"><input type="checkbox" name="canMargin" id="p_canMargin" ${u.canMargin || ['md', 'manager', 'admin'].includes(curRole) ? 'checked' : ''}> <b>Can View Internal Profit Margins</b><div class="mute sm" style="margin-left:22px">Inspect cost vs revenue &amp; profit margins</div></label>
+              <label class="chk" style="grid-column:1/-1"><input type="checkbox" name="canSettings" id="p_canSettings" ${u.canSettings || ['md', 'admin'].includes(curRole) ? 'checked' : ''}> <b>Can Edit Company Settings &amp; Bank Details</b><div class="mute sm" style="margin-left:22px">Manage company GST, address, bank accounts &amp; templates</div></label>
+            </div>
+          </div>
+
+          <label class="chk" style="grid-column:1/-1;margin-top:4px"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}> Account is active (enabled for login)</label>
+        </div>`,
         onOk: async el => {
           const d = formData(el); d.username = d.username.trim().toLowerCase();
-          if (!d.name.trim() || !d.username) { toast('Enter a name and username.', 'bad'); return false }
-          if (db.users.some(x => x.username === d.username && x !== u)) { toast('That username is taken.', 'bad'); return false }
-          if (isNew && (d.pw || '').length < 6) { toast('Password must be at least 6 characters.', 'bad'); return false }
-          const admins = db.users.filter(x => x.role === 'admin' && x.active && x !== u).length;
-          if (!isNew && (d.role !== 'admin' || !d.active) && u.role === 'admin' && !admins) { toast('Keep at least one active admin.', 'bad'); return false }
-          if (u === me && !d.active) { toast('You cannot switch off your own account.', 'bad'); return false }
-          if (isNew) { const salt = uid(); db.users.push({ id: uid(), name: d.name.trim(), username: d.username, salt, pass: await hashPw(d.pw, salt), role: d.role, active: d.active }) }
-          else Object.assign(u, { name: d.name.trim(), username: d.username, role: d.role, active: d.active });
-          persist(true); renderApp()
+          if (!d.name.trim() || !d.username) { toast('Enter a name and username.', 'bad'); return false; }
+          if (db.users.some(x => x.username === d.username && x !== u)) { toast('That username is taken.', 'bad'); return false; }
+          if (isNew && (d.pw || '').length < 6) { toast('Password must be at least 6 characters.', 'bad'); return false; }
+          const admins = db.users.filter(x => (x.role === 'admin' || x.role === 'md') && x.active && x !== u).length;
+          if (!isNew && (d.role !== 'admin' && d.role !== 'md' || !d.active) && (u.role === 'admin' || u.role === 'md') && !admins) { toast('Keep at least one active admin or MD.', 'bad'); return false; }
+          if (u === me && !d.active) { toast('You cannot switch off your own account.', 'bad'); return false; }
+
+          const payload = {
+            name: d.name.trim(),
+            username: d.username,
+            role: d.role,
+            access: d.access || 'rw',
+            canApprove: !!d.canApprove,
+            canPayments: !!d.canPayments,
+            canRates: !!d.canRates,
+            canMargin: !!d.canMargin,
+            canSettings: !!d.canSettings,
+            active: !!d.active
+          };
+
+          if (isNew) {
+            const salt = uid();
+            db.users.push({
+              id: uid(),
+              ...payload,
+              salt,
+              pass: await hashPw(d.pw, salt)
+            });
+          } else {
+            Object.assign(u, payload);
+          }
+          persist(true);
+          renderApp();
+          toast(isNew ? 'User created with permissions! 🎉' : 'User updated! ✅');
         }
       });
+
+      // Role selection auto-preset trigger
+      setTimeout(() => {
+        const sel = document.getElementById('userRoleSelect');
+        if (sel) {
+          sel.onchange = () => {
+            const r = sel.value;
+            const ca = document.getElementById('p_canApprove');
+            const cp = document.getElementById('p_canPayments');
+            const cr = document.getElementById('p_canRates');
+            const cm = document.getElementById('p_canMargin');
+            const cs = document.getElementById('p_canSettings');
+            const acc = document.getElementById('userAccessSelect');
+            if (r === 'md') {
+              if (ca) ca.checked = true; if (cp) cp.checked = true; if (cr) cr.checked = true; if (cm) cm.checked = true; if (cs) cs.checked = true;
+              if (acc) acc.value = 'rw';
+            } else if (r === 'manager') {
+              if (ca) ca.checked = true; if (cp) cp.checked = true; if (cr) cr.checked = true; if (cm) cm.checked = true; if (cs) cs.checked = false;
+              if (acc) acc.value = 'rw';
+            } else if (r === 'accounts') {
+              if (ca) ca.checked = false; if (cp) cp.checked = true; if (cr) cr.checked = false; if (cm) cm.checked = false; if (cs) cs.checked = true;
+              if (acc) acc.value = 'rw';
+            } else if (r === 'sales') {
+              if (ca) ca.checked = false; if (cp) cp.checked = false; if (cr) cr.checked = false; if (cm) cm.checked = false; if (cs) cs.checked = false;
+              if (acc) acc.value = 'rw';
+            } else if (r === 'admin') {
+              if (ca) ca.checked = true; if (cp) cp.checked = true; if (cr) cr.checked = true; if (cm) cm.checked = true; if (cs) cs.checked = true;
+              if (acc) acc.value = 'rw';
+            }
+          };
+        }
+      }, 50);
     };
 
     /* ========== settings ========== */
@@ -2798,7 +3091,8 @@
   <div class="card" id="set2"><h3>Approval rules</h3><div class="grid">
    <label class="f"><span>When is manager approval needed?</span><select name="approvalMode">${opt(['rules', 'always', 'never'], s.approvalMode, k => [k, { rules: 'When a rule below is crossed', always: 'Always', never: 'Never' }[k]])}</select></label>
    <div class="grid g2"><label class="f"><span>Total at or above (${'₹'})</span><input name="approvalAbove" type="number" value="${s.approvalAbove}"></label>
-   <label class="f"><span>Overall discount above (%)</span><input name="maxDisc" type="number" step="any" value="${s.maxDisc}"></label></div>
+   <label class="f"><span>Overall discount above (%)</span><input name="maxDisc" type="number" step="any" value="${s.maxDisc}"></label>
+   <label class="f"><span>Minimum margin % (warn below this)</span><input name="minMarginPct" type="number" step="any" value="${s.minMarginPct || 15}" placeholder="e.g. 15"></label></div>
    <div class="mute sm">Managers and admins can finalise their own quotes without approval.</div></div></div>
   <div class="card" id="set3"><h3>Defaults for new quotations</h3><div class="grid">
    <label class="f"><span>Payment schedule (one per line: label | percent)</span><textarea name="pay" rows="4">${esc(s.pay.map(p => p.label + ' | ' + p.pct).join('\n'))}</textarea></label>
@@ -2807,7 +3101,8 @@
   <div class="card" id="set4"><h3>Bank details (printed on the quotation if filled)</h3><div class="grid g2">
    <label class="f"><span>Account name</span><input name="b_acName" value="${esc(s.bank.acName)}"></label><label class="f"><span>Bank</span><input name="b_bank" value="${esc(s.bank.bank)}"></label>
    <label class="f"><span>Account number</span><input name="b_acNo" value="${esc(s.bank.acNo)}"></label><label class="f"><span>IFSC</span><input name="b_ifsc" value="${esc(s.bank.ifsc)}"></label>
-   <label class="f"><span>Branch</span><input name="b_branch" value="${esc(s.bank.branch)}"></label></div></div></div>
+   <label class="f"><span>Branch</span><input name="b_branch" value="${esc(s.bank.branch)}"></label>
+   <label class="f"><span>UPI ID (for QR code on printouts)</span><input name="b_upiId" value="${esc(s.bank.upiId || '')}" placeholder="e.g. yourshop@okaxis"></label></div></div></div>
   <div>
   <div class="card"><h3>Letterhead (Full Page Banner Mode)</h3><div class="mute sm" style="margin-bottom:8px">Used when Header Layout is set to &ldquo;Full Letterhead Image&rdquo;.</div>
    <div class="sm" style="font-weight:500">Header</div>
@@ -2953,7 +3248,9 @@
         pay,
         terms: c.terms.trim()
       });
-      s.bank = { acName: d.b_acName, bank: d.b_bank, acNo: d.b_acNo, ifsc: d.b_ifsc, branch: d.b_branch };
+      s.bank = { acName: d.b_acName, bank: d.b_bank, acNo: d.b_acNo, ifsc: d.b_ifsc, branch: d.b_branch, upiId: (d.b_upiId || '').trim() };
+      // Minimum margin setting
+      try { const e2b = g('#set2'); if (e2b.minMarginPct !== undefined) s.minMarginPct = num(e2b.minMarginPct) || 15; } catch(e_){}
       // Signature & Seal settings
       try {
         const e5 = g('#set5');
@@ -3047,6 +3344,28 @@
       }[t] || '<rect class="gf" x="6" y="6" width="32" height="32"/><rect class="gg" x="10" y="10" width="24" height="24"/>';
       return `<svg class="glyph" width="${s}" height="${s}" viewBox="0 0 44 44" aria-hidden="true">${body}</svg>`;
     }
+    // ── Live SVG window/door preview ──────────────────────────────────────────
+    function windowSvg({ type = 'slider', w = 1200, h = 1200 } = {}) {
+      const maxW = 180, maxH = 140;
+      const s = Math.min(maxW / Math.max(w, 1), maxH / Math.max(h, 1));
+      const W = w * s, H = h * s, f = 5;
+      const glassColor = '#cfe8f1', glassColor2 = '#e3f2f8';
+      let inner = '';
+      if (type === 'slider' || type === 'sliding') {
+        const pw = (W - 2 * f) / 2 + 3;
+        inner = `<rect x="${f}" y="${f}" width="${pw}" height="${H - 2*f}" fill="${glassColor}" stroke="#5a7f8c" stroke-width="1"/><rect x="${W-f-pw}" y="${f}" width="${pw}" height="${H - 2*f}" fill="${glassColor2}" stroke="#5a7f8c" stroke-width="1"/><path d="M${W*.3} ${H/2} h${W*.13} m-5 -4 l5 4 l-5 4" stroke="#2a6080" fill="none" stroke-width="1.2"/>`;
+      } else if (type === 'casement') {
+        inner = `<rect x="${f}" y="${f}" width="${W-2*f}" height="${H-2*f}" fill="${glassColor}" stroke="#5a7f8c" stroke-width="1"/><path d="M${f} ${f} L${W-f} ${H/2} L${f} ${H-f}" stroke="#2a6080" fill="none" stroke-dasharray="4 3" stroke-width="1"/>`;
+      } else if (type === 'door') {
+        inner = `<rect x="${f}" y="${f}" width="${W-2*f}" height="${H-2*f}" fill="#d4bfa0" stroke="#8b6347" stroke-width="1"/><rect x="${f+4}" y="${f+4}" width="${(W-2*f-8)*0.9}" height="${(H-2*f-8)*0.4}" fill="none" stroke="#8b6347" stroke-width="0.8"/><rect x="${f+4}" y="${f+4+(H-2*f-8)*0.45}" width="${(W-2*f-8)*0.9}" height="${(H-2*f-8)*0.5}" fill="none" stroke="#8b6347" stroke-width="0.8"/><circle cx="${W-f-8}" cy="${H/2}" r="2" fill="#8b6347"/>`;
+      } else {
+        inner = `<rect x="${f}" y="${f}" width="${W-2*f}" height="${H-2*f}" fill="${glassColor}" stroke="#5a7f8c" stroke-width="1"/><line x1="${f+8}" y1="${H-f-8}" x2="${W-f-8}" y2="${f+8}" stroke="#8ab8cc" stroke-width="1"/>`;
+      }
+      const label = w > 0 && h > 0 ? `<text x="${W/2}" y="-6" text-anchor="middle" font-size="10" fill="#2a6080" font-family="sans-serif">${w} × ${h} mm</text>` : '';
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -18 ${W+8} ${H+22}" width="${W+8}" height="${H+22}" style="display:block">
+        <rect width="${W}" height="${H}" fill="#9aa5ad" stroke="#445" stroke-width="1.5" rx="1"/>${inner}${label}
+      </svg>`;
+    }
 
     /* ========== quote editor ========== */
     let Q = null;
@@ -3060,10 +3379,10 @@
   ${q.status === 'rejected' && q.reviewNote ? `<div class="note" style="margin-bottom:14px;background:var(--bad-l);border-color:#e3b4b4"><b>Rejected:</b> ${esc(q.reviewNote)}</div>` : ''}
   <div class="qg"><div><fieldset class="fs" ${ro ? 'disabled' : ''}>
    <div class="card"><h3>Customer and project</h3><div id="custCard"></div></div>
-   <div class="card"><div class="card-h"><h3>Items and pricing</h3><div class="acts"><button class="btn sm" data-act="searchHistoryItems">🔍 Rate History Search</button><button class="btn sm pri" data-act="addSize">Add window, door or facade</button><button class="btn sm" data-act="addBoq">Add BOQ item</button><button class="btn sm" data-act="addSec">Add heading</button></div></div>
+   <div class="card"><div class="card-h"><h3>Items and pricing</h3><div class="acts"><button class="btn sm" data-act="aiDraftQuote" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:0;font-weight:600">✨ AI Assistant</button><button class="btn sm" data-act="searchHistoryItems">🔍 Rate History Search</button><button class="btn sm pri" data-act="addSize">Add window, door or facade</button><button class="btn sm" data-act="addBoq">Add BOQ item</button><button class="btn sm" data-act="addSec">Add heading</button></div></div>
     <div class="grid g2" style="margin-bottom:12px"><label class="f"><span>Sizes are entered in</span><select data-q="dimUnit"><option value="mm" ${q.dimUnit === 'mm' ? 'selected' : ''}>Millimetres (mm)</option><option value="ft" ${q.dimUnit === 'ft' ? 'selected' : ''}>Feet (ft)</option><option value="in" ${q.dimUnit === 'in' ? 'selected' : ''}>Inches (in)</option><option value="m" ${q.dimUnit === 'm' ? 'selected' : ''}>Metres (m)</option></select></label></div>
     <div id="lines"></div>
-    <div class="acts" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:8px"><button class="btn sm" data-act="searchHistoryItems">🔍 Rate History Search</button><button class="btn sm pri" data-act="addSize">+ Add window, door or facade</button><button class="btn sm" data-act="addBoq">+ Add BOQ item</button><button class="btn sm" data-act="addSec">+ Add heading</button></div></div>
+    <div class="acts" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:8px"><button class="btn sm" data-act="aiDraftQuote" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:0;font-weight:600">✨ AI Assistant</button><button class="btn sm" data-act="searchHistoryItems">🔍 Rate History Search</button><button class="btn sm pri" data-act="addSize">+ Add window, door or facade</button><button class="btn sm" data-act="addBoq">+ Add BOQ item</button><button class="btn sm" data-act="addSec">+ Add heading</button></div></div>
    <div class="card"><h3>Extra charges</h3><div class="mute sm" style="margin-bottom:8px">Transport, installation, scaffolding and similar. Added before GST.</div><div id="extras"></div><button class="btn sm" data-act="addExtra">Add charge</button></div>
    <div class="card"><h3>Payment schedule</h3><div id="pays"></div><button class="btn sm" data-act="addPay">Add stage</button></div>
    <div class="card"><h3>Terms and notes</h3><div class="grid">
@@ -3087,10 +3406,66 @@
       <label class="f" style="grid-column:1/-1"><span>GST tax option</span><select data-q="gstType"><option value="auto" ${(!q.gstType || q.gstType === 'auto') ? 'selected' : ''}>Auto (Place of supply vs state)</option><option value="igst" ${q.gstType === 'igst' ? 'selected' : ''}>IGST (Interstate)</option><option value="cgst_sgst" ${q.gstType === 'cgst_sgst' ? 'selected' : ''}>CGST + SGST (Intrastate)</option></select></label></div></fieldset>
     <div id="totbox"></div></div>
    <div id="aprBox"></div><div id="mgnBox"></div>
+   <div id="paymentBox"></div>
    <div class="card"><h3>Revisions</h3><ul class="hist" id="revs"></ul></div>
    <div class="card"><h3>Activity</h3><ul class="hist" id="logs"></ul></div></aside></div>`;
       drawCustCard(); drawLines(); drawExtras(); drawPays(); drawActs(); refreshCalc(); drawSide();
+      // Load payment tracking (cloud mode)
+      if (CLOUD) loadPayments(q.id);
     }
+    // Payment tracking
+    async function loadPayments(qId) {
+      const box = $('#paymentBox'); if (!box) return;
+      try {
+        const q = db.quotes.find(x => x.id === qId); if (!q) return;
+        const d = await apiGet('/api/quotes/' + qId + '/payments');
+        const t = calcTotals(q); const grand = t.grand;
+        const paid = d.paid || 0;
+        const balance = grand - paid;
+        const pctPaid = grand > 0 ? Math.min(100, (paid / grand * 100)) : 0;
+        box.innerHTML = `<div class="card"><h3>💳 Payment Tracking</h3>
+          <div style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;font-size:0.9rem;margin-bottom:4px">
+              <span>Received: <b style="color:var(--ok)">${rs(paid, 0)}</b></span>
+              <span>Balance: <b style="color:${balance > 0 ? 'var(--bad)' : 'var(--ok)'}">${rs(balance, 0)}</b></span>
+            </div>
+            <div style="height:8px;background:var(--line2);border-radius:4px;overflow:hidden">
+              <div style="height:100%;background:${pctPaid >= 100 ? 'var(--ok)' : 'var(--glass)'};width:${pctPaid}%;transition:width .4s"></div>
+            </div>
+            <div class="mute sm" style="margin-top:4px">${pctPaid.toFixed(0)}% of ${rs(grand, 0)} received</div>
+          </div>
+          ${(d.payments || []).length ? `<div class="scx" style="max-height:180px;overflow-y:auto">${d.payments.map(p => `<div style="padding:5px 0;border-bottom:1px solid var(--line2);font-size:0.85rem"><b>${rs(p.amount, 0)}</b> · ${esc(p.mode || 'Cash')} · ${esc(p.milestone || '-')}<div class="mute" style="font-size:0.78rem">${p.receivedOn} ${p.reference ? '· Ref: ' + esc(p.reference) : ''}</div></div>`).join('')}</div>` : '<div class="mute sm">No payments recorded yet.</div>'}
+          ${['won', 'sent', 'approved'].includes(q.status) ? `<button class="btn sm pri" style="margin-top:10px;width:100%" data-act="recordPayment" data-id="${qId}">+ Record Payment</button>` : ''}
+        </div>`;
+      } catch(e) { /* payment panel hidden on error */ }
+    }
+    ACT.recordPayment = b => {
+      if (!canManagePayments()) { toast('You do not have permission to record payments.', 'bad'); return; }
+      const qId = b.dataset.id, q = db.quotes.find(x => x.id === qId); if (!q) return;
+      const t = calcTotals(q);
+      modal({
+        title: '💳 Record a Payment',
+        body: `<div class="grid g2">
+          <label class="f" style="grid-column:1/-1"><span>Milestone / Stage</span><select name="milestone">
+            ${(q.pay || []).map(p => `<option>${esc(p.label)}</option>`).join('')}
+            <option value="Full Payment">Full Payment</option>
+            <option value="Advance">Advance</option>
+            <option value="Other">Other</option>
+          </select></label>
+          <label class="f"><span>Amount (₹)</span><input name="amount" type="number" step="any" min="0" placeholder="e.g. 50000"></label>
+          <label class="f"><span>Payment mode</span><select name="mode"><option>UPI</option><option>NEFT/RTGS</option><option>Cheque</option><option>Cash</option><option>Card</option></select></label>
+          <label class="f" style="grid-column:1/-1"><span>Reference / UTR / Cheque no. (optional)</span><input name="reference" placeholder="e.g. UTR12345678"></label>
+        </div>`,
+        onOk: async el => {
+          const d = formData(el);
+          if (!d.amount || isNaN(parseFloat(d.amount))) { toast('Enter a valid amount.', 'bad'); return false; }
+          try {
+            await apiPost('/api/quotes/' + qId + '/payments', d);
+            toast('Payment recorded! ✅'); loadPayments(qId);
+          } catch(e) { toast('Could not save payment.', 'bad'); return false; }
+        }
+      });
+    };
     function drawCustCard() {
       const q = Q, c = q.cust;
       $('#custCard').innerHTML = `<div class="grid g2">
@@ -3112,7 +3487,7 @@
    <label class="f" style="grid-column:1/-1"><span>Introduction</span><textarea data-q="intro" rows="3">${esc(q.intro)}</textarea></label></div>`;
     }
     function lineHTML(l, i, n) {
-      const mg = isMgr(), num_ = Q.lines.slice(0, i + 1).filter(x => x.type !== 'section').length;
+      const mg = canViewMargin(), num_ = Q.lines.slice(0, i + 1).filter(x => x.type !== 'section').length;
       const ctr = `<div class="ln-c"><button class="btn ghost sm" data-act="lnUp" title="Move up" ${i === 0 ? 'disabled' : ''}>&uarr;</button><button class="btn ghost sm" data-act="lnDown" title="Move down" ${i === n - 1 ? 'disabled' : ''}>&darr;</button><button class="btn ghost sm" data-act="lnDup" title="Duplicate">Copy</button><button class="btn ghost sm bad" data-act="lnDel" title="Delete">Delete</button></div>`;
       if (l.type === 'section') return `<div class="ln sec" data-lid="${l.id}"><div class="ln-h"><input ${gl(l, 'title')} value="${esc(l.title)}" placeholder="Heading, for example Ground floor" style="flex:1;min-width:160px">${ctr}</div></div>`;
       if (l.type === 'boq') return `<div class="ln" data-lid="${l.id}"><div class="ln-h"><span class="ln-n">${num_}</span><span class="mute sm">BOQ item</span><span class="sp"></span>${ctr}</div><div class="ln-b one"><div class="ln-f">
@@ -3128,7 +3503,7 @@
       const gs = db.settings.glass, fs = db.settings.finish;
       const gopts = (arr, cur) => (arr.some(o => o.name === cur) || !cur ? '' : `<option value="-1" selected>${esc(cur)} (not in list)</option>`) + arr.map((o, k) => `<option value="${k}" ${o.name === cur ? 'selected' : ''}>${esc(o.name)}${o.add ? ' (+' + o.add + ')' : ''}</option>`).join('');
       return `<div class="ln" data-lid="${l.id}"><div class="ln-h"><span class="ln-n">${num_}</span><input class="tag" ${gl(l, 'tag')} value="${esc(l.tag)}" placeholder="Mark, e.g. W1" aria-label="Mark"><input class="loc" ${gl(l, 'loc')} value="${esc(l.loc)}" placeholder="Location, e.g. Master bedroom" aria-label="Location">${ctr}</div>
-   <div class="ln-b"><div>${glyph(l.glyph)}</div><div class="ln-f">
+   <div class="ln-b"><div style="display:flex;flex-direction:column;align-items:center;min-width:64px;gap:6px">${glyph(l.glyph)}<div id="svgprev_${l.id}" style="margin-top:4px">${num(l.w) > 0 && num(l.h) > 0 ? windowSvg({type: l.glyph || 'slider', w: num(l.w), h: num(l.h), maxW: 100, maxH: 75}) : ''}</div></div><div class="ln-f">
     <label class="f s6"><span>Item</span><input ${gl(l, 'name')} value="${esc(l.name)}"></label>
     <label class="f s6"><span>Specification (printed on the quotation)</span><textarea rows="2" ${gl(l, 'spec')}>${esc(l.spec)}</textarea></label>
     <label class="f"><span>Width</span><input type="number" step="any" min="0" ${gl(l, 'w', 'n')} value="${l.w}"></label>
@@ -3170,7 +3545,14 @@
       const t = calcTotals(Q); $('#totbox').innerHTML = totHTML(t);
       const rs_ = ['draft', 'rejected'].includes(Q.status) ? approvalReasons(Q) : null, box = $('#aprBox');
       box.innerHTML = rs_ === null ? '' : (rs_.length ? `<div class="note" style="margin-bottom:16px"><b>${isMgr() ? 'Approval rule crossed' : 'Needs manager approval'}</b><br>${rs_.map(esc).join('<br>')}${isMgr() ? '<br><span class="mute">You can finalise it yourself.</span>' : ''}</div>` : `<div class="mute sm" style="margin-bottom:16px">No approval needed for this quote.</div>`);
-      $('#mgnBox').innerHTML = isMgr() && t.margin ? `<div class="card"><h3>Margin (internal)</h3><div class="sm">On lines with a cost entered: <b>${rs(t.margin.amt, 0)}</b> on ${rs(t.margin.rev, 0)} (<b>${t.margin.pct.toFixed(1)}%</b>)</div><div class="mute sm" style="margin-top:4px">Overall discount: ${t.effDisc.toFixed(1)}%</div></div>` : '';
+      $('#mgnBox').innerHTML = canViewMargin() && t.margin ? `<div class="card"><h3>Margin (internal)</h3><div class="sm">On lines with a cost entered: <b>${rs(t.margin.amt, 0)}</b> on ${rs(t.margin.rev, 0)} (<b style="color:${t.margin.pct >= (db.settings.minMarginPct || 15) ? 'var(--ok)' : 'var(--bad)'};font-size:1.1em">${t.margin.pct.toFixed(1)}%</b>)</div>${t.margin.pct < (db.settings.minMarginPct || 15) ? `<div class="note" style="margin-top:8px;background:var(--warn-l)">⚠️ Margin below minimum ${db.settings.minMarginPct || 15}%. Manager approval may be required.</div>` : ''}<div class="mute sm" style="margin-top:4px">Overall discount: ${t.effDisc.toFixed(1)}%</div></div>` : '';
+      // Update SVG previews live as user types width/height
+      Q.lines.forEach(l => {
+        if (l.type === 'size') {
+          const el = $(`#svgprev_${l.id}`);
+          if (el) el.innerHTML = num(l.w) > 0 && num(l.h) > 0 ? windowSvg({type: l.glyph || 'fixed', w: num(l.w), h: num(l.h)}) : '<span class="mute sm">Enter width &amp; height to see preview</span>';
+        }
+      });
     }
     function drawSide() {
       const grp = db.quotes.filter(x => x.groupId === Q.groupId).sort((a, b) => a.rev - b.rev);
@@ -3186,13 +3568,15 @@
     }
     function drawActs() {
       const q = Q, b = (a, t, c) => `<button class="btn ${c || ''}" data-act="${a}">${t}</button>`; let h = '';
-      if (['draft', 'rejected'].includes(q.status) && canEdit(q)) h += b('submit', isMgr() ? 'Finalise' : 'Submit for approval', 'pri') + b('delQuote', 'Delete', 'bad');
-      if (q.status === 'pending') { if (isMgr()) h += b('approve', 'Approve', 'pri') + b('reject', 'Reject', 'bad'); if (q.createdBy === me.id || isMgr()) h += b('withdraw', 'Withdraw to draft') }
-      if (q.status === 'approved') h += b('markSent', 'Mark as sent', 'pri');
-      if (q.status === 'sent') h += b('markWon', 'Mark won', 'pri') + b('markLost', 'Mark lost');
-      if ((q.status === 'won' || q.status === 'lost') && isMgr()) h += b('reopen', 'Reopen as sent');
-      if (['approved', 'sent', 'won', 'lost'].includes(q.status) && !q.superseded) h += b('revise', 'Create revision');
-      h += b('preview', 'Preview and print') + b('copyQuote', 'Copy as new quote');
+      if (['draft', 'rejected'].includes(q.status) && canEdit(q)) h += b('submit', canApprove() ? 'Finalise' : 'Submit for approval', 'pri') + b('delQuote', 'Delete', 'bad');
+      if (q.status === 'pending') { if (canApprove()) h += b('approve', 'Approve', 'pri') + b('reject', 'Reject', 'bad'); if (q.createdBy === me.id || canApprove()) h += b('withdraw', 'Withdraw to draft') }
+      if (q.status === 'approved' && canWrite()) h += b('markSent', 'Mark as sent', 'pri');
+      if (q.status === 'sent' && canWrite()) h += b('markWon', 'Mark won', 'pri') + b('markLost', 'Mark lost');
+      if ((q.status === 'won' || q.status === 'lost') && canApprove()) h += b('reopen', 'Reopen as sent');
+      if (['approved', 'sent', 'won', 'lost'].includes(q.status) && !q.superseded && canWrite()) h += b('revise', 'Create revision');
+      h += b('preview', 'Preview and print');
+      if (canWrite()) h += b('copyQuote', 'Copy as new quote');
+      if (CLOUD && ['approved', 'sent', 'won'].includes(q.status)) h += `<button class="btn" data-act="shareLink" data-id="${q.id}" style="color:var(--glass);border-color:var(--glass)">🔗 Share with Client</button>`;
       $('#topActs').innerHTML = h;
     }
 
@@ -3310,6 +3694,57 @@
     }
     const lineIdx = b => Q.lines.findIndex(l => l.id === b.closest('[data-lid]').dataset.lid);
     Object.assign(ACT, {
+      aiDraftQuote() {
+        if (!Q) return;
+        modal({
+          title: '✨ AI Quote Assistant',
+          wide: true,
+          body: `<div style="margin-bottom:12px">
+            <div class="mute sm" style="margin-bottom:8px">Describe or paste your customer requirements. AI will identify quantities, dimensions and window/door profiles and match them against your catalogue:</div>
+            <textarea id="aiInputText" rows="5" placeholder="e.g. 12 sliding windows 1500x1200, 4 casement doors 900x2100 and 2 fixed panels 1000x1200 with 5mm clear glass" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid var(--line);border-radius:6px;font-family:inherit;font-size:0.95rem"></textarea>
+            <div class="mute sm" style="margin-top:8px">💡 Supports millimeter (1500x1200) or feet (5x4 ft). Types detected: sliding, casement, fixed, door.</div>
+          </div>`,
+          okText: '✨ Generate & Add Items',
+          onOk: async el => {
+            const txt = ($('#aiInputText') && $('#aiInputText').value || '').trim();
+            if (!txt) { toast('Please enter customer requirements.', 'bad'); return false; }
+            toast('Drafting items with AI...', '');
+            try {
+              const res = await apiPost('/api/ai/draft-items', { text: txt });
+              if (!res || !res.length) { toast('Could not identify any items.', 'bad'); return false; }
+              res.forEach(item => {
+                Q.lines.push({
+                  id: uid(),
+                  type: 'size',
+                  glyph: item.glyph || 'slider',
+                  name: item.name || 'Window',
+                  spec: item.spec || '',
+                  tag: '',
+                  loc: '',
+                  w: item.w || 1200,
+                  h: item.h || 1200,
+                  qty: item.qty || 1,
+                  rate: item.rate || 450,
+                  cost: item.cost || 0,
+                  disc: 0,
+                  glassName: db.settings.glass && db.settings.glass[0] ? db.settings.glass[0].name : '',
+                  finishName: db.settings.finish && db.settings.finish[0] ? db.settings.finish[0].name : '',
+                  hw: 0,
+                  minArea: item.minArea || 0
+                });
+              });
+              touch();
+              drawLines();
+              refreshCalc();
+              toast(`Added ${res.length} item${res.length > 1 ? 's' : ''} to quotation! ✨`);
+              return true;
+            } catch(e) {
+              toast('AI drafting failed.', 'bad');
+              return false;
+            }
+          }
+        });
+      },
       addSize() { picker('size') }, addBoq() { picker('boq') },
       addSec() { addLine({ id: uid(), type: 'section', title: '' }) },
       lnUp(b) { const i = lineIdx(b); if (i > 0) { [Q.lines[i - 1], Q.lines[i]] = [Q.lines[i], Q.lines[i - 1]]; touch(); drawLines(); refreshCalc() } },
@@ -3643,7 +4078,7 @@
     ${t.round ? `<tr><td>Round off</td><td class="r">${t.round > 0 ? '+' : '&minus;'}${rs(Math.abs(t.round))}</td></tr>` : ''}
     <tr class="gt"><td>Grand total</td><td class="r">${rs(t.grand)}</td></tr></table></div>
    ${pays.length ? `<h4>Payment schedule</h4><table class="doc-pay"><tbody>${pays.map(p => `<tr><td>${esc(p.label)}</td><td class="r">${num(p.pct)}%</td><td class="r">${rs(t.grand * num(p.pct) / 100, 0)}</td></tr>`).join('')}</tbody></table>` : ''}
-   ${hasBank ? `<h4>Bank details</h4><div class="doc-bank">${[b.acName && 'Account name: ' + esc(b.acName), b.bank && 'Bank: ' + esc(b.bank), b.acNo && 'A/C no.: ' + esc(b.acNo), b.ifsc && 'IFSC: ' + esc(b.ifsc), b.branch && 'Branch: ' + esc(b.branch)].filter(Boolean).join(' &nbsp;|&nbsp; ')}</div>` : ''}
+   ${hasBank ? `<h4>Bank details</h4><div class="doc-bank">${[b.acName && 'Account name: ' + esc(b.acName), b.bank && 'Bank: ' + esc(b.bank), b.acNo && 'A/C no.: ' + esc(b.acNo), b.ifsc && 'IFSC: ' + esc(b.ifsc), b.branch && 'Branch: ' + esc(b.branch)].filter(Boolean).join(' &nbsp;|&nbsp; ')}${b.upiId ? `<div style="display:flex;align-items:center;gap:12px;margin-top:8px"><div><b>UPI:</b> ${esc(b.upiId)}</div><canvas id="upiQrCanvas" width="90" height="90" style="border:1px solid #eee;border-radius:4px"></canvas></div><script>try{const cv=document.getElementById('upiQrCanvas');if(cv&&typeof QRCode!=='undefined'){const uri='upi://pay?pa='+encodeURIComponent('${esc(b.upiId)}')+'&pn='+encodeURIComponent('${esc(s.company||'')}')+'&cu=INR&tn='+encodeURIComponent('${esc(q.no||'')} advance');QRCode.toCanvas(cv,uri,{width:90,margin:1});}}catch(e){}<\/script>` : ''}</div>` : ''}
    ${terms.length ? `<h4>Terms and conditions</h4><ol>${terms.map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
    ${q.notes ? `<h4>Notes</h4><div>${nl2(q.notes)}</div>` : ''}
    <div class="doc-sign">
@@ -3676,10 +4111,21 @@
     <div>${s.isoStandard ? esc(s.isoStandard) : ''}</div>
   </div>` : '')}</td></tr></tfoot></table>`;
     }
+    function renderDocQr(q) {
+      const cv = document.getElementById('upiQrCanvas');
+      const b = (db && db.settings && db.settings.bank) || {};
+      if (cv && b.upiId && typeof QRCode !== 'undefined') {
+        const t = calcTotals(q);
+        const advance = (q.pay && q.pay.length) ? Math.round(t.grand * (num(q.pay[0].pct) || 50) / 100) : t.grand;
+        const uri = `upi://pay?pa=${encodeURIComponent(b.upiId)}&pn=${encodeURIComponent((db.settings && db.settings.company) || 'Company')}&am=${advance}&cu=INR&tn=${encodeURIComponent((q.no || 'Quote') + ' Advance')}`;
+        QRCode.toCanvas(cv, uri, { width: 90, margin: 1 }, () => {});
+      }
+    }
     function previewQuote(q) {
       const p = $('#preview');
       p.innerHTML = `<div class="pv-bar"><button class="btn sm" data-act="closePreview">Close</button><button class="btn sm pri" data-act="printNow">Print or save as PDF</button><small>In the print window choose &ldquo;Save as PDF&rdquo; and turn off &ldquo;Headers and footers&rdquo;.</small></div><div class="sheet doc">${docHTML(q)}</div>`;
       p.classList.add('on'); p.scrollTop = 0; document.body.style.overflow = 'hidden';
+      setTimeout(() => renderDocQr(q), 50);
     }
     ACT.closePreview = () => { $('#preview').classList.remove('on'); $('#preview').innerHTML = ''; document.body.style.overflow = '' };
     ACT.printNow = () => window.print();
