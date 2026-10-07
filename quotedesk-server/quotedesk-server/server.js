@@ -4,14 +4,83 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { MongoClient } = require('mongodb');
+
+// Load local .env if present
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  try {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    lines.forEach(l => {
+      const line = l.trim();
+      if (line && !line.startsWith('#') && line.includes('=')) {
+        const idx = line.indexOf('=');
+        const k = line.slice(0, idx).trim();
+        const v = line.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
+        if (!process.env[k]) process.env[k] = v;
+      }
+    });
+  } catch (e) {}
+}
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'quotedesk.json');
 const SESS_FILE = path.join(DATA_DIR, 'sessions.json');
+const MONGODB_URI = process.env.MONGODB_URI || '';
 
 // Ensure data directory exists
 fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// ── Cloud Database State ─────────────────────────────────────────────────────
+let mongoClient = null;
+let mongoDb = null;
+let mongoConnected = false;
+let memoryDb = null;
+let memorySessions = null;
+
+async function initMongo() {
+  if (!MONGODB_URI) {
+    console.log('[Storage] Running in LOCAL file storage mode (data/quotedesk.json)');
+    return;
+  }
+  try {
+    console.log('[Storage] Connecting to MongoDB Atlas cloud database...');
+    mongoClient = new MongoClient(MONGODB_URI, {
+      serverSelectionTimeoutMS: 6000,
+      connectTimeoutMS: 8000,
+    });
+    await mongoClient.connect();
+    mongoDb = mongoClient.db(process.env.MONGODB_DBNAME || 'quotedesk');
+    mongoConnected = true;
+    console.log('✅ [Storage] Successfully connected to MongoDB Atlas Cloud Database!');
+
+    // Initialize data from Cloud or seed local to cloud
+    const cloudDoc = await mongoDb.collection('app_data').findOne({ _id: 'quotedesk_main' });
+    if (cloudDoc && cloudDoc.data) {
+      memoryDb = cloudDoc.data;
+      // also keep local replica updated
+      try { fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb), 'utf8'); } catch (e) {}
+      console.log('[Storage] Loaded latest client data from Cloud Database.');
+    } else {
+      // If cloud is empty but local exists, migrate local to cloud
+      const local = readJson(DB_FILE, null);
+      if (local) {
+        memoryDb = local;
+        await mongoDb.collection('app_data').updateOne(
+          { _id: 'quotedesk_main' },
+          { $set: { _id: 'quotedesk_main', data: local, updatedAt: new Date() } },
+          { upsert: true }
+        );
+        console.log('[Storage] Migrated existing local data to MongoDB Cloud Database!');
+      }
+    }
+  } catch (err) {
+    mongoConnected = false;
+    console.error('⚠️ [Storage] MongoDB connection warning:', err.message);
+    console.log('[Storage] Falling back to local file storage.');
+  }
+}
 
 // ── cyrb fallback hash (matches client) ──────────────────────────────────────
 function cyrbHash(str) {
@@ -26,20 +95,45 @@ function cyrbHash(str) {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
 }
 
-// ── JSON file storage ────────────────────────────────────────────────────────
+// ── Hybrid JSON / Cloud Storage ──────────────────────────────────────────────
 function readJson(file, def) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch (e) { return def; }
 }
 function writeJson(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data), 'utf8');
+  try { fs.writeFileSync(file, JSON.stringify(data), 'utf8'); } catch (e) {}
 }
 
-function getDb() { return readJson(DB_FILE, null); }
-function saveDb(data) { writeJson(DB_FILE, data); }
+function getDb() {
+  if (memoryDb) return memoryDb;
+  memoryDb = readJson(DB_FILE, null);
+  return memoryDb;
+}
 
-function getSessions() { return readJson(SESS_FILE, {}); }
-function saveSessions(s) { writeJson(SESS_FILE, s); }
+function saveDb(data) {
+  memoryDb = data;
+  // Always write local file backup
+  writeJson(DB_FILE, data);
+  // Persist to MongoDB Cloud if connected
+  if (mongoConnected && mongoDb) {
+    mongoDb.collection('app_data').updateOne(
+      { _id: 'quotedesk_main' },
+      { $set: { _id: 'quotedesk_main', data: data, updatedAt: new Date() } },
+      { upsert: true }
+    ).catch(err => console.error('[Storage] Cloud sync error:', err.message));
+  }
+}
+
+function getSessions() {
+  if (memorySessions) return memorySessions;
+  memorySessions = readJson(SESS_FILE, {});
+  return memorySessions;
+}
+
+function saveSessions(s) {
+  memorySessions = s;
+  writeJson(SESS_FILE, s);
+}
 
 // ── session helpers ───────────────────────────────────────────────────────────
 function genToken() { return crypto.randomBytes(32).toString('hex'); }
@@ -162,9 +256,25 @@ app.get('/api/me', auth, (req, res) => {
   res.json({ userId: req.userId });
 });
 
+// Cloud status
+app.get('/api/cloud-status', (req, res) => {
+  res.json({
+    ok: true,
+    cloud: mongoConnected,
+    mode: mongoConnected ? 'MongoDB Atlas (Free Cloud Database)' : 'Local File Storage',
+    mongoConfigured: !!MONGODB_URI
+  });
+});
+
 // Serve app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`QuoteDesk running on http://localhost:${PORT}`));
+// Initialize Cloud DB and start server
+initMongo().then(() => {
+  app.listen(PORT, () => console.log(`QuoteDesk running on http://localhost:${PORT}`));
+}).catch(err => {
+  console.error('[Startup Error]', err);
+  app.listen(PORT, () => console.log(`QuoteDesk running on http://localhost:${PORT}`));
+});

@@ -1492,7 +1492,7 @@
     }
 
     .doc-header-clean {
-      border-bottom: 2px solid #1b2a2f;
+      border-bottom: 2px solid var(--doc-header-bg, #1b2a2f);
       padding: 8px 0 6px;
       margin-bottom: 6px;
     }
@@ -1500,7 +1500,7 @@
     .doc-hdr-title {
       font-size: 15pt;
       font-weight: 700;
-      color: #1b2a2f;
+      color: var(--doc-header-bg, #1b2a2f);
       letter-spacing: 0.5px;
     }
 
@@ -1508,6 +1508,95 @@
       font-size: 8.5pt;
       color: #4a5d63;
       margin-top: 2px;
+    }
+
+    /* Modern Corporate Quotation Header */
+    .doc-hdr-modern {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2.5px solid var(--doc-header-bg, #1b2a2f);
+      padding: 8px 0 10px;
+      margin-bottom: 12px;
+      gap: 16px;
+    }
+    .doc-hdr-left {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      flex: 1;
+    }
+    .doc-logo-img {
+      max-height: 80px;
+      max-width: 140px;
+      object-fit: contain;
+      align-self: center;
+    }
+    .doc-hdr-company {
+      font-size: 15pt;
+      font-weight: 800;
+      color: var(--doc-header-bg, #1b2a2f);
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+    }
+    .doc-hdr-tagline {
+      font-size: 8.5pt;
+      font-style: italic;
+      color: var(--doc-accent, #2a7880);
+      margin-top: 2px;
+      margin-bottom: 3px;
+      font-weight: 600;
+    }
+    .doc-hdr-address {
+      font-size: 8pt;
+      color: #334155;
+      line-height: 1.35;
+      margin-top: 2px;
+    }
+    .doc-hdr-contacts {
+      font-size: 7.5pt;
+      color: #475569;
+      margin-top: 3px;
+      line-height: 1.3;
+    }
+    .doc-hdr-regs {
+      font-size: 7.5pt;
+      color: #0f172a;
+      margin-top: 3px;
+    }
+    .doc-hdr-iso {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      min-width: 110px;
+      max-width: 150px;
+      padding-left: 12px;
+      border-left: 1px dashed #cbd5e1;
+      align-self: center;
+    }
+    .doc-iso-badge {
+      max-height: 52px;
+      max-width: 90px;
+      object-fit: contain;
+      margin-bottom: 3px;
+    }
+    .doc-iso-txt {
+      font-size: 7pt;
+      color: #1e293b;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .doc-ftr-modern {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #cbd5e1;
+      padding-top: 6px;
+      font-size: 7.5pt;
+      color: #64748b;
+      margin-top: 8px;
     }
 
     .doc-ftr-clean {
@@ -1918,7 +2007,12 @@
       const I = (cat, desc, unit, rate) => ({ id: uid(), category: cat, desc, unit, rate, cost: 0 });
       return {
         settings: {
-          company: '', gstin: '', state: 'Tamil Nadu', prefix: 'QT/Q', validity: 30, gstRate: 18,
+          company: '', tagline: '', logoImg: '',
+          address1: '', address2: '', city: '', state: 'Tamil Nadu', pincode: '',
+          phone: '', mobile: '', email: '', billingEmail: '', website: '',
+          gstin: '', pan: '', msme: '', cin: '',
+          isoStandard: '', isoCertNo: '', isoBody: '', isoImg: '',
+          prefix: 'QT/Q', validity: 30, gstRate: 18, headerStyle: 'modern',
           approvalMode: 'rules', approvalAbove: 500000, maxDisc: 10, terms: DEF_TERMS, pay: DEF_PAY,
           bank: { acName: '', bank: '', acNo: '', ifsc: '', branch: '' }, headerImg: '', footerImg: '',
           authorisedDefault: 'Managing Director', authorisedTitleDefault: 'Authorised Signatory',
@@ -2614,15 +2708,93 @@
     /* ========== settings ========== */
     function viewSettings() {
       const s = db.settings, m = $('#main');
-      m.innerHTML = `<div class="ph"><div><h1>Settings</h1></div><div class="acts"><button class="btn pri" data-act="saveSettings">Save settings</button></div></div>
+      m.innerHTML = `<div class="ph"><div><h1>Settings</h1><div class="mute sm">Configure your company identity, address, contact details, ISO certifications, and cloud storage.</div></div><div class="acts"><button class="btn pri" data-act="saveSettings">Save settings</button></div></div>
   <div class="two"><div>
-  <div class="card" id="set1"><h3>Company and numbering</h3><div class="grid g2">
-   <label class="f"><span>Company name (used for signature)</span><input name="company" value="${esc(s.company)}"></label>
-   <label class="f"><span>GSTIN</span><input name="gstin" value="${esc(s.gstin)}"></label>
-   <label class="f"><span>Company state (decides CGST + SGST or IGST)</span><select name="state">${opt(STATES, s.state)}</select></label>
-   <label class="f"><span>Quote number prefix</span><input name="prefix" value="${esc(s.prefix)}"></label>
-   <label class="f"><span>Default validity (days)</span><input name="validity" type="number" value="${s.validity}"></label>
-   <label class="f"><span>Default GST rate (%)</span><input name="gstRate" type="number" step="any" value="${s.gstRate}"></label></div></div>
+
+  <!-- 1. Company Profile & Logo -->
+  <div class="card" id="set1">
+    <h3>Company Profile &amp; Branding</h3>
+    <div class="grid g2">
+      <label class="f"><span>Company name (used for signature &amp; quotes)</span><input name="company" value="${esc(s.company)}" placeholder="e.g. Crescent Technobuild Pvt Ltd" required></label>
+      <label class="f"><span>Tagline / Slogan</span><input name="tagline" value="${esc(s.tagline || '')}" placeholder="e.g. Architectural Facades &amp; High Performance Glazing"></label>
+      <label class="f"><span>Quote number prefix</span><input name="prefix" value="${esc(s.prefix || 'QT/Q')}"></label>
+      <label class="f"><span>Default validity (days)</span><input name="validity" type="number" value="${s.validity || 30}"></label>
+      <label class="f"><span>Default GST rate (%)</span><input name="gstRate" type="number" step="any" value="${s.gstRate || 18}"></label>
+      <label class="f"><span>Quotation Header Layout</span>
+        <select name="headerStyle">
+          <option value="modern" ${(s.headerStyle !== 'letterhead' && s.headerStyle !== 'minimal') ? 'selected' : ''}>Modern Corporate (Logo + Full Address + ISO Badge)</option>
+          <option value="letterhead" ${s.headerStyle === 'letterhead' ? 'selected' : ''}>Full Letterhead Image (Pre-printed banner mode)</option>
+          <option value="minimal" ${s.headerStyle === 'minimal' ? 'selected' : ''}>Minimalist Text</option>
+        </select>
+      </label>
+    </div>
+    
+    <div style="margin-top:14px;border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--bg)">
+      <div class="sm" style="font-weight:600;margin-bottom:4px">Company Official Logo</div>
+      <div class="mute sm" style="margin-bottom:8px">High-resolution logo (transparent PNG, JPEG, SVG). Appears on your modern quotation headers and printouts.</div>
+      ${s.logoImg ? `<img src="${s.logoImg}" alt="Company Logo" style="max-height:85px;max-width:200px;object-fit:contain;border:1px dashed var(--line);border-radius:4px;margin-bottom:8px;background:#fff;padding:6px;display:block">` : `<div class="mute sm" style="padding:10px;background:#fff;border:1px dashed var(--line);border-radius:4px;margin-bottom:8px;text-align:center">No company logo uploaded.</div>`}
+      <div class="acts">
+        <button class="btn sm pri" data-act="imgUp" data-k="logoImg">${s.logoImg ? 'Change Company Logo' : 'Upload Company Logo'}</button>
+        ${s.logoImg ? `<button class="btn sm bad" data-act="imgReset" data-k="logoImg">Remove Logo</button>` : ''}
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Company Address Details -->
+  <div class="card" id="set_addr">
+    <h3>Registered Office &amp; Works Address</h3>
+    <div class="mute sm" style="margin-bottom:10px">Printed automatically on quotation headers, footer, and tax documents.</div>
+    <div class="grid">
+      <label class="f"><span>Address Line 1 (Building, Door / Plot No, Street)</span><input name="address1" value="${esc(s.address1 || '')}" placeholder="e.g. Plot No. 42, Industrial Estate Phase-II"></label>
+      <label class="f"><span>Address Line 2 (Area, Landmark, Road)</span><input name="address2" value="${esc(s.address2 || '')}" placeholder="e.g. Near Tech Park, Guindy"></label>
+      <div class="grid g3">
+        <label class="f"><span>City / District</span><input name="city" value="${esc(s.city || '')}" placeholder="e.g. Chennai"></label>
+        <label class="f"><span>State (decides CGST+SGST or IGST)</span><select name="state">${opt(STATES, s.state)}</select></label>
+        <label class="f"><span>PIN / Postal Code</span><input name="pincode" value="${esc(s.pincode || '')}" placeholder="e.g. 600032"></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Contact Details & Web Links -->
+  <div class="card" id="set_contact">
+    <h3>Contact Details &amp; Online Presence</h3>
+    <div class="grid g2">
+      <label class="f"><span>Office Landline / Phone</span><input name="phone" value="${esc(s.phone || '')}" placeholder="e.g. +91 44 2234 5678"></label>
+      <label class="f"><span>Mobile / WhatsApp Number</span><input name="mobile" value="${esc(s.mobile || '')}" placeholder="e.g. +91 98765 43210"></label>
+      <label class="f"><span>Official Email (Quotation / Inquiries)</span><input name="email" type="email" value="${esc(s.email || '')}" placeholder="e.g. sales@company.com"></label>
+      <label class="f"><span>Billing / Accounts Email (Optional)</span><input name="billingEmail" type="email" value="${esc(s.billingEmail || '')}" placeholder="e.g. accounts@company.com"></label>
+      <label class="f" style="grid-column:span 2"><span>Company Website Link</span><input name="website" value="${esc(s.website || '')}" placeholder="e.g. https://www.company.com"></label>
+    </div>
+  </div>
+
+  <!-- 4. Government Registrations & ISO Certifications -->
+  <div class="card" id="set_cert">
+    <h3>Tax, Registrations &amp; ISO Certifications</h3>
+    <div class="grid g2">
+      <label class="f"><span>GSTIN</span><input name="gstin" value="${esc(s.gstin || '')}" placeholder="e.g. 33AAAAA0000A1Z5"></label>
+      <label class="f"><span>PAN Number</span><input name="pan" value="${esc(s.pan || '')}" placeholder="e.g. ABCDE1234F"></label>
+      <label class="f"><span>MSME / Udyam Reg. Number</span><input name="msme" value="${esc(s.msme || '')}" placeholder="e.g. UDYAM-TN-02-0001234"></label>
+      <label class="f"><span>CIN / Company Registration No.</span><input name="cin" value="${esc(s.cin || '')}" placeholder="e.g. U74999TN2022PTC123456"></label>
+    </div>
+    
+    <div style="margin-top:14px;border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--bg)">
+      <div class="sm" style="font-weight:600;margin-bottom:6px">ISO Accreditation &amp; Quality Certifications</div>
+      <div class="grid g2">
+        <label class="f"><span>ISO Standard / Certification Title</span><input name="isoStandard" value="${esc(s.isoStandard || '')}" placeholder="e.g. ISO 9001:2015 Certified Company"></label>
+        <label class="f"><span>Certificate Number</span><input name="isoCertNo" value="${esc(s.isoCertNo || '')}" placeholder="e.g. QMS/2024/90123"></label>
+        <label class="f" style="grid-column:span 2"><span>Certifying Agency / Body (Optional)</span><input name="isoBody" value="${esc(s.isoBody || '')}" placeholder="e.g. TUV NORD / JAS-ANZ / UKAS"></label>
+      </div>
+      <div style="margin-top:10px">
+        <div class="mute sm" style="margin-bottom:6px">Upload ISO Logo / Certification Badge (PNG with transparent background):</div>
+        ${s.isoImg ? `<img src="${s.isoImg}" alt="ISO Badge" style="max-height:65px;max-width:130px;object-fit:contain;border:1px dashed var(--line);border-radius:4px;margin-bottom:8px;background:#fff;padding:4px;display:block">` : `<div class="mute sm" style="padding:8px;background:#fff;border:1px dashed var(--line);border-radius:4px;margin-bottom:8px;text-align:center">No ISO certificate badge uploaded.</div>`}
+        <div class="acts">
+          <button class="btn sm pri" data-act="imgUp" data-k="isoImg">${s.isoImg ? 'Change ISO Badge' : 'Upload ISO Badge'}</button>
+          ${s.isoImg ? `<button class="btn sm bad" data-act="imgReset" data-k="isoImg">Remove Badge</button>` : ''}
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="card" id="set2"><h3>Approval rules</h3><div class="grid">
    <label class="f"><span>When is manager approval needed?</span><select name="approvalMode">${opt(['rules', 'always', 'never'], s.approvalMode, k => [k, { rules: 'When a rule below is crossed', always: 'Always', never: 'Never' }[k]])}</select></label>
    <div class="grid g2"><label class="f"><span>Total at or above (${'₹'})</span><input name="approvalAbove" type="number" value="${s.approvalAbove}"></label>
@@ -2637,7 +2809,7 @@
    <label class="f"><span>Account number</span><input name="b_acNo" value="${esc(s.bank.acNo)}"></label><label class="f"><span>IFSC</span><input name="b_ifsc" value="${esc(s.bank.ifsc)}"></label>
    <label class="f"><span>Branch</span><input name="b_branch" value="${esc(s.bank.branch)}"></label></div></div></div>
   <div>
-  <div class="card"><h3>Letterhead</h3><div class="mute sm" style="margin-bottom:8px">Printed at the top and bottom of every page of the quotation.</div>
+  <div class="card"><h3>Letterhead (Full Page Banner Mode)</h3><div class="mute sm" style="margin-bottom:8px">Used when Header Layout is set to &ldquo;Full Letterhead Image&rdquo;.</div>
    <div class="sm" style="font-weight:500">Header</div>
    ${getHeaderImg() ? `<img src="${getHeaderImg()}" alt="Header" style="width:100%;max-height:120px;object-fit:contain;border:1px solid var(--line);border-radius:4px;margin:4px 0 8px">` : `<div class="mute sm" style="padding:10px;background:var(--bg);border:1px dashed var(--line);border-radius:4px;margin:4px 0 8px;text-align:center">No header image uploaded.</div>`}
    <div class="acts"><button class="btn sm pri" data-act="imgUp" data-k="headerImg">${getHeaderImg() ? 'Upload new header' : 'Upload header'}</button>${getHeaderImg() ? `<button class="btn sm bad" data-act="imgReset" data-k="headerImg">Remove</button>` : ''}</div>
@@ -2684,19 +2856,102 @@
      <label class="f"><span>Website sidebar / header colour</span><input type="color" name="headerColor" id="set_headerColor" value="${esc(s.headerColor || '#1b2a2f')}"></label>
      <label class="f"><span>Quotation document table header</span><input type="color" name="docColor" id="set_docColor" value="${esc(s.docColor || s.headerColor || '#1b2a2f')}"></label>
    </div></div>
-  <div class="card"><h3>Backup and restore</h3><div class="mute sm" style="margin-bottom:10px">Data is stored in this browser on this computer. Download a backup regularly and keep it somewhere safe.</div>
-   <div class="acts"><button class="btn" data-act="backup">Download backup</button><button class="btn" data-act="restore">Restore from backup</button><button class="btn bad" data-act="wipe">Erase all data</button></div></div></div></div>`;
+
+  <!-- 5. Cloud Database & Backup -->
+  <div class="card" id="set_cloud">
+    <h3>Cloud Database &amp; Data Safety (100% Free)</h3>
+    <div style="margin-bottom:12px;padding:12px;border-radius:6px;background:var(--bg);border:1px solid var(--line)">
+      <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px">
+        <span id="cloud_dot" style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#eab308"></span>
+        <span id="cloud_txt">Checking Cloud Database status...</span>
+      </div>
+      <div id="cloud_desc" class="mute sm" style="margin-top:6px;line-height:1.4">Connecting to server storage diagnostics...</div>
+    </div>
+    <div class="mute sm" style="margin-bottom:12px">
+      <b>Permanent Cloud Storage:</b> Client records and quotations are safely kept across server restarts when your free MongoDB Atlas URI is set. You can also download local JSON backups anytime.
+    </div>
+    <div class="acts">
+      <button class="btn" data-act="backup">Download backup (.json)</button>
+      <button class="btn" data-act="restore">Restore from backup</button>
+      <button class="btn bad" data-act="wipe">Erase all data</button>
+    </div>
+  </div>
+
+  </div></div>`;
+
+      // Check cloud database status
+      setTimeout(async () => {
+        try {
+          const res = await apiGet('/api/cloud-status');
+          const dot = $('#cloud_dot'), txt = $('#cloud_txt'), desc = $('#cloud_desc');
+          if (dot && txt && desc) {
+            if (res.cloud) {
+              dot.style.background = '#22c55e';
+              txt.textContent = 'Active: MongoDB Atlas Cloud Database (100% Free)';
+              desc.innerHTML = 'All your quotations, company settings, and client data are securely stored in the cloud forever.';
+            } else if (res.mongoConfigured) {
+              dot.style.background = '#f97316';
+              txt.textContent = 'Connecting to MongoDB Atlas Cloud...';
+              desc.innerHTML = 'MongoDB URI is configured. Checking cloud cluster responsiveness.';
+            } else {
+              dot.style.background = '#3b82f6';
+              txt.textContent = 'Active: Local Server Storage Mode';
+              desc.innerHTML = 'Data is currently saving to the local server. To enable <b>free cloud database</b>, add your free MongoDB Atlas connection string to your Render or server environment variables (<code>MONGODB_URI</code>).';
+            }
+          }
+        } catch(e) {
+          const dot = $('#cloud_dot'), txt = $('#cloud_txt'), desc = $('#cloud_desc');
+          if (dot && txt && desc) {
+            dot.style.background = '#10b981';
+            txt.textContent = 'Local Browser Storage Active';
+            desc.innerHTML = 'All quotes and customer data are safely saved in your browser and will download when backing up.';
+          }
+        }
+      }, 250);
     }
+
     ACT.saveSettings = () => {
       const s = db.settings, g = id => formData($(id));
-      const a = g('#set1'), b = g('#set2'), c = g('#set3'), d = g('#set4');
+      const a = g('#set1'), addr = g('#set_addr'), cont = g('#set_contact'), cert = g('#set_cert');
+      const b = g('#set2'), c = g('#set3'), d = g('#set4');
       if (!a.company.trim() || !a.prefix.trim()) { toast('Company name and prefix are required.', 'bad'); return }
       const pay = c.pay.split('\n').map(x => x.trim()).filter(Boolean).map(x => { const [l, p] = x.split('|'); return { label: l.trim(), pct: num(p) } });
       const tot = pay.reduce((x, p) => x + p.pct, 0);
       if (pay.length && Math.abs(tot - 100) > 0.001) { toast('Payment schedule adds up to ' + tot + '%. It must be 100%.', 'bad'); return }
+      
       Object.assign(s, {
-        company: a.company.trim(), gstin: a.gstin.trim().toUpperCase(), state: a.state, prefix: a.prefix.trim(), validity: num(a.validity) || 30, gstRate: num(a.gstRate),
-        approvalMode: b.approvalMode, approvalAbove: num(b.approvalAbove), maxDisc: num(b.maxDisc), pay, terms: c.terms.trim()
+        company: a.company.trim(),
+        tagline: (a.tagline || '').trim(),
+        prefix: a.prefix.trim(),
+        validity: num(a.validity) || 30,
+        gstRate: num(a.gstRate),
+        headerStyle: a.headerStyle || 'modern',
+
+        address1: (addr.address1 || '').trim(),
+        address2: (addr.address2 || '').trim(),
+        city: (addr.city || '').trim(),
+        state: addr.state || 'Tamil Nadu',
+        pincode: (addr.pincode || '').trim(),
+
+        phone: (cont.phone || '').trim(),
+        mobile: (cont.mobile || '').trim(),
+        email: (cont.email || '').trim(),
+        billingEmail: (cont.billingEmail || '').trim(),
+        website: (cont.website || '').trim(),
+
+        gstin: (cert.gstin || '').trim().toUpperCase(),
+        pan: (cert.pan || '').trim().toUpperCase(),
+        msme: (cert.msme || '').trim().toUpperCase(),
+        cin: (cert.cin || '').trim().toUpperCase(),
+        isoStandard: (cert.isoStandard || '').trim(),
+        isoCertNo: (cert.isoCertNo || '').trim(),
+        isoBody: (cert.isoBody || '').trim(),
+
+        approvalMode: b.approvalMode,
+        approvalAbove: num(b.approvalAbove),
+        maxDisc: num(b.maxDisc),
+        pay,
+        terms: c.terms.trim()
       });
       s.bank = { acName: d.b_acName, bank: d.b_bank, acNo: d.b_acNo, ifsc: d.b_ifsc, branch: d.b_branch };
       // Signature & Seal settings
@@ -2714,7 +2969,7 @@
         s.headerColor = e6.headerColor || '#1b2a2f';
         s.docColor = e6.docColor || s.headerColor;
       } catch(e_){}
-      persist(true); toast('Settings saved.'); applyThemeColors();
+      persist(true); toast('Settings saved successfully.'); applyThemeColors();
     };
     ACT.setPresetTheme = b => {
       const acc = b.dataset.acc, hdr = b.dataset.hdr, doc = b.dataset.doc;
@@ -2745,7 +3000,7 @@
         const file = f.files[0]; if (!file) return; const rd = new FileReader();
         rd.onload = () => {
           const im = new Image(); im.onload = () => {
-            const isTransparent = file.type === 'image/png' || k === 'sealImg' || k === 'signImg';
+            const isTransparent = file.type === 'image/png' || k === 'sealImg' || k === 'signImg' || k === 'logoImg' || k === 'isoImg';
             const sc = Math.min(1, 1600 / im.width), cv = document.createElement('canvas');
             cv.width = im.width * sc; cv.height = im.height * sc;
             const cx = cv.getContext('2d');
@@ -3354,7 +3609,24 @@
       const ftrImg = getFooterImg();
       const wmImg = db.settings.watermarkImg || '';
       return `${wmImg ? `<img class="wm" src="${wmImg}" alt="">` : ''}
-  <table class="pg doc"><thead><tr><td>${hdrImg ? `<img class="hd-img" src="${hdrImg}" alt="${esc(s.company)}">` : (s.company ? `<div class="doc-header-clean"><div class="doc-hdr-title">${esc(s.company)}</div>${s.gstin || s.state ? `<div class="doc-hdr-sub">${[s.gstin && 'GSTIN: ' + esc(s.gstin), s.state && 'State: ' + esc(s.state)].filter(Boolean).join(' &nbsp;|&nbsp; ')}</div>` : ''}</div>` : '')}</td></tr></thead>
+  <table class="pg doc"><thead><tr><td>${(s.headerStyle === 'letterhead' && hdrImg) ? `<img class="hd-img" src="${hdrImg}" alt="${esc(s.company)}">` : (s.company ? `
+  <div class="doc-hdr-modern">
+    <div class="doc-hdr-left">
+      ${s.logoImg ? `<img class="doc-logo-img" src="${s.logoImg}" alt="Company Logo">` : ''}
+      <div style="flex:1">
+        <div class="doc-hdr-company">${esc(s.company)}</div>
+        ${s.tagline ? `<div class="doc-hdr-tagline">${esc(s.tagline)}</div>` : ''}
+        ${(s.address1 || s.city || s.state) ? `<div class="doc-hdr-address">${[s.address1, s.address2, s.city, s.state && (s.state + (s.pincode ? ' - ' + s.pincode : ''))].filter(Boolean).map(esc).join(', ')}</div>` : ''}
+        ${(s.phone || s.mobile || s.email || s.website) ? `<div class="doc-hdr-contacts">${[s.phone && 'Tel: ' + esc(s.phone), s.mobile && 'Mob: ' + esc(s.mobile), s.email && 'Email: ' + esc(s.email), s.website && 'Web: ' + esc(s.website)].filter(Boolean).join(' &nbsp;|&nbsp; ')}</div>` : ''}
+        ${(s.gstin || s.pan || s.msme || s.cin) ? `<div class="doc-hdr-regs">${[s.gstin && '<b>GSTIN:</b> ' + esc(s.gstin), s.pan && '<b>PAN:</b> ' + esc(s.pan), s.msme && '<b>MSME:</b> ' + esc(s.msme), s.cin && '<b>CIN:</b> ' + esc(s.cin)].filter(Boolean).join(' &nbsp;&bull;&nbsp; ')}</div>` : ''}
+      </div>
+    </div>
+    ${(s.isoStandard || s.isoImg) ? `
+    <div class="doc-hdr-iso">
+      ${s.isoImg ? `<img src="${s.isoImg}" class="doc-iso-badge" alt="ISO Certification">` : ''}
+      ${s.isoStandard ? `<div class="doc-iso-txt"><b>${esc(s.isoStandard)}</b>${s.isoCertNo ? `<br><small>Cert No: ${esc(s.isoCertNo)}</small>` : ''}</div>` : ''}
+    </div>` : ''}
+  </div>` : '')}</td></tr></thead>
   <tbody><tr><td>
    <div class="doc-title"><div><h1>QUOTATION</h1>${draft ? `<span class="stamp">DRAFT, NOT APPROVED</span>` : ''}</div>
     <table class="doc-info"><tr><td>Quotation no.</td><td><b>${esc(q.no)}</b></td></tr><tr><td>Date</td><td>${fmtDate(q.date)}</td></tr><tr><td>Valid until</td><td>${fmtDate(exp)}</td></tr>${q.rev ? `<tr><td>Revision</td><td>${q.rev}</td></tr>` : ''}</table></div>
@@ -3397,7 +3669,12 @@
      </div>` : ''}
    </div>
   </td></tr></tbody>
-  <tfoot><tr><td>${ftrImg ? `<img class="ft-img" src="${ftrImg}" alt="">` : (s.company ? `<div class="doc-ftr-clean">${esc(s.company)} &bull; Ref: ${esc(q.no)}</div>` : '')}</td></tr></tfoot></table>`;
+  <tfoot><tr><td>${(s.headerStyle === 'letterhead' && ftrImg) ? `<img class="ft-img" src="${ftrImg}" alt="">` : (s.company ? `
+  <div class="doc-ftr-modern">
+    <div><b>${esc(s.company)}</b> &bull; Quotation Ref: <b>${esc(q.no)}</b></div>
+    <div>${[s.email, s.website, s.phone || s.mobile].filter(Boolean).map(esc).join(' &nbsp;|&nbsp; ')}</div>
+    <div>${s.isoStandard ? esc(s.isoStandard) : ''}</div>
+  </div>` : '')}</td></tr></tfoot></table>`;
     }
     function previewQuote(q) {
       const p = $('#preview');
