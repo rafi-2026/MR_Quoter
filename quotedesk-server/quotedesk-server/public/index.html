@@ -114,14 +114,15 @@
     }
 
     .side-nav {
-      background: var(--ink);
+      background: linear-gradient(160deg, #0d2137 0%, #1a3a52 40%, #0e4a4a 100%);
       color: #d6e2e4;
       display: flex;
       flex-direction: column;
       padding: 18px 0;
       position: sticky;
       top: 0;
-      height: 100vh
+      height: 100vh;
+      box-shadow: 3px 0 15px rgba(0,0,0,.3)
     }
 
     .brand {
@@ -129,22 +130,23 @@
       gap: 10px;
       align-items: center;
       padding: 0 18px 18px;
-      border-bottom: 1px solid rgba(255, 255, 255, .1)
+      border-bottom: 1px solid rgba(255, 255, 255, .15)
     }
 
     .mono {
-      width: 38px;
-      height: 38px;
-      border-radius: 5px;
-      background: var(--bronze);
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #f4a04a, #e07020);
       color: #fff;
       display: grid;
       place-items: center;
       font-family: "IBM Plex Sans Condensed", sans-serif;
-      font-weight: 600;
-      font-size: 1.15rem;
+      font-weight: 700;
+      font-size: 1.2rem;
       flex: none;
-      overflow: hidden
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(244,160,74,.4)
     }
 
     .mono img {
@@ -157,13 +159,14 @@
     .brand b {
       display: block;
       color: #fff;
-      font-size: .98rem;
-      line-height: 1.2
+      font-size: 1rem;
+      line-height: 1.2;
+      letter-spacing: .02em
     }
 
     .brand span {
-      font-size: .78rem;
-      color: #8fa6ab
+      font-size: .75rem;
+      color: #a8c8ce
     }
 
     .nav {
@@ -174,28 +177,34 @@
     .nav a {
       display: flex;
       align-items: center;
-      padding: .55rem .8rem;
-      border-radius: 5px;
-      color: #c4d3d6;
+      padding: .55rem .85rem;
+      border-radius: 7px;
+      color: #b8d4d8;
       text-decoration: none;
-      margin-bottom: 2px;
-      border-left: 3px solid transparent
+      margin-bottom: 3px;
+      border-left: 3px solid transparent;
+      transition: all .18s ease;
+      font-size: .92rem
     }
 
     .nav a:hover {
-      background: rgba(255, 255, 255, .06)
+      background: rgba(255, 255, 255, .09);
+      color: #fff;
+      padding-left: 1.1rem
     }
 
     .nav a.on {
-      background: rgba(255, 255, 255, .1);
+      background: linear-gradient(90deg, rgba(244,160,74,.22), rgba(244,160,74,.08));
       color: #fff;
-      border-left-color: var(--bronze)
+      border-left-color: #f4a04a;
+      font-weight: 600
     }
 
     .me {
-      padding: 12px 18px 0;
-      border-top: 1px solid rgba(255, 255, 255, .1);
-      font-size: .86rem
+      padding: 12px 18px 6px;
+      border-top: 1px solid rgba(255, 255, 255, .12);
+      font-size: .86rem;
+      background: rgba(0,0,0,.15)
     }
 
     .me b {
@@ -204,7 +213,10 @@
     }
 
     .me .role {
-      color: #8fa6ab
+      color: #a8c8ce;
+      font-size: .78rem;
+      margin-top: 1px;
+      display: block
     }
 
     .me button {
@@ -212,9 +224,10 @@
       border: 0;
       color: #8fa6ab;
       padding: 0;
-      margin: 6px 12px 0 0;
+      margin: 6px 8px 0 0;
       cursor: pointer;
       font: inherit;
+      font-size: .8rem;
       text-decoration: underline
     }
 
@@ -1298,11 +1311,11 @@
     }
 
     .doc-tbl th {
-      background: #1b2a2f;
+      background: var(--doc-header-bg, #1b2a2f);
       color: #fff;
       text-align: left;
-      padding: 5px 6px;
-      font-weight: 500
+      padding: 6px 8px;
+      font-weight: 600;
     }
 
     .doc-tbl td {
@@ -1416,7 +1429,7 @@
     }
 
     .doc-tot .gt td {
-      border-top: 2px solid #1b2a2f;
+      border-top: 2px solid var(--doc-header-bg, #1b2a2f);
       font-weight: 700;
       font-size: 11.5pt;
       padding-top: 5px
@@ -1425,7 +1438,8 @@
     .doc h4 {
       font-size: 10.5pt;
       margin: 14px 0 4px;
-      border-bottom: 1px solid #1b2a2f;
+      border-bottom: 1px solid var(--doc-accent, #2a7880);
+      color: var(--doc-header-bg, #1b2a2f);
       padding-bottom: 2px
     }
 
@@ -2107,7 +2121,8 @@
       const el = $('#liveClock'); if (!el) return;
       const d = new Date();
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      el.innerHTML = `<div>📅 ${days[d.getDay()]}, ${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}</div><div style="color:#fff;font-weight:600;font-size:.9rem;margin-top:2px">⏰ ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}</div>`;
+      const h = d.getHours(), ampm = h >= 12 ? 'PM' : 'AM', h12 = h % 12 || 12;
+      el.innerHTML = `<div style="color:#a8c8ce">📅 ${days[d.getDay()]}, ${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}</div><div style="color:#f4a04a;font-weight:700;font-size:.95rem;margin-top:3px;letter-spacing:.03em">⏰ ${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}</div>`;
     }
     if (!window.__clockTimer) window.__clockTimer = setInterval(updateLiveClock, 1000);
 
@@ -2294,19 +2309,57 @@
       download('quotes.csv', '﻿' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n'), 'text/csv');
     };
     ACT.quickView = b => { const q = db.quotes.find(x => x.id === b.dataset.id); if (q) previewQuote(q) };
+    function downloadQuoteHtml(q) {
+      const s = db.settings || {};
+      const safeNo = (q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_');
+      const htmlDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quotation ${esc(q.no)} - ${esc(q.cust ? q.cust.name : '')}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  ${document.querySelector('style') ? document.querySelector('style').innerHTML : ''}
+  body { background: #eaedec; margin: 0; padding: 20px; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
+  .dl-bar { max-width: 210mm; margin: 0 auto 16px; background: #fff; padding: 12px 18px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; }
+  .dl-bar button { background: #2a7880; color: #fff; border: 0; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+  .sheet.doc { margin: 0 auto; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .dl-bar { display: none !important; }
+    .sheet.doc { box-shadow: none; margin: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="dl-bar">
+  <div><b>${esc(s.company || 'Quotation')}</b> &bull; Ref: <b>${esc(q.no)}</b> (${fmtDate(q.date)})</div>
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+</div>
+<div class="sheet doc">${docHTML(q)}</div>
+</body>
+</html>`;
+      download(`Quote_${safeNo}.html`, htmlDoc, 'text/html');
+      toast('Downloaded Quotation document file.');
+    }
     ACT.quickDownload = b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       modal({
-        title: `Download / Export Quote: ${q.no}`,
+        title: `Download & Export: ${q.no}`,
         noFooter: true,
-        body: `<div class="grid g3" style="margin:10px 0">
-      <button class="btn pri" data-act="dlPdf" data-id="${q.id}" style="justify-content:center;padding:12px">📄 Print / PDF Document</button>
-      <button class="btn" data-act="dlCsv" data-id="${q.id}" style="justify-content:center;padding:12px">📊 Export CSV for Excel</button>
-      <button class="btn" data-act="dlJson" data-id="${q.id}" style="justify-content:center;padding:12px">📦 Backup JSON Data</button>
-    </div>`
+        body: `<div class="grid g2" style="margin:12px 0;gap:12px">
+      <button class="btn pri" data-act="dlHtml" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📥 Download Quote File (.html)</button>
+      <button class="btn" data-act="dlPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">🖨️ Print / Save as PDF Window</button>
+      <button class="btn" data-act="dlCsv" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📊 Export Excel / CSV File</button>
+      <button class="btn" data-act="dlJson" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📦 Backup JSON Data File</button>
+    </div>
+    <div class="mute sm" style="text-align:center;margin-top:6px">Tip: "Download Quote File" saves a complete offline quotation you can send to customers or open anywhere.</div>`
       });
     };
-    ACT.dlPdf = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) previewQuote(q) };
+    ACT.dlHtml = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) downloadQuoteHtml(q); };
+    ACT.dlPdf = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) previewQuote(q); };
     ACT.dlCsv = b => {
       closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       const rows = [['Item #', 'Type', 'Tag/Mark', 'Location', 'Item Name', 'Specification', 'Width', 'Height', 'Qty', 'Rate', 'Amount']];
@@ -2583,13 +2636,54 @@
    <label class="f"><span>Account name</span><input name="b_acName" value="${esc(s.bank.acName)}"></label><label class="f"><span>Bank</span><input name="b_bank" value="${esc(s.bank.bank)}"></label>
    <label class="f"><span>Account number</span><input name="b_acNo" value="${esc(s.bank.acNo)}"></label><label class="f"><span>IFSC</span><input name="b_ifsc" value="${esc(s.bank.ifsc)}"></label>
    <label class="f"><span>Branch</span><input name="b_branch" value="${esc(s.bank.branch)}"></label></div></div></div>
-  <div><div class="card"><h3>Letterhead</h3><div class="mute sm" style="margin-bottom:8px">Printed at the top and bottom of every page of the quotation.</div>
+  <div>
+  <div class="card"><h3>Letterhead</h3><div class="mute sm" style="margin-bottom:8px">Printed at the top and bottom of every page of the quotation.</div>
    <div class="sm" style="font-weight:500">Header</div>
    ${getHeaderImg() ? `<img src="${getHeaderImg()}" alt="Header" style="width:100%;max-height:120px;object-fit:contain;border:1px solid var(--line);border-radius:4px;margin:4px 0 8px">` : `<div class="mute sm" style="padding:10px;background:var(--bg);border:1px dashed var(--line);border-radius:4px;margin:4px 0 8px;text-align:center">No header image uploaded.</div>`}
    <div class="acts"><button class="btn sm pri" data-act="imgUp" data-k="headerImg">${getHeaderImg() ? 'Upload new header' : 'Upload header'}</button>${getHeaderImg() ? `<button class="btn sm bad" data-act="imgReset" data-k="headerImg">Remove</button>` : ''}</div>
    <div class="sm" style="font-weight:500;margin-top:14px">Footer</div>
    ${getFooterImg() ? `<img src="${getFooterImg()}" alt="Footer" style="width:100%;max-height:120px;object-fit:contain;border:1px solid var(--line);border-radius:4px;margin:4px 0 8px">` : `<div class="mute sm" style="padding:10px;background:var(--bg);border:1px dashed var(--line);border-radius:4px;margin:4px 0 8px;text-align:center">No footer image uploaded.</div>`}
    <div class="acts"><button class="btn sm pri" data-act="imgUp" data-k="footerImg">${getFooterImg() ? 'Upload new footer' : 'Upload footer'}</button>${getFooterImg() ? `<button class="btn sm bad" data-act="imgReset" data-k="footerImg">Remove</button>` : ''}</div></div>
+  <div class="card" id="set5"><h3>Company Seal &amp; Authorised Signature</h3>
+   <div class="mute sm" style="margin-bottom:12px">Upload your company official seal/stamp and authorized signatory signature to appear automatically on all quotations.</div>
+   <div class="grid g2" style="gap:14px">
+     <div style="border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--bg)">
+       <div class="sm" style="font-weight:600;margin-bottom:4px">1. Company Round Seal / Stamp</div>
+       <div class="mute sm" style="margin-bottom:8px">PNG with transparent background recommended.</div>
+       ${s.sealImg ? `<img src="${s.sealImg}" alt="Company Seal" style="max-height:80px;max-width:100%;object-fit:contain;border:1px dashed var(--line);border-radius:4px;margin-bottom:8px;background:#fff;padding:4px;display:block">` : `<div class="mute sm" style="padding:10px;background:#fff;border:1px dashed var(--line);border-radius:4px;margin-bottom:8px;text-align:center">No company seal uploaded.</div>`}
+       <div class="acts"><button class="btn sm pri" data-act="imgUp" data-k="sealImg">${s.sealImg ? 'Upload new seal' : 'Upload company seal'}</button>${s.sealImg ? `<button class="btn sm bad" data-act="imgReset" data-k="sealImg">Remove</button>` : ''}</div>
+     </div>
+     <div style="border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--bg)">
+       <div class="sm" style="font-weight:600;margin-bottom:4px">2. Authorised Signature</div>
+       <div class="mute sm" style="margin-bottom:8px">Signature image of MD or Authorized Signatory.</div>
+       ${s.signImg ? `<img src="${s.signImg}" alt="Authorised Signature" style="max-height:80px;max-width:100%;object-fit:contain;border:1px dashed var(--line);border-radius:4px;margin-bottom:8px;background:#fff;padding:4px;display:block">` : `<div class="mute sm" style="padding:10px;background:#fff;border:1px dashed var(--line);border-radius:4px;margin-bottom:8px;text-align:center">No signature uploaded.</div>`}
+       <div class="acts"><button class="btn sm pri" data-act="imgUp" data-k="signImg">${s.signImg ? 'Upload new signature' : 'Upload signature'}</button>${s.signImg ? `<button class="btn sm bad" data-act="imgReset" data-k="signImg">Remove</button>` : ''}</div>
+     </div>
+   </div>
+   <div class="grid g2" style="margin-top:14px">
+     <label class="f"><span>Show Seal &amp; Signature on Quotation?</span><select name="showSealSign"><option value="yes" ${(s.showSealSign !== 'no') ? 'selected' : ''}>Yes, show seal and signature</option><option value="no" ${s.showSealSign === 'no' ? 'selected' : ''}>No, leave blank line for manual sign</option></select></label>
+     <label class="f"><span>Default Authorised Signatory title</span><input name="authorisedDefault" value="${esc(s.authorisedDefault || 'Managing Director')}" placeholder="e.g. Managing Director"></label>
+     <label class="f"><span>Show client acceptance box?</span><select name="showClientSign"><option value="yes" ${(s.showClientSign !== 'no') ? 'selected' : ''}>Yes</option><option value="no" ${s.showClientSign === 'no' ? 'selected' : ''}>No</option></select></label>
+     <label class="f"><span>Show Name &amp; Date under client sign?</span><select name="showClientNameDate"><option value="yes" ${(s.showClientNameDate !== 'no') ? 'selected' : ''}>Yes</option><option value="no" ${s.showClientNameDate === 'no' ? 'selected' : ''}>No</option></select></label>
+   </div></div>
+  <div class="card" id="set6"><h3>Website &amp; Quotation Colours</h3>
+   <div class="mute sm" style="margin-bottom:12px">Choose a preset theme or customize the primary brand colors for both the website and printed quotations.</div>
+   <div style="margin-bottom:14px">
+     <div class="sm" style="font-weight:600;margin-bottom:6px">Quick Color Presets:</div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap">
+       <button type="button" class="btn sm" data-act="setPresetTheme" data-acc="#2a7880" data-hdr="#1b2a2f" data-doc="#1b2a2f" style="border-left:4px solid #2a7880">Teal &amp; Dark Slate (Default)</button>
+       <button type="button" class="btn sm" data-act="setPresetTheme" data-acc="#1e40af" data-hdr="#0f172a" data-doc="#1e40af" style="border-left:4px solid #1e40af">Royal Navy Blue</button>
+       <button type="button" class="btn sm" data-act="setPresetTheme" data-acc="#15803d" data-hdr="#142918" data-doc="#15803d" style="border-left:4px solid #15803d">Emerald Forest Green</button>
+       <button type="button" class="btn sm" data-act="setPresetTheme" data-acc="#b91c1c" data-hdr="#1c1917" data-doc="#b91c1c" style="border-left:4px solid #b91c1c">Crimson Red &amp; Charcoal</button>
+       <button type="button" class="btn sm" data-act="setPresetTheme" data-acc="#b45309" data-hdr="#1f2937" data-doc="#b45309" style="border-left:4px solid #b45309">Warm Bronze &amp; Slate</button>
+       <button type="button" class="btn sm" data-act="setPresetTheme" data-acc="#4f46e5" data-hdr="#111827" data-doc="#4f46e5" style="border-left:4px solid #4f46e5">Indigo &amp; Midnight</button>
+     </div>
+   </div>
+   <div class="grid g3">
+     <label class="f"><span>Primary brand / accent colour</span><input type="color" name="accentColor" id="set_accentColor" value="${esc(s.accentColor || '#2a7880')}"></label>
+     <label class="f"><span>Website sidebar / header colour</span><input type="color" name="headerColor" id="set_headerColor" value="${esc(s.headerColor || '#1b2a2f')}"></label>
+     <label class="f"><span>Quotation document table header</span><input type="color" name="docColor" id="set_docColor" value="${esc(s.docColor || s.headerColor || '#1b2a2f')}"></label>
+   </div></div>
   <div class="card"><h3>Backup and restore</h3><div class="mute sm" style="margin-bottom:10px">Data is stored in this browser on this computer. Download a backup regularly and keep it somewhere safe.</div>
    <div class="acts"><button class="btn" data-act="backup">Download backup</button><button class="btn" data-act="restore">Restore from backup</button><button class="btn bad" data-act="wipe">Erase all data</button></div></div></div></div>`;
     }
@@ -2605,19 +2699,65 @@
         approvalMode: b.approvalMode, approvalAbove: num(b.approvalAbove), maxDisc: num(b.maxDisc), pay, terms: c.terms.trim()
       });
       s.bank = { acName: d.b_acName, bank: d.b_bank, acNo: d.b_acNo, ifsc: d.b_ifsc, branch: d.b_branch };
-      persist(true); toast('Settings saved.');
+      // Signature & Seal settings
+      try {
+        const e5 = g('#set5');
+        s.showSealSign = e5.showSealSign;
+        s.authorisedDefault = (e5.authorisedDefault || '').trim();
+        s.showClientSign = e5.showClientSign;
+        s.showClientNameDate = e5.showClientNameDate;
+      } catch(e_){}
+      // Color settings
+      try {
+        const e6 = g('#set6');
+        s.accentColor = e6.accentColor || '#2a7880';
+        s.headerColor = e6.headerColor || '#1b2a2f';
+        s.docColor = e6.docColor || s.headerColor;
+      } catch(e_){}
+      persist(true); toast('Settings saved.'); applyThemeColors();
     };
+    ACT.setPresetTheme = b => {
+      const acc = b.dataset.acc, hdr = b.dataset.hdr, doc = b.dataset.doc;
+      if ($('#set_accentColor')) $('#set_accentColor').value = acc;
+      if ($('#set_headerColor')) $('#set_headerColor').value = hdr;
+      if ($('#set_docColor')) $('#set_docColor').value = doc;
+      db.settings.accentColor = acc;
+      db.settings.headerColor = hdr;
+      db.settings.docColor = doc;
+      applyThemeColors();
+      toast('Color theme applied. Click Save Settings to persist.');
+    };
+    function applyThemeColors() {
+      const s = db && db.settings;
+      if (!s) return;
+      const acc = s.accentColor || '#2a7880';
+      const hdr = s.headerColor || '#1b2a2f';
+      const doc = s.docColor || hdr;
+      document.documentElement.style.setProperty('--glass', acc);
+      document.documentElement.style.setProperty('--ink', hdr);
+      document.documentElement.style.setProperty('--doc-header-bg', doc);
+      document.documentElement.style.setProperty('--doc-accent', acc);
+    }
     ACT.imgUp = b => {
+      const k = b.dataset.k;
       const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*';
       f.onchange = () => {
         const file = f.files[0]; if (!file) return; const rd = new FileReader();
         rd.onload = () => {
           const im = new Image(); im.onload = () => {
-            const sc = Math.min(1, 1600 / im.width), cv = document.createElement('canvas'); cv.width = im.width * sc; cv.height = im.height * sc;
-            const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0, cv.width, cv.height);
-            db.settings[b.dataset.k] = cv.toDataURL('image/jpeg', .92); persist(true); viewSettings(); toast('Image updated.')
-          }; im.onerror = () => toast('That file is not a readable image.', 'bad'); im.src = rd.result
-        }; rd.readAsDataURL(file)
+            const isTransparent = file.type === 'image/png' || k === 'sealImg' || k === 'signImg';
+            const sc = Math.min(1, 1600 / im.width), cv = document.createElement('canvas');
+            cv.width = im.width * sc; cv.height = im.height * sc;
+            const cx = cv.getContext('2d');
+            if (!isTransparent) {
+              cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+            }
+            cx.drawImage(im, 0, 0, cv.width, cv.height);
+            const mime = isTransparent ? 'image/png' : 'image/jpeg';
+            db.settings[k] = cv.toDataURL(mime, 0.92);
+            persist(true); viewSettings(); toast('Image uploaded successfully.');
+          }; im.onerror = () => toast('That file is not a readable image.', 'bad'); im.src = rd.result;
+        }; rd.readAsDataURL(file);
       };
       f.click();
     };
@@ -2676,11 +2816,20 @@
     <label class="f"><span>Notes for the customer (optional)</span><textarea data-q="notes" rows="3">${esc(q.notes)}</textarea></label></div></div>
   </fieldset></div>
   <aside class="qside"><div class="card"><h3>Summary</h3><fieldset class="fs" ${ro ? 'disabled' : ''}>
-    <div class="grid g2" style="margin-bottom:10px"><label class="f"><span>Discount</span><select data-q="discType"><option value="pct" ${q.discType === 'pct' ? 'selected' : ''}>Percent (%)</option><option value="amt" ${q.discType === 'amt' ? 'selected' : ''}>Amount (&#8377;)</option></select></label>
-    <label class="f"><span>Value</span><input type="number" step="any" min="0" data-q="discVal" data-t="n" value="${q.discVal || ''}"></label>
-    <label class="chk" style="grid-column:1/-1"><input type="checkbox" data-q="gst" data-t="b" ${q.gst ? 'checked' : ''}> Charge GST</label>
-    <label class="f"><span>GST rate (%)</span><input type="number" step="any" min="0" data-q="gstRate" data-t="n" value="${q.gstRate}"></label>
-    <label class="f" style="grid-column:1/-1"><span>GST tax option</span><select data-q="gstType"><option value="auto" ${(!q.gstType || q.gstType === 'auto') ? 'selected' : ''}>Auto (Place of supply vs state)</option><option value="igst" ${q.gstType === 'igst' ? 'selected' : ''}>IGST (Interstate)</option><option value="cgst_sgst" ${q.gstType === 'cgst_sgst' ? 'selected' : ''}>CGST + SGST (Intrastate)</option></select></label></div></fieldset>
+    <div class="grid g2" style="margin-bottom:8px">
+      <label class="f"><span>Discount type</span><select data-q="discType" id="q_discType"><option value="pct" ${q.discType === 'pct' ? 'selected' : ''}>Percentage (%)</option><option value="amt" ${q.discType === 'amt' ? 'selected' : ''}>Lump sum (&#8377;)</option></select></label>
+      <label class="f"><span id="discValLabel">${q.discType === 'amt' ? 'Discount Amount (&#8377;)' : 'Enter Discount %'}</span><input type="number" step="any" min="0" id="q_discVal" data-q="discVal" data-t="n" value="${q.discVal || ''}" placeholder="${q.discType === 'amt' ? 'e.g. 5000' : 'e.g. 10'}"></label>
+      <div style="grid-column:1/-1;display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:-2px 0 6px">
+        <small class="mute">Quick %:</small>
+        <button type="button" class="chip sm" data-act="setDiscPct" data-v="0">0%</button>
+        <button type="button" class="chip sm" data-act="setDiscPct" data-v="5">5%</button>
+        <button type="button" class="chip sm" data-act="setDiscPct" data-v="10">10%</button>
+        <button type="button" class="chip sm" data-act="setDiscPct" data-v="15">15%</button>
+        <button type="button" class="chip sm" data-act="setDiscPct" data-v="20">20%</button>
+      </div>
+      <label class="chk" style="grid-column:1/-1"><input type="checkbox" data-q="gst" data-t="b" ${q.gst ? 'checked' : ''}> Charge GST</label>
+      <label class="f"><span>GST rate (%)</span><input type="number" step="any" min="0" data-q="gstRate" data-t="n" value="${q.gstRate}"></label>
+      <label class="f" style="grid-column:1/-1"><span>GST tax option</span><select data-q="gstType"><option value="auto" ${(!q.gstType || q.gstType === 'auto') ? 'selected' : ''}>Auto (Place of supply vs state)</option><option value="igst" ${q.gstType === 'igst' ? 'selected' : ''}>IGST (Interstate)</option><option value="cgst_sgst" ${q.gstType === 'cgst_sgst' ? 'selected' : ''}>CGST + SGST (Intrastate)</option></select></label></div></fieldset>
     <div id="totbox"></div></div>
    <div id="aprBox"></div><div id="mgnBox"></div>
    <div class="card"><h3>Revisions</h3><ul class="hist" id="revs"></ul></div>
@@ -2841,7 +2990,15 @@
       const val = () => t.dataset.t === 'n' ? num(t.value) : t.dataset.t === 'b' ? t.checked : t.value;
       if (t.dataset.q) {
         if (e.type === 'change' && t.type !== 'checkbox' && t.tagName !== 'SELECT' && t.type !== 'date') {/* input event already handled */ }
-        Q[t.dataset.q] = val(); touch(); refreshCalc(); return;
+        Q[t.dataset.q] = val();
+        if (t.dataset.q === 'discType') {
+          const isAmt = t.value === 'amt';
+          const lbl = $('#discValLabel');
+          if (lbl) lbl.textContent = isAmt ? 'Discount Amount (₹)' : 'Enter Discount %';
+          const inp = $('#q_discVal');
+          if (inp) inp.placeholder = isAmt ? 'e.g. 5000' : 'e.g. 10';
+        }
+        touch(); refreshCalc(); return;
       }
       if (t.dataset.c) { Q.cust[t.dataset.c] = t.value; Q.customerId = Q.customerId && db.customers.find(x => x.id === Q.customerId && x.name === Q.cust.name) ? Q.customerId : ''; touch(); return }
       if (t.id === 'custSel' && e.type === 'change') { const c = db.customers.find(x => x.id === t.value); if (c) { applyCustomer(Q, c) } else Q.customerId = ''; touch(); drawCustCard(); refreshCalc(); return }
@@ -2992,21 +3149,189 @@
         };
         setTimeout(() => { ['cs_profSelect', 'cs_config', 'cs_weightPerM', 'cs_ratePerKg', 'cs_wastage', 'cs_glassRate', 'cs_hwRate', 'cs_laborRate', 'cs_margin'].forEach(id => { const el = $('#' + id); if (el) { el.oninput = updateCalc; el.onchange = updateCalc } }); updateCalc() }, 50);
       },
+      setDiscPct(b) {
+        if (!Q) return;
+        const val = num(b.dataset.v);
+        Q.discType = 'pct';
+        Q.discVal = val;
+        const sel = $('#q_discType'); if (sel) sel.value = 'pct';
+        const lbl = $('#discValLabel'); if (lbl) lbl.textContent = 'Enter Discount %';
+        const inp = $('#q_discVal'); if (inp) { inp.value = val || ''; inp.placeholder = 'e.g. 10'; }
+        touch(); refreshCalc();
+        toast(`Applied ${val}% discount.`);
+      },
       searchHistoryItems() {
-        const all = [];
-        db.quotes.forEach(q => { (q.lines || []).forEach(l => { if (l.type !== 'section' && l.name) all.push({ qNo: q.no, date: q.date, cName: q.cust ? q.cust.name : '', ...l }) }) });
-        const el = modal({
-          title: 'Search Line Items & Rate History', wide: true, noFooter: true,
-          body: `<div class="tools" style="margin-bottom:10px"><input type="search" id="hItemSearch" placeholder="Search line items by name, specification, customer..." style="width:100%"></div>
-      <div style="max-height:60vh;overflow:auto"><table class="tbl"><thead><tr><th>Item Name / Description</th><th>Customer</th><th>Quote & Date</th><th class="r">Size / Unit</th><th class="r">Rate</th><th></th></tr></thead><tbody id="hItemRows"></tbody></table></div>`
+        const quoteItems = [];
+        (db.quotes || []).forEach(q => {
+          (q.lines || []).forEach(l => {
+            if (l.type !== 'section' && (l.name || l.desc)) {
+              quoteItems.push({
+                source: 'quote',
+                qNo: q.no,
+                date: q.date,
+                cName: q.cust ? q.cust.name : '',
+                ...l
+              });
+            }
+          });
         });
+
+        const boqItems = (db.items || []).map(i => ({
+          source: 'library_boq',
+          type: 'boq',
+          _libId: i.id,
+          name: i.desc,
+          desc: i.notes || '',
+          unit: i.unit,
+          rate: i.rate,
+          cost: i.cost || 0,
+          category: i.category || 'BOQ',
+          disc: 0,
+          qty: 1
+        }));
+
+        const prodItems = (db.products || []).map(p => ({
+          source: 'library_prod',
+          type: 'size',
+          _libId: p.id,
+          name: p.name,
+          spec: p.desc || '',
+          glyph: p.glyph || 'slider',
+          rate: p.rate,
+          minArea: p.minArea || 0,
+          cost: p.cost || 0,
+          category: p.category || 'Windows/Doors',
+          unit: 'sq ft',
+          disc: 0,
+          qty: 1
+        }));
+
+        const profItems = (db.profiles || []).map(p => ({
+          source: 'library_prof',
+          type: 'boq',
+          _libId: p.id,
+          name: p.name,
+          desc: `${p.material || ''} ${p.series || ''} • ${p.weightPerM || 0} kg/m • ₹${p.ratePerKg || 0}/kg`,
+          unit: 'kg',
+          rate: p.ratePerKg || 0,
+          category: 'Profiles',
+          disc: 0,
+          qty: 1
+        }));
+
+        const allItems = [...boqItems, ...prodItems, ...profItems, ...quoteItems];
+        let curFilter = 'all';
+
+        const el = modal({
+          title: 'Search Rate Library & Line Item History',
+          wide: true,
+          noFooter: true,
+          body: `
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <button class="chip on" id="hTabAll" type="button">All Items (${allItems.length})</button>
+            <button class="chip" id="hTabLib" type="button">Rate Library (${boqItems.length + prodItems.length + profItems.length})</button>
+            <button class="chip" id="hTabQuotes" type="button">Past Quotes History (${quoteItems.length})</button>
+          </div>
+          <div class="tools" style="margin-bottom:10px">
+            <input type="search" id="hItemSearch" placeholder="Search by name, category, gypsum, profile, customer, quote #..." style="width:100%" autofocus>
+          </div>
+          <div style="max-height:60vh;overflow:auto">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Item Name & Description</th>
+                  <th>Source / Category</th>
+                  <th>Ref / Customer</th>
+                  <th class="r">Size / Unit</th>
+                  <th class="r">Rate</th>
+                  <th class="r">Action</th>
+                </tr>
+              </thead>
+              <tbody id="hItemRows"></tbody>
+            </table>
+          </div>`
+        });
+
         const drawH = () => {
           const t = ($('#hItemSearch', el).value || '').trim().toLowerCase();
-          const matches = all.filter(l => !t || l.name.toLowerCase().includes(t) || (l.spec || '').toLowerCase().includes(t) || (l.desc || '').toLowerCase().includes(t) || (l.cName || '').toLowerCase().includes(t) || l.qNo.toLowerCase().includes(t)).slice(0, 40);
-          $('#hItemRows', el).innerHTML = matches.length ? matches.map((m, idx) => `<tr><td><b>${esc(m.name)}</b><div class="mute sm">${esc(m.spec || m.desc || '')}</div></td><td>${esc(m.cName || '-')}</td><td><b>${esc(m.qNo)}</b><div class="mute sm">${fmtDate(m.date)}</div></td><td class="r">${m.w ? `${m.w} x ${m.h}` : esc(m.unit || '-')}</td><td class="r"><b>${rs(m.rate)}</b></td><td class="r"><button class="btn sm pri" data-himport="${idx}">Copy to Quote</button></td></tr>`).join('') : `<tr><td colspan="6"><div class="empty">No matching line items found.</div></td></tr>`;
-          $$('[data-himport]', el).forEach(btn => { btn.onclick = e => { const target = matches[+e.currentTarget.dataset.himport]; if (target) { const newItem = JSON.parse(JSON.stringify(target)); newItem.id = uid(); delete newItem.qNo; delete newItem.date; delete newItem.cName; Q.lines.push(newItem); touch(); drawLines(); refreshCalc(); closeModal(); toast(`Added "${target.name}" to quote.`) } } });
+          let list = allItems;
+          if (curFilter === 'lib') list = [...boqItems, ...prodItems, ...profItems];
+          else if (curFilter === 'quotes') list = quoteItems;
+
+          const matches = list.filter(m => {
+            if (!t) return true;
+            return (m.name || '').toLowerCase().includes(t) ||
+              (m.desc || '').toLowerCase().includes(t) ||
+              (m.spec || '').toLowerCase().includes(t) ||
+              (m.category || '').toLowerCase().includes(t) ||
+              (m.cName || '').toLowerCase().includes(t) ||
+              (m.qNo || '').toLowerCase().includes(t);
+          }).slice(0, 60);
+
+          $('#hItemRows', el).innerHTML = matches.length ? matches.map((m, idx) => {
+            const isLib = m.source.startsWith('library');
+            const sourceBadge = isLib 
+              ? `<span class="bd approved" style="font-size:0.75rem">${esc(m.category || 'Rate Library')}</span>`
+              : `<span class="bd sent" style="font-size:0.75rem">Past Quote</span>`;
+            const refCol = isLib 
+              ? `<div class="mute sm">Standard Library</div>` 
+              : `<b>${esc(m.qNo || '')}</b><div class="mute sm">${esc(m.cName || '')} ${m.date ? '• ' + fmtDate(m.date) : ''}</div>`;
+            const sizeCol = m.w ? `${m.w} &times; ${m.h}` : esc(m.unit || 'nos');
+            return `<tr>
+              <td>
+                <b>${esc(m.name || m.desc || '')}</b>
+                ${m.desc && m.name && m.desc !== m.name ? `<div class="mute sm">${esc(m.desc)}</div>` : ''}
+                ${m.spec ? `<div class="mute sm">${esc(m.spec)}</div>` : ''}
+              </td>
+              <td>${sourceBadge}</td>
+              <td>${refCol}</td>
+              <td class="r">${sizeCol}</td>
+              <td class="r"><b>${rs(m.rate)}</b></td>
+              <td class="r">
+                <button class="btn sm pri" data-himport="${idx}">+ Add to Quote</button>
+              </td>
+            </tr>`;
+          }).join('') : `<tr><td colspan="6"><div class="empty">No items match "${esc(t)}". Try another search term.</div></td></tr>`;
+
+          $$('[data-himport]', el).forEach(btn => {
+            btn.onclick = e => {
+              const target = matches[+e.currentTarget.dataset.himport];
+              if (!target) return;
+              let newItem;
+              if (target.source === 'library_prod') {
+                newItem = mkSize(target._prodObj || target);
+                newItem.rate = target.rate;
+                newItem.name = target.name;
+                newItem.spec = target.spec || '';
+              } else if (target.source === 'library_boq' || target.source === 'library_prof') {
+                newItem = mkBoq(target._itemObj || target);
+                newItem.name = target.name;
+                newItem.desc = target.desc || '';
+                newItem.rate = target.rate;
+                newItem.unit = target.unit || 'nos';
+              } else {
+                newItem = JSON.parse(JSON.stringify(target));
+                newItem.id = uid();
+                delete newItem.source;
+                delete newItem.qNo;
+                delete newItem.date;
+                delete newItem.cName;
+              }
+              Q.lines.push(newItem);
+              touch();
+              drawLines();
+              refreshCalc();
+              closeModal();
+              toast(`Added "${newItem.name || 'item'}" to quote.`);
+            };
+          });
         };
-        $('#hItemSearch', el).oninput = drawH; drawH();
+
+        $('#hTabAll', el).onclick = () => { curFilter = 'all'; $$('.chip', el).forEach(c => c.classList.remove('on')); $('#hTabAll', el).classList.add('on'); drawH(); };
+        $('#hTabLib', el).onclick = () => { curFilter = 'lib'; $$('.chip', el).forEach(c => c.classList.remove('on')); $('#hTabLib', el).classList.add('on'); drawH(); };
+        $('#hTabQuotes', el).onclick = () => { curFilter = 'quotes'; $$('.chip', el).forEach(c => c.classList.remove('on')); $('#hTabQuotes', el).classList.add('on'); drawH(); };
+        $('#hItemSearch', el).oninput = drawH;
+        drawH();
       }
     });
     function setStatus(s, note) { Q.status = s; Q.updatedAt = Date.now(); logq(Q, note); persist(true); viewQuote(Q.id) }
@@ -3050,9 +3375,26 @@
    ${terms.length ? `<h4>Terms and conditions</h4><ol>${terms.map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
    ${q.notes ? `<h4>Notes</h4><div>${nl2(q.notes)}</div>` : ''}
    <div class="doc-sign">
-     <div>Prepared By:<br><b>${esc(q.preparedByName || userName(q.createdBy))}</b><div class="ln2">Signature & Date</div></div>
-     <div>Authorised Signatory:<br><b>${esc(q.authorisedBy || 'Manager / MD')}</b><div class="ln2">${s.company ? 'For ' + esc(s.company.toUpperCase()) : 'Authorised Signature'}</div></div>
-     <div>Accepted By Customer:<br><b>${esc(c.name || 'Customer')}</b><div class="ln2">Signature, Name & Date</div></div>
+     <div>
+       Prepared By:<br><b>${esc(q.preparedByName || userName(q.createdBy))}</b>
+       <div style="height:36px"></div>
+       <div class="ln2">Signature &amp; Date</div>
+     </div>
+     <div>
+       Authorised Signatory:<br><b>${esc(q.authorisedBy || s.authorisedDefault || 'Manager / MD')}</b>
+       ${(s.showSealSign !== 'no' && (s.signImg || s.sealImg)) ? `
+       <div style="min-height:50px;display:flex;align-items:flex-end;justify-content:flex-start;gap:12px;margin:4px 0 2px">
+         ${s.sealImg ? `<img src="${s.sealImg}" alt="Company Seal" style="max-height:54px;max-width:110px;object-fit:contain">` : ''}
+         ${s.signImg ? `<img src="${s.signImg}" alt="Signature" style="max-height:48px;max-width:120px;object-fit:contain">` : ''}
+       </div>` : `<div style="height:36px"></div>`}
+       <div class="ln2">${s.company ? 'For ' + esc(s.company.toUpperCase()) : 'Authorised Signature'}</div>
+     </div>
+     ${s.showClientSign !== 'no' ? `
+     <div>
+       Accepted By Customer:<br><b>${esc(c.name || 'Customer')}</b>
+       <div style="height:36px"></div>
+       <div class="ln2">Signature${s.showClientNameDate !== 'no' ? ', Name &amp; Date' : ''}</div>
+     </div>` : ''}
    </div>
   </td></tr></tbody>
   <tfoot><tr><td>${ftrImg ? `<img class="ft-img" src="${ftrImg}" alt="">` : (s.company ? `<div class="doc-ftr-clean">${esc(s.company)} &bull; Ref: ${esc(q.no)}</div>` : '')}</td></tr></tfoot></table>`;
@@ -3078,6 +3420,7 @@
             else db = seedData();
           } catch (ex) { db = seedData(); }
           me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
+          applyThemeColors();
           renderApp();
           return;
         }
@@ -3101,6 +3444,7 @@
           ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {};
         }
       }
+      applyThemeColors();
       renderApp();
     })();
 
