@@ -204,6 +204,16 @@ app.get('/api/setup-needed', (req, res) => {
   res.json({ needed: !data || !data.users || data.users.length === 0 });
 });
 
+// Public init endpoint - returns minimal data for login/setup screen (no auth needed)
+app.get('/api/init', (req, res) => {
+  const data = getDb();
+  const hasUsers = !!(data && data.users && data.users.length > 0);
+  const company = (data && data.settings && data.settings.company) || '';
+  const accentColor = (data && data.settings && data.settings.accentColor) || '';
+  const headerColor = (data && data.settings && data.settings.headerColor) || '';
+  res.json({ hasUsers, company, accentColor, headerColor });
+});
+
 // Initial setup (no auth needed, only when no users exist)
 app.post('/api/setup', (req, res) => {
   const existing = getDb();
