@@ -1,0 +1,11 @@
+# Secrets and credentials
+CREDENTIALS_AND_ACCESS.md
+QuoteDesk_Master_Doc.html
+QuoteDesk_Master_Documentation.pdf
+*.pdf
+.env
+*.env
+*.bak
+data/
+node_modules/
+.metals/

@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
+const nodemailer = require('nodemailer');
 
 // Load local .env if present
 const envPath = path.join(__dirname, '.env');
@@ -27,8 +28,83 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'quotedesk.json');
 const SESS_FILE = path.join(DATA_DIR, 'sessions.json');
+const AUDIT_FILE = path.join(DATA_DIR, 'audit_logs.json');
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const BASE_URL = process.env.BASE_URL || '';
+
+// Master Admin Security & Mail OTP Configuration
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'RAFIQTN70@GMAIL.COM';
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
+
+let mailTransporter = null;
+function getTransporter() {
+  if (mailTransporter) return mailTransporter;
+  if (SMTP_USER && SMTP_PASS) {
+    mailTransporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
+      auth: { user: SMTP_USER, pass: SMTP_PASS }
+    });
+  }
+  return mailTransporter;
+}
+
+// In-memory OTP storage: username => { otp, expires, attempts, ip, lastSent }
+const pendingOtps = new Map();
+
+async function sendAdminOtpEmail(email, otp, ip) {
+  console.log(`\n=============================================================`);
+  console.log(`🔐 [MASTER ADMIN OTP] Generated for: ${email}`);
+  console.log(`👉 OTP CODE: ${otp} (Valid for 10 minutes)`);
+  console.log(`🌐 Requested from IP: ${ip}`);
+  console.log(`⏰ Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
+  console.log(`=============================================================\n`);
+
+  const transporter = getTransporter();
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: `"MR_Quoter Security" <${SMTP_USER}>`,
+        to: email,
+        subject: `Your Master Admin Security OTP: ${otp} - MR_Quoter`,
+        html: `
+          <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
+            <div style="text-align:center;margin-bottom:24px;">
+              <h2 style="color:#0f172a;margin:0;font-size:22px;">MR_Quoter Platform Security</h2>
+              <p style="color:#64748b;font-size:14px;margin-top:4px;">Master Admin Verification</p>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:20px;text-align:center;margin-bottom:20px;border:1px solid #cbd5e1;">
+              <p style="margin:0 0 10px;color:#475569;font-size:14px;">Your one-time security code is:</p>
+              <div style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0284c7;padding:6px 0;">${otp}</div>
+              <p style="margin:10px 0 0;color:#dc2626;font-size:13px;font-weight:600;">Valid for 10 minutes</p>
+            </div>
+            <div style="font-size:13px;color:#64748b;line-height:1.5;margin-bottom:20px;">
+              <p style="margin:0 0 6px;"><b>Login Details:</b></p>
+              <p style="margin:0 0 4px;">• IP Address: <code>${ip}</code></p>
+              <p style="margin:0 0 4px;">• Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
+            </div>
+            <p style="color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:14px;margin:0;">
+              If you did not request this login code, please review your server logs and secure your account immediately.
+            </p>
+          </div>
+        `
+      });
+      console.log(`✅ [Email] Successfully sent OTP email to ${email}`);
+      return { success: true };
+    } catch (err) {
+      console.error(`⚠️ [Email Error] Could not send OTP email via SMTP:`, err.message);
+      return { success: false, error: err.message, fallbackConsole: true };
+    }
+  } else {
+    console.log(`ℹ️ [Email Notice] SMTP credentials not set in .env. OTP printed to server log above for direct access.`);
+    return { success: true, fallbackConsole: true };
+  }
+}
 
 // Ensure data directory exists
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -58,23 +134,25 @@ async function initMongo() {
 
     // Initialize data from Cloud or seed local to cloud
     const cloudDoc = await mongoDb.collection('app_data').findOne({ _id: 'quotedesk_main' });
-    if (cloudDoc && cloudDoc.data) {
+    const local = readJson(DB_FILE, null);
+    if (cloudDoc && cloudDoc.data && cloudDoc.data.users && cloudDoc.data.users.length > 0) {
       memoryDb = cloudDoc.data;
       // also keep local replica updated
       try { fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb), 'utf8'); } catch (e) {}
       console.log('[Storage] Loaded latest client data from Cloud Database.');
-    } else {
-      // If cloud is empty but local exists, migrate local to cloud
-      const local = readJson(DB_FILE, null);
-      if (local) {
-        memoryDb = local;
-        await mongoDb.collection('app_data').updateOne(
-          { _id: 'quotedesk_main' },
-          { $set: { _id: 'quotedesk_main', data: local, updatedAt: new Date() } },
-          { upsert: true }
-        );
-        console.log('[Storage] Migrated existing local data to MongoDB Cloud Database!');
-      }
+    } else if (local && local.users && local.users.length > 0) {
+      memoryDb = local;
+      await mongoDb.collection('app_data').updateOne(
+        { _id: 'quotedesk_main' },
+        { $set: { _id: 'quotedesk_main', data: local, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      console.log('[Storage] Synced local company data with users to MongoDB Cloud Database!');
+    } else if (cloudDoc && cloudDoc.data) {
+      memoryDb = cloudDoc.data;
+      try { fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb), 'utf8'); } catch (e) {}
+    } else if (local) {
+      memoryDb = local;
     }
   } catch (err) {
     mongoConnected = false;
@@ -168,8 +246,63 @@ function deleteSession(token) {
   saveSessions(sessions);
 }
 
+// ── Login Activity Audit Helpers ─────────────────────────────────────────────
+let memoryAuditLogs = null;
+
+function getAuditLogs() {
+  if (memoryAuditLogs) return memoryAuditLogs;
+  memoryAuditLogs = readJson(AUDIT_FILE, []);
+  return memoryAuditLogs;
+}
+
+function saveAuditLogs(logs) {
+  memoryAuditLogs = logs;
+  writeJson(AUDIT_FILE, logs);
+  if (mongoConnected && mongoDb) {
+    mongoDb.collection('audit_logs').updateOne(
+      { _id: 'recent_audits' },
+      { $set: { _id: 'recent_audits', logs: logs.slice(0, 500), updatedAt: new Date() } },
+      { upsert: true }
+    ).catch(err => console.error('[Audit] Cloud sync error:', err.message));
+  }
+}
+
+function getClientIp(req) {
+  const xForwardedFor = req.headers['x-forwarded-for'];
+  if (xForwardedFor) {
+    const list = xForwardedFor.split(',');
+    return list[0].trim();
+  }
+  return req.socket && req.socket.remoteAddress ? req.socket.remoteAddress.replace(/^::ffff:/, '') : req.ip || 'Unknown';
+}
+
+function recordLoginLog(req, { companyId, companyName, userId, username, role, status, reason }) {
+  const ip = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  const logs = getAuditLogs();
+  const entry = {
+    id: crypto.randomBytes(6).toString('hex'),
+    timestamp: Date.now(),
+    dateStr: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+    ip: ip,
+    companyId: companyId || '-',
+    companyName: companyName || (role === 'master' ? 'Master Platform Admin' : 'General'),
+    userId: userId || '-',
+    username: username || '-',
+    role: role || '-',
+    userAgent: userAgent,
+    status: status, // 'SUCCESS' | 'FAILED' | 'BLOCKED'
+    reason: reason || ''
+  };
+  logs.unshift(entry);
+  if (logs.length > 500) logs.length = 500;
+  saveAuditLogs(logs);
+  return entry;
+}
+
 // ── app ───────────────────────────────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -228,31 +361,304 @@ app.post('/api/setup', (req, res) => {
   res.json({ ok: true });
 });
 
-// Login
+// Login with IP tracking & Multi-Company support
 app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  if (username === 'master' && password === 'Rafiq@24') {
-    const token = createSession('master');
-    res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
-    return res.json({ ok: true, userId: 'master' });
+  const { username, password, companyCode } = req.body || {};
+  const clientIp = getClientIp(req);
+  const un = (username || '').trim().toLowerCase();
+
+  // 1. MASTER SUPERADMIN LOGIN -> Trigger Email OTP
+  if (un === 'master') {
+    if (password === 'Rafiq@24') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      pendingOtps.set('master', {
+        otp,
+        expires: Date.now() + 10 * 60 * 1000, // 10 minutes validity
+        attempts: 0,
+        ip: clientIp,
+        lastSent: Date.now()
+      });
+
+      sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+
+      const masked = ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)));
+      return res.json({
+        ok: true,
+        otpRequired: true,
+        email: masked,
+        devHint: !SMTP_USER ? `Dev Notice: Check server console for code (${otp})` : null
+      });
+    } else {
+      recordLoginLog(req, {
+        username: 'master',
+        role: 'master',
+        status: 'FAILED',
+        reason: 'Incorrect master password'
+      });
+      return res.status(401).json({ error: 'Wrong username or password' });
+    }
   }
+
+  // 2. COMPANY USER LOGIN
   const data = getDb();
   if (!data) return res.status(400).json({ error: 'App not set up yet' });
-  const user = (data.users || []).find(u => (u.username || '').toLowerCase() === (username || '').trim().toLowerCase());
-  if (!user) return res.status(401).json({ error: 'Wrong username or password' });
 
-  // Password stored as salted SHA-256: SHA256(salt + ':' + password) — same as client hashPw()
+  const companies = data.companies || [];
+  let user = null;
+  let targetCompany = null;
+
+  // Filter by companyCode if provided
+  if (companyCode) {
+    const codeClean = companyCode.trim().toLowerCase();
+    targetCompany = companies.find(c =>
+      (c.code && c.code.toLowerCase() === codeClean) ||
+      (c.id && c.id.toLowerCase() === codeClean) ||
+      (c.name && c.name.toLowerCase().includes(codeClean))
+    );
+    if (!targetCompany) {
+      recordLoginLog(req, {
+        username: un,
+        status: 'FAILED',
+        reason: `Company code "${companyCode}" not found`
+      });
+      return res.status(404).json({ error: 'Company not found with that code.' });
+    }
+    if (targetCompany.active === false) {
+      recordLoginLog(req, {
+        companyId: targetCompany.id,
+        companyName: targetCompany.name,
+        username: un,
+        status: 'BLOCKED',
+        reason: 'Company account is deactivated'
+      });
+      return res.status(403).json({ error: 'Company account is disabled by Master Admin.' });
+    }
+    user = (data.users || []).find(u =>
+      (u.companyId === targetCompany.id || (!u.companyId && targetCompany.id === 'k88ft5zx1un')) &&
+      (u.username || '').toLowerCase() === un
+    );
+  } else {
+    // Direct username lookup across active users
+    user = (data.users || []).find(u => (u.username || '').toLowerCase() === un);
+    if (user && user.companyId) {
+      targetCompany = companies.find(c => c.id === user.companyId);
+    }
+    if (!targetCompany && companies.length > 0) {
+      targetCompany = companies.find(c => c.active) || companies[0];
+    }
+  }
+
+  if (!user) {
+    recordLoginLog(req, {
+      username: un,
+      status: 'FAILED',
+      reason: 'User not found'
+    });
+    return res.status(401).json({ error: 'Wrong username or password' });
+  }
+
+  // Verify password hash
   const raw = (user.salt || '') + ':' + password;
   const hash = crypto.createHash('sha256').update(raw).digest('hex');
   const fallback = 'c' + cyrbHash(raw);
   if (user.pass !== hash && user.pass !== fallback) {
+    recordLoginLog(req, {
+      companyId: targetCompany ? targetCompany.id : (user.companyId || '-'),
+      companyName: targetCompany ? targetCompany.name : ((data.settings && data.settings.company) || 'Primary Company'),
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+      status: 'FAILED',
+      reason: 'Incorrect password'
+    });
     return res.status(401).json({ error: 'Wrong username or password' });
   }
-  if (!user.active) return res.status(403).json({ error: 'Account is disabled' });
+
+  if (targetCompany && targetCompany.active === false) {
+    recordLoginLog(req, {
+      companyId: targetCompany.id,
+      companyName: targetCompany.name,
+      userId: user.id,
+      username: user.username,
+      status: 'BLOCKED',
+      reason: 'Company disabled'
+    });
+    return res.status(403).json({ error: 'This company account is disabled. Contact Master Admin.' });
+  }
+
+  if (!user.active) {
+    recordLoginLog(req, {
+      companyId: targetCompany ? targetCompany.id : '-',
+      companyName: targetCompany ? targetCompany.name : '-',
+      userId: user.id,
+      username: user.username,
+      status: 'BLOCKED',
+      reason: 'User account disabled'
+    });
+    return res.status(403).json({ error: 'Your account is disabled. Contact company administrator.' });
+  }
+
+  // Record successful login with client IP
+  recordLoginLog(req, {
+    companyId: targetCompany ? targetCompany.id : (user.companyId || '-'),
+    companyName: targetCompany ? targetCompany.name : ((data.settings && data.settings.company) || 'Primary Company'),
+    userId: user.id,
+    username: user.username,
+    role: user.role,
+    status: 'SUCCESS'
+  });
 
   const token = createSession(user.id);
   res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
-  res.json({ ok: true, userId: user.id });
+  res.json({ ok: true, userId: user.id, companyId: user.companyId || (targetCompany && targetCompany.id) });
+});
+
+// Master Admin OTP Verification
+app.post('/api/admin/verify-otp', (req, res) => {
+  const { otp } = req.body || {};
+  const clientIp = getClientIp(req);
+  const pending = pendingOtps.get('master');
+
+  if (!pending) {
+    return res.status(400).json({ error: 'No OTP session found or expired. Please sign in again.' });
+  }
+
+  if (Date.now() > pending.expires) {
+    pendingOtps.delete('master');
+    return res.status(400).json({ error: 'Security OTP expired. Please sign in again.' });
+  }
+
+  if (pending.attempts >= 4) {
+    pendingOtps.delete('master');
+    recordLoginLog(req, {
+      username: 'master',
+      role: 'master',
+      status: 'BLOCKED',
+      reason: 'Maximum OTP attempts exceeded'
+    });
+    return res.status(403).json({ error: 'Too many incorrect attempts. Please sign in again.' });
+  }
+
+  if (String(otp || '').trim() !== String(pending.otp).trim()) {
+    pending.attempts += 1;
+    recordLoginLog(req, {
+      username: 'master',
+      role: 'master',
+      status: 'FAILED',
+      reason: `Wrong OTP entered (Attempt ${pending.attempts}/4)`
+    });
+    return res.status(400).json({ error: `Invalid security code. (${4 - pending.attempts} attempts remaining)` });
+  }
+
+  // OTP verified successfully
+  pendingOtps.delete('master');
+  const token = createSession('master');
+  res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
+
+  recordLoginLog(req, {
+    companyId: 'MASTER',
+    companyName: 'Master Platform Admin',
+    userId: 'master',
+    username: 'master',
+    role: 'master',
+    status: 'SUCCESS',
+    reason: 'Verified via Email OTP'
+  });
+
+  res.json({ ok: true, userId: 'master' });
+});
+
+// Resend Admin OTP
+app.post('/api/admin/resend-otp', (req, res) => {
+  const clientIp = getClientIp(req);
+  const pending = pendingOtps.get('master');
+  if (pending && Date.now() - (pending.lastSent || 0) < 30000) {
+    return res.status(429).json({ error: 'Please wait 30 seconds before requesting another code.' });
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  pendingOtps.set('master', {
+    otp,
+    expires: Date.now() + 10 * 60 * 1000,
+    attempts: 0,
+    ip: clientIp,
+    lastSent: Date.now()
+  });
+
+  sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+
+  res.json({
+    ok: true,
+    message: 'New security code sent to ' + ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length))),
+    devHint: !SMTP_USER ? `Dev Notice: Check server console for code (${otp})` : null
+  });
+});
+
+// Master Admin: View Login Audit Logs with IP Tracker
+app.get('/api/admin/login-audit', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const logs = getAuditLogs();
+  res.json({ ok: true, logs });
+});
+
+// Master Admin: Delete Company
+app.delete('/api/admin/companies/:id', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const companyId = req.params.id;
+  const data = getDb();
+  if (!data || !data.companies) return res.status(404).json({ error: 'No data' });
+
+  const idx = data.companies.findIndex(c => c.id === companyId);
+  if (idx === -1) return res.status(404).json({ error: 'Company not found' });
+
+  const removed = data.companies.splice(idx, 1)[0];
+
+  // Also remove users associated specifically with this deleted company
+  if (data.users) {
+    data.users = data.users.filter(u => u.companyId !== companyId);
+  }
+
+  saveDb(data);
+
+  recordLoginLog(req, {
+    companyId,
+    companyName: removed.name,
+    userId: 'master',
+    username: 'master',
+    role: 'master',
+    status: 'SUCCESS',
+    reason: `Deleted company "${removed.name}"`
+  });
+
+  res.json({ ok: true, message: `Company "${removed.name}" deleted successfully.` });
+});
+
+// Master Admin: Alter / Edit Company
+app.put('/api/admin/companies/:id', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const companyId = req.params.id;
+  const { name, code, gstin, state, active } = req.body || {};
+  const data = getDb();
+  if (!data || !data.companies) return res.status(404).json({ error: 'No data' });
+
+  const comp = data.companies.find(c => c.id === companyId);
+  if (!comp) return res.status(404).json({ error: 'Company not found' });
+
+  if (name !== undefined) comp.name = String(name).trim();
+  if (code !== undefined) comp.code = String(code).trim().toUpperCase();
+  if (gstin !== undefined) comp.gstin = String(gstin).trim().toUpperCase();
+  if (state !== undefined) comp.state = String(state).trim();
+  if (active !== undefined) comp.active = !!active;
+  comp.updatedAt = Date.now();
+
+  saveDb(data);
+  res.json({ ok: true, company: comp });
 });
 
 // Logout

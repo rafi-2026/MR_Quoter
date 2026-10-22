@@ -1961,6 +1961,8 @@
     /* --- cloud mode --- */
     async function apiGet(url) { const r = await fetch(url, { credentials: 'include' }); if (!r.ok) throw new Error(r.status); return r.json() }
     async function apiPost(url, body) { const r = await fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.status) } return r.json() }
+    async function apiPut(url, body) { const r = await fetch(url, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.status) } return r.json() }
+    async function apiDelete(url) { const r = await fetch(url, { method: 'DELETE', credentials: 'include' }); if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.status) } return r.json() }
 
     async function loadDbCloud() {
       try { const data = await apiGet('/api/db'); return data } catch (e) { return null }
@@ -2204,6 +2206,7 @@
       db.profiles = db.profiles || [];
       const nav = [['dash', 'Dashboard'], ['quotes', 'Quotes'], ['customers', 'Customers'], ['rates', 'Rate library']];
       if (isAdmin() || isMaster()) { nav.push(['users', 'Users'], ['settings', 'Settings']) }
+      if (isMaster()) { nav.push(['companies', '🏢 Companies'], ['audit', '🛡️ Login IP Audit']) }
       const name = r.name === 'quote' ? 'quotes' : r.name;
       const coName = (db && db.settings && db.settings.company) || 'Quote Desk';
       root.innerHTML = `<div class="app"><aside class="side-nav">
@@ -2213,9 +2216,9 @@
     <div class="me"><b>${esc(me.name)}</b><span class="role">${ROLES[me.role] || me.role}</span><br><button data-act="mypw">Change password</button><button data-act="logout">Sign out</button></div>
   </aside><main class="main" id="main"></main></div>`;
       updateLiveClock();
-      const v = { dash: viewDash, quotes: viewQuotes, quote: viewQuote, customers: viewCustomers, rates: viewRates, users: viewUsers, settings: viewSettings, companies: viewCompanies }[r.name];
+      const v = { dash: viewDash, quotes: viewQuotes, quote: viewQuote, customers: viewCustomers, rates: viewRates, users: viewUsers, settings: viewSettings, companies: viewCompanies, audit: viewAudit }[r.name];
       if ((r.name === 'users' || r.name === 'settings') && !isAdmin() && !isMaster()) { go('#/dash'); return }
-      if (r.name === 'companies' && !isMaster()) { go('#/dash'); return }
+      if ((r.name === 'companies' || r.name === 'audit') && !isMaster()) { go('#/dash'); return }
       (v || viewDash)(r.arg);
       window.scrollTo(0, 0);
     }
@@ -2286,47 +2289,136 @@
     function viewLogin() {
       const cname = (db && db.settings && db.settings.company) ? db.settings.company : '';
       authShell('Sign in', cname ? esc(cname) : 'Enter your credentials to continue', `
+   <label class="f"><span>Company Code <small style="color:var(--mute)">(Leave empty for primary company)</small></span><input id="l_co" placeholder="e.g. CTB (Optional)" autocapitalize="characters"></label>
    <label class="f"><span>Username</span><input id="l_un" placeholder="Username" required autocapitalize="none" autofocus></label>
    <label class="f"><span>Password</span><input id="l_pw" type="password" placeholder="Password" required></label>
-   <button class="btn pri" type="submit" style="justify-content:center">Sign in</button>
+   <button class="btn pri" id="login_btn" type="submit" style="justify-content:center">Sign in</button>
    <div style="margin-top:12px;text-align:center"><a href="#/setup" style="color:#2a7880;font-weight:600;font-size:0.88rem;text-decoration:underline">First time setup? Go to Setup</a></div>`);
       $('#af').onsubmit = async e => {
         e.preventDefault();
+        const co = ($('#l_co') ? $('#l_co').value.trim() : '');
         const un = $('#l_un').value.trim().toLowerCase(), pw = $('#l_pw').value;
-        if (un === 'master' && pw === MASTER_PASS) {
-          // Load db from server if in cloud mode, else init
-          if (CLOUD) {
-            try {
-              await apiPost('/api/login', { username: 'master', password: MASTER_PASS });
-              let d = await loadDbCloud();
-              if (d) { db = d; db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {}; }
-              else { db = seedData(); await apiPost('/api/db', db); }
-            } catch (ex) {
-              try { let d = await loadDbCloud(); if (d) db = d; else db = seedData(); } catch (e) { db = seedData(); }
+        const btn = $('#login_btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
+
+        if (CLOUD) {
+          try {
+            const res = await apiPost('/api/login', { username: un, password: pw, companyCode: co });
+            if (res.otpRequired) {
+              return showOtpScreen(un, res.email, res.devHint);
             }
-          } else {
-            if (!db) { db = seedData(); persist(true); }
+            if (un === 'master') {
+              let d = await loadDbCloud();
+              if (d) { db = d; db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {}; ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {}; }
+              else { db = seedData(); await apiPost('/api/db', db); }
+              me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
+              setMasterSess(true);
+              go('#/dash');
+              renderApp();
+              return;
+            }
+            db = await loadDbCloud();
+            if (db) { db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {}; ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {}; }
+            const mData = await apiGet('/api/me');
+            me = db && db.users.find(u => u.id === mData.userId && u.active) || null;
+            if (!me) {
+              $('#aerr').textContent = 'User account not found or deactivated.';
+              if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+              return;
+            }
+            renderApp();
+          } catch (ex) {
+            $('#aerr').textContent = ex.message || 'Sign in failed.';
+            if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
           }
+          return;
+        }
+
+        // Offline / local fallback
+        if (un === 'master' && pw === MASTER_PASS) {
+          if (!db) { db = seedData(); persist(true); }
           me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
-          setMasterSess(true); // Persist master session across refreshes
+          setMasterSess(true);
           go('#/dash');
           renderApp();
           return;
         }
-        if (CLOUD) {
-          try {
-            await apiPost('/api/login', { username: un, password: pw });
-            db = await loadDbCloud();
-            if (db) { db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {}; }
-            const mData = await apiGet('/api/me'); me = db && db.users.find(u => u.id === mData.userId && u.active) || null;
-            renderApp();
-          } catch (ex) { $('#aerr').textContent = ex.message || 'Sign in failed.'; }
+        const u = db.users.find(x => x.username === un);
+        if (!u || !(await checkPw(u, pw))) {
+          $('#aerr').textContent = 'Username or password is wrong.';
+          if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
           return;
         }
-        const u = db.users.find(x => x.username === un);
-        if (!u || !(await checkPw(u, pw))) return $('#aerr').textContent = 'Username or password is wrong.';
-        if (!u.active) return $('#aerr').textContent = 'This account is switched off. Ask an admin.';
+        if (!u.active) {
+          $('#aerr').textContent = 'This account is switched off. Ask an admin.';
+          if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+          return;
+        }
         me = u; setSess(u.id); renderApp();
+      };
+    }
+
+    function showOtpScreen(username, maskedEmail, devHint) {
+      authShell('Admin Security Verification', `One-time code sent to <b>${esc(maskedEmail || 'registered email')}</b>`, `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:2.4rem;line-height:1;margin-bottom:8px">🔐</div>
+      <p style="color:var(--text);font-size:0.92rem;line-height:1.45;margin:0 0 8px">
+        Enter the 6-digit security code sent to your registered email to complete Master Admin login.
+      </p>
+      ${devHint ? `<div style="background:#fef3c7;border:1px solid #f59e0b;padding:6px 10px;border-radius:6px;font-size:0.82rem;color:#92400e;margin-bottom:10px">${esc(devHint)}</div>` : ''}
+    </div>
+    <label class="f"><span style="text-align:center;font-weight:700">Security OTP</span>
+      <input id="otp_code" type="text" maxlength="6" pattern="\\d{6}" placeholder="• • • • • •" style="text-align:center;font-size:1.6rem;letter-spacing:8px;font-weight:800;padding:10px;" required autofocus autocomplete="one-time-code">
+    </label>
+    <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:6px">Verify &amp; Sign In</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:0.86rem">
+      <a href="#/login" onclick="viewLogin();return false;" style="color:var(--mute);text-decoration:underline">&larr; Back to Login</a>
+      <button type="button" id="otp_resend_btn" class="btn sm" style="background:transparent;border:0;color:var(--pri);cursor:pointer;font-weight:600;padding:4px 8px">Resend Code</button>
+    </div>`);
+
+      $('#af').onsubmit = async e => {
+        e.preventDefault();
+        const code = $('#otp_code').value.trim();
+        if (code.length !== 6) {
+          $('#aerr').textContent = 'Please enter all 6 digits of the code.';
+          return;
+        }
+        const btn = $('#otp_verify_btn');
+        btn.disabled = true;
+        btn.textContent = 'Verifying security code...';
+        try {
+          const v = await apiPost('/api/admin/verify-otp', { otp: code });
+          if (v.ok) {
+            let d = await loadDbCloud();
+            if (d) {
+              db = d; db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};
+              ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []);
+              db.seq = db.seq || {};
+            } else {
+              db = seedData();
+              await apiPost('/api/db', db);
+            }
+            me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
+            setMasterSess(true);
+            go('#/dash');
+            renderApp();
+            toast('Welcome, Master Admin! Verified successfully.');
+          }
+        } catch (ex) {
+          $('#aerr').textContent = ex.message || 'OTP verification failed.';
+          btn.disabled = false;
+          btn.textContent = 'Verify & Sign In';
+        }
+      };
+
+      $('#otp_resend_btn').onclick = async () => {
+        try {
+          const res = await apiPost('/api/admin/resend-otp', {});
+          toast(res.message || 'New OTP sent to your email.');
+          if (res.devHint) toast(res.devHint, 'pri');
+        } catch (ex) {
+          toast(ex.message || 'Failed to resend code.', 'bad');
+        }
       };
     }
     function pwModal(u, own) {
@@ -2753,40 +2845,278 @@
     /* ========== Master Admin Companies ========== */
     function viewCompanies() {
       const m = $('#main'), list = db.companies || [];
-      m.innerHTML = `<div class="ph"><div><h1>Company Management</h1><div class="mute">Master Admin Panel — Manage companies and create company logins.</div></div><div class="acts"><button class="btn pri" data-act="compAdd">Add New Company & Admin</button></div></div>
-  <div class="card" style="padding:6px 10px"><div class="scx"><table class="tbl"><thead><tr><th>Company Name</th><th>GSTIN</th><th>State</th><th>Status</th><th class="r">Users</th><th class="r">Quotes</th><th></th></tr></thead><tbody>${list.map(c => {
-        const uCount = db.users.filter(u => u.companyId === c.id || !u.companyId).length;
-        const qCount = db.quotes.filter(q => q.companyId === c.id).length;
-        return `<tr><td><b>${esc(c.name)}</b><div class="mute sm">ID: ${esc(c.id)} &middot; Added ${fmtDate(new Date(c.createdAt).toISOString().slice(0, 10))}</div></td><td>${esc(c.gstin || '-')}</td><td>${esc(c.state || '-')}</td><td>${c.active ? '<span class="bd approved">Authorised</span>' : '<span class="bd rejected">Disabled</span>'}</td><td class="r">${uCount}</td><td class="r">${qCount}</td><td class="r nowrap"><button class="btn sm" data-act="compEdit" data-id="${c.id}">Edit</button> <button class="btn sm ${c.active ? 'bad' : 'pri'}" data-act="compToggle" data-id="${c.id}">${c.active ? 'Disable' : 'Authorise'}</button></td></tr>`;
-      }).join('') || '<tr><td colspan="7"><div class="empty">No companies added yet. Click "Add New Company & Admin" to get started.</div></td></tr>'}</tbody></table></div></div>`;
+      m.innerHTML = `<div class="ph">
+        <div>
+          <h1>Company Management</h1>
+          <div class="mute">Master Admin Panel — Onboard companies, alter company details, manage status, and delete companies.</div>
+        </div>
+        <div class="acts">
+          <button class="btn pri" data-act="compAdd">+ Add New Company &amp; Admin</button>
+        </div>
+      </div>
+      <div class="card" style="padding:6px 10px">
+        <div class="scx">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Company Name</th>
+                <th>Code</th>
+                <th>GSTIN</th>
+                <th>State</th>
+                <th>Status</th>
+                <th class="r">Users</th>
+                <th class="r">Quotes</th>
+                <th class="r">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${list.map(c => {
+                const uCount = db.users.filter(u => u.companyId === c.id || (!u.companyId && c.id === 'k88ft5zx1un')).length;
+                const qCount = db.quotes.filter(q => q.companyId === c.id || (!q.companyId && c.id === 'k88ft5zx1un')).length;
+                const codeBadge = c.code ? `<span style="background:rgba(2,132,199,0.12);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700;font-size:0.8rem;letter-spacing:0.5px">${esc(c.code)}</span>` : '<span class="mute sm">-</span>';
+                return `<tr>
+                  <td>
+                    <b>${esc(c.name)}</b>
+                    <div class="mute sm">ID: ${esc(c.id)} &middot; Added ${fmtDate(new Date(c.createdAt || Date.now()).toISOString().slice(0, 10))}</div>
+                  </td>
+                  <td>${codeBadge}</td>
+                  <td>${esc(c.gstin || '-')}</td>
+                  <td>${esc(c.state || '-')}</td>
+                  <td>${c.active ? '<span class="bd approved">Authorised</span>' : '<span class="bd rejected">Disabled</span>'}</td>
+                  <td class="r"><b>${uCount}</b></td>
+                  <td class="r"><b>${qCount}</b></td>
+                  <td class="r nowrap">
+                    <button class="btn sm" data-act="compEdit" data-id="${c.id}" title="Alter Company Details">Edit</button>
+                    <button class="btn sm ${c.active ? 'bad' : 'pri'}" data-act="compToggle" data-id="${c.id}">${c.active ? 'Disable' : 'Authorise'}</button>
+                    <button class="btn sm bad" data-act="compDel" data-id="${c.id}" title="Delete Company">Delete</button>
+                  </td>
+                </tr>`;
+              }).join('') || '<tr><td colspan="8"><div class="empty">No companies added yet. Click "+ Add New Company &amp; Admin" to get started.</div></td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
     }
+
     ACT.compAdd = () => {
       modal({
         title: 'Add New Company & Admin Login', wide: true, body: `<div class="grid g2">
-  <label class="f" style="grid-column:1/-1"><span>Company Name</span><input name="name" placeholder="e.g. Acme Construction Pvt Ltd" required></label>
+  <label class="f" style="grid-column:1/-1"><span>Company Name</span><input name="name" placeholder="e.g. Acme Façades Pvt Ltd" required></label>
+  <label class="f"><span>Company Code (for login & quote prefix)</span><input name="code" placeholder="e.g. ACME" autocapitalize="characters" required></label>
   <label class="f"><span>GSTIN (optional)</span><input name="gstin" placeholder="GSTIN"></label>
-  <label class="f"><span>State</span><select name="state">${opt(STATES, 'Tamil Nadu')}</select></label>
+  <label class="f" style="grid-column:1/-1"><span>State</span><select name="state">${opt(STATES, 'Tamil Nadu')}</select></label>
   <div style="grid-column:1/-1;border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><b>Initial Company Admin Login</b></div>
   <label class="f"><span>Admin Full Name</span><input name="adminName" placeholder="e.g. John Doe"></label>
-  <label class="f"><span>Admin Username</span><input name="adminUsername" placeholder="e.g. john_admin" autocapitalize="none"></label>
-  <label class="f" style="grid-column:1/-1"><span>Admin Password</span><input name="adminPw" type="password" placeholder="At least 6 characters"></label>
+  <label class="f"><span>Admin Username</span><input name="adminUsername" placeholder="e.g. john_admin" autocapitalize="none" required></label>
+  <label class="f" style="grid-column:1/-1"><span>Admin Password</span><input name="adminPw" type="password" placeholder="At least 6 characters" required></label>
 </div>`, onOk: async el => {
-          const d = formData(el); if (!d.name.trim()) { toast('Enter company name.', 'bad'); return false }
-          const coId = uid(); db.companies = db.companies || [];
-          db.companies.push({ id: coId, name: d.name.trim(), gstin: d.gstin.trim().toUpperCase(), state: d.state, active: true, createdAt: Date.now() });
+          const d = formData(el);
+          if (!d.name.trim()) { toast('Enter company name.', 'bad'); return false; }
+          const code = (d.code || '').trim().toUpperCase();
+          if (!code) { toast('Enter a unique company code.', 'bad'); return false; }
+          if (db.companies.some(x => (x.code || '').toUpperCase() === code)) { toast('Company code already in use.', 'bad'); return false; }
+          const coId = uid();
+          db.companies = db.companies || [];
+          db.companies.push({ id: coId, name: d.name.trim(), code: code, gstin: d.gstin.trim().toUpperCase(), state: d.state, active: true, createdAt: Date.now() });
+
           if (d.adminUsername.trim()) {
             const un = d.adminUsername.trim().toLowerCase();
-            if (db.users.some(x => x.username === un)) { toast('Username already taken.', 'bad'); return false }
-            if ((d.adminPw || '').length < 6) { toast('Admin password must be at least 6 characters.', 'bad'); return false }
+            if (db.users.some(x => x.username === un)) { toast('Username already taken.', 'bad'); return false; }
+            if ((d.adminPw || '').length < 6) { toast('Admin password must be at least 6 characters.', 'bad'); return false; }
             const salt = uid();
-            db.users.push({ id: uid(), companyId: coId, name: d.adminName.trim() || (d.name.trim() + ' Admin'), username: un, salt, pass: await hashPw(d.adminPw, salt), role: 'admin', active: true });
+            db.users.push({
+              id: uid(),
+              companyId: coId,
+              name: d.adminName.trim() || (d.name.trim() + ' Admin'),
+              username: un,
+              salt,
+              pass: await hashPw(d.adminPw, salt),
+              role: 'admin',
+              active: true,
+              access: 'rw',
+              canApprove: true,
+              canPayments: true,
+              canRates: true,
+              canMargin: true,
+              canSettings: true
+            });
           }
-          await persist(true); renderApp(); toast('Company & Admin login created successfully!')
+          await persist(true);
+          renderApp();
+          toast('Company & Admin login created successfully!');
         }
-      })
+      });
     };
-    ACT.compEdit = b => { const c = (db.companies || []).find(x => x.id === b.dataset.id); if (!c) return; modal({ title: 'Edit Company', body: `<div class="grid"><label class="f"><span>Company Name</span><input name="name" value="${esc(c.name)}"></label><label class="f"><span>GSTIN</span><input name="gstin" value="${esc(c.gstin || '')}"></label><label class="f"><span>State</span><select name="state">${opt(STATES, c.state)}</select></label></div>`, onOk: el => { const d = formData(el); if (!d.name.trim()) { toast('Enter company name.', 'bad'); return false } Object.assign(c, { name: d.name.trim(), gstin: d.gstin.trim().toUpperCase(), state: d.state }); persist(true); renderApp(); toast('Company updated.') } }) };
-    ACT.compToggle = b => { const c = (db.companies || []).find(x => x.id === b.dataset.id); if (!c) return; c.active = !c.active; persist(true); renderApp(); toast(`Company ${c.active ? 'authorised' : 'disabled'}.`) };
+
+    ACT.compEdit = b => {
+      const c = (db.companies || []).find(x => x.id === b.dataset.id);
+      if (!c) return;
+      modal({
+        title: 'Alter Company Details', body: `<div class="grid">
+          <label class="f"><span>Company Name</span><input name="name" value="${esc(c.name)}"></label>
+          <label class="f"><span>Company Code</span><input name="code" value="${esc(c.code || '')}" autocapitalize="characters"></label>
+          <label class="f"><span>GSTIN</span><input name="gstin" value="${esc(c.gstin || '')}"></label>
+          <label class="f"><span>State</span><select name="state">${opt(STATES, c.state)}</select></label>
+        </div>`,
+        onOk: async el => {
+          const d = formData(el);
+          if (!d.name.trim()) { toast('Enter company name.', 'bad'); return false; }
+          const newCode = (d.code || '').trim().toUpperCase();
+          if (newCode && db.companies.some(x => x.id !== c.id && (x.code || '').toUpperCase() === newCode)) {
+            toast('Company code already in use by another company.', 'bad'); return false;
+          }
+          Object.assign(c, { name: d.name.trim(), code: newCode, gstin: d.gstin.trim().toUpperCase(), state: d.state });
+          if (CLOUD) {
+            try { await apiPut('/api/admin/companies/' + c.id, c); } catch (e) { }
+          }
+          await persist(true);
+          renderApp();
+          toast('Company details updated.');
+        }
+      });
+    };
+
+    ACT.compToggle = async b => {
+      const c = (db.companies || []).find(x => x.id === b.dataset.id);
+      if (!c) return;
+      c.active = !c.active;
+      if (CLOUD) {
+        try { await apiPut('/api/admin/companies/' + c.id, { active: c.active }); } catch (e) { }
+      }
+      await persist(true);
+      renderApp();
+      toast(`Company ${c.active ? 'authorised' : 'disabled'}.`);
+    };
+
+    ACT.compDel = b => {
+      const c = (db.companies || []).find(x => x.id === b.dataset.id);
+      if (!c) return;
+      confirmBox(`Are you sure you want to delete company "${esc(c.name)}"? All associated staff logins and data will be permanently removed.`, async () => {
+        try {
+          if (CLOUD) {
+            await apiDelete('/api/admin/companies/' + c.id);
+          }
+          db.companies = (db.companies || []).filter(x => x.id !== c.id);
+          db.users = (db.users || []).filter(x => x.companyId !== c.id);
+          await persist(true);
+          renderApp();
+          toast(`Company "${c.name}" deleted successfully.`);
+        } catch (e) {
+          toast('Failed to delete company: ' + e.message, 'bad');
+        }
+      }, 'Delete Company', 'bad');
+    };
+
+    /* ========== Login Audit & IP Activity Log ========== */
+    let _auditData = [];
+
+    async function viewAudit() {
+      const m = $('#main');
+      m.innerHTML = `<div class="ph">
+        <div>
+          <h1>Company Login Activity &amp; IP Tracker</h1>
+          <div class="mute">Security audit logger tracking all company user logins, timestamps, client IP addresses, and authentication status.</div>
+        </div>
+        <div class="acts">
+          <button class="btn" id="auditRefreshBtn">🔄 Refresh Activity</button>
+        </div>
+      </div>
+      <div class="card" style="padding:14px 18px;margin-bottom:18px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <input id="auditSearchInput" placeholder="🔍 Search company name, username, or IP address..." style="flex:1;min-width:240px;padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
+          <select id="auditStatusSelect" style="padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
+            <option value="">All Statuses</option>
+            <option value="SUCCESS">Success Only</option>
+            <option value="FAILED">Failed Only</option>
+            <option value="BLOCKED">Blocked Only</option>
+          </select>
+        </div>
+      </div>
+      <div class="card" style="padding:6px 10px">
+        <div class="scx">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Date &amp; Time (IST)</th>
+                <th>Company</th>
+                <th>User / Role</th>
+                <th>Client IP Address</th>
+                <th>Status</th>
+                <th>Browser / Device</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditRows">
+              <tr><td colspan="7" style="text-align:center;padding:24px"><div class="mute">Loading activity logs...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+      $('#auditRefreshBtn').onclick = () => loadAuditRecords();
+      $('#auditSearchInput').oninput = () => renderAuditRows();
+      $('#auditStatusSelect').onchange = () => renderAuditRows();
+
+      await loadAuditRecords();
+    }
+
+    async function loadAuditRecords() {
+      const tbody = $('#auditRows');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px"><div class="mute">Fetching latest logs from server...</div></td></tr>`;
+      try {
+        const res = await apiGet('/api/admin/login-audit');
+        _auditData = (res && res.logs) || [];
+        renderAuditRows();
+      } catch (e) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--bad)">Could not load audit logs: ${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    function renderAuditRows() {
+      const tbody = $('#auditRows');
+      if (!tbody) return;
+      const q = ($('#auditSearchInput') ? $('#auditSearchInput').value.trim().toLowerCase() : '');
+      const stat = ($('#auditStatusSelect') ? $('#auditStatusSelect').value : '');
+
+      let filtered = _auditData.filter(log => {
+        if (stat && log.status !== stat) return false;
+        if (!q) return true;
+        return (
+          (log.companyName || '').toLowerCase().includes(q) ||
+          (log.username || '').toLowerCase().includes(q) ||
+          (log.ip || '').toLowerCase().includes(q) ||
+          (log.reason || '').toLowerCase().includes(q)
+        );
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px"><div class="empty">No login events match your search criteria.</div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(log => {
+        let badge = `<span class="bd approved">SUCCESS</span>`;
+        if (log.status === 'FAILED') badge = `<span class="bd rejected">FAILED</span>`;
+        else if (log.status === 'BLOCKED') badge = `<span class="bd rejected" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5">BLOCKED</span>`;
+
+        let device = log.userAgent || '-';
+        if (device.includes('Windows')) device = '💻 Windows PC';
+        else if (device.includes('Macintosh') || device.includes('Mac OS')) device = '🍎 Mac';
+        else if (device.includes('iPhone')) device = '📱 iPhone';
+        else if (device.includes('Android')) device = '📱 Android';
+        else if (device.includes('Linux')) device = '🐧 Linux';
+
+        return `<tr>
+          <td class="nowrap"><b>${esc(log.dateStr || '-')}</b></td>
+          <td><b>${esc(log.companyName || 'General')}</b></td>
+          <td><b>${esc(log.username || '-')}</b> <span class="mute sm">(${esc(log.role || 'user')})</span></td>
+          <td><code style="background:rgba(2,132,199,0.1);color:#0284c7;padding:3px 8px;border-radius:4px;font-weight:700;font-size:0.85rem">${esc(log.ip || '-')}</code></td>
+          <td>${badge}</td>
+          <td class="sm">${esc(device)}</td>
+          <td class="sm mute">${esc(log.reason || '-')}</td>
+        </tr>`;
+      }).join('');
+    }
 
     /* ========== users ========== */
     function viewUsers() {
