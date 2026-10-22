@@ -327,17 +327,129 @@ function auth(req, res, next) {
 
 // ── API endpoints ─────────────────────────────────────────────────────────────
 
-// Get full database
+// Get database - strictly tenant-isolated for company users
 app.get('/api/db', auth, (req, res) => {
   const data = getDb();
-  res.json(data);
+
+  if (req.userId === 'master') {
+    // Master sees all data, but auto-tag any orphaned records to 'master' namespace
+    let dirty = false;
+    const knownCompanyIds = new Set((data.companies || []).map(c => c.id));
+    knownCompanyIds.add('master');
+
+    (data.quotes || []).forEach(q => {
+      if (!q.companyId || !knownCompanyIds.has(q.companyId)) {
+        q.companyId = 'master';
+        dirty = true;
+      }
+    });
+    (data.customers || []).forEach(c => {
+      if (!c.companyId || !knownCompanyIds.has(c.companyId)) {
+        c.companyId = 'master';
+        dirty = true;
+      }
+    });
+    (data.users || []).forEach(u => {
+      if (u.id !== 'master' && (!u.companyId || (!knownCompanyIds.has(u.companyId) && u.companyId !== 'master'))) {
+        u.companyId = 'master';
+        dirty = true;
+      }
+    });
+
+    if (dirty) saveDb(data);
+    return res.json(data);
+  }
+
+  const user = (data.users || []).find(u => u.id === req.userId);
+  if (!user || !user.companyId) {
+    // Unknown user - return empty safe workspace
+    return res.json({
+      settings: data.settings || {},
+      users: [],
+      quotes: [],
+      customers: [],
+      products: data.products || [],
+      items: data.items || [],
+      companies: [],
+      seq: {},
+      profiles: []
+    });
+  }
+
+  const coId = user.companyId;
+  const targetCompany = (data.companies || []).find(c => c.id === coId);
+
+  // Return STRICTLY this company's workspace only - no orphaned data
+  const companyDb = {
+    settings: {
+      ...data.settings,
+      company: (targetCompany && targetCompany.name) || data.settings.company,
+      gstin: (targetCompany && targetCompany.gstin) || '',
+      state: (targetCompany && targetCompany.state) || data.settings.state,
+      prefix: (targetCompany && targetCompany.code ? targetCompany.code + '/Q' : data.settings.prefix)
+    },
+    users: (data.users || []).filter(u => u.companyId === coId),
+    quotes: (data.quotes || []).filter(q => q.companyId === coId),
+    customers: (data.customers || []).filter(c => c.companyId === coId),
+    products: (data.products || []).filter(p => !p.companyId || p.companyId === coId),
+    items: (data.items || []).filter(i => !i.companyId || i.companyId === coId),
+    companies: targetCompany ? [targetCompany] : [],
+    seq: (data.companySeq && data.companySeq[coId]) || {},
+    profiles: []
+  };
+  res.json(companyDb);
 });
 
-// Save full database
+// Save database - strictly tenant-isolated for company users
 app.post('/api/db', auth, (req, res) => {
-  const data = req.body;
-  if (!data || typeof data !== 'object') return res.status(400).json({ error: 'Invalid data' });
-  saveDb(data);
+  const incoming = req.body;
+  if (!incoming || typeof incoming !== 'object') return res.status(400).json({ error: 'Invalid data' });
+
+  if (req.userId === 'master') {
+    // Tag all master-level records with 'master' companyId before saving
+    if (Array.isArray(incoming.quotes)) {
+      incoming.quotes = incoming.quotes.map(q => q.companyId ? q : { ...q, companyId: 'master' });
+    }
+    if (Array.isArray(incoming.customers)) {
+      incoming.customers = incoming.customers.map(c => c.companyId ? c : { ...c, companyId: 'master' });
+    }
+    saveDb(incoming);
+    return res.json({ ok: true });
+  }
+
+  const fullData = getDb();
+  const user = (fullData.users || []).find(u => u.id === req.userId);
+  const coId = user && user.companyId;
+  if (!coId) {
+    return res.status(403).json({ error: 'No company assigned to user.' });
+  }
+
+  // 1. Tag all incoming quotes with this companyId and merge
+  const incomingQuotes = (incoming.quotes || []).map(q => ({ ...q, companyId: coId }));
+  fullData.quotes = [
+    ...(fullData.quotes || []).filter(q => q.companyId !== coId),
+    ...incomingQuotes
+  ];
+
+  // 2. Tag all incoming customers with this companyId and merge
+  const incomingCustomers = (incoming.customers || []).map(c => ({ ...c, companyId: coId }));
+  fullData.customers = [
+    ...(fullData.customers || []).filter(c => c.companyId !== coId),
+    ...incomingCustomers
+  ];
+
+  // 3. Tag all incoming users with this companyId and merge
+  const incomingUsers = (incoming.users || []).map(u => ({ ...u, companyId: coId }));
+  fullData.users = [
+    ...(fullData.users || []).filter(u => u.companyId !== coId),
+    ...incomingUsers
+  ];
+
+  // 4. Save company sequence separately so numbers don't clash across companies
+  if (!fullData.companySeq) fullData.companySeq = {};
+  if (incoming.seq) fullData.companySeq[coId] = incoming.seq;
+
+  saveDb(fullData);
   res.json({ ok: true });
 });
 
