@@ -327,75 +327,139 @@ function auth(req, res, next) {
 
 // ── API endpoints ─────────────────────────────────────────────────────────────
 
+// ── DEFAULT blank settings template for a fresh company ──────────────────────
+const DEFAULT_COMPANY_SETTINGS = {
+  company: '',
+  tagline: '',
+  address1: '',
+  address2: '',
+  city: '',
+  state: '',
+  pincode: '',
+  phone: '',
+  email: '',
+  website: '',
+  gstin: '',
+  prefix: 'QT/Q',
+  validity: 30,
+  gstRate: 18,
+  approvalMode: 'rules',
+  approvalAbove: 500000,
+  maxDisc: 10,
+  terms: 'Prices are valid for the period stated in this quotation.\nGST is charged as shown in the totals of this quotation.',
+  pay: [
+    { label: 'Advance with order', pct: 50 },
+    { label: 'On material delivery at site', pct: 40 },
+    { label: 'On completion and handover', pct: 10 }
+  ],
+  bank: { acName: '', bank: '', acNo: '', ifsc: '', branch: '', upiId: '' },
+  headerImg: '',
+  footerImg: '',
+  authorisedDefault: 'Managing Director',
+  authorisedTitleDefault: 'Authorised Signatory',
+  glass: [
+    { name: '5 mm clear glass', add: 0 },
+    { name: '5 mm tinted glass', add: 25 },
+    { name: '6 mm toughened clear', add: 45 },
+    { name: '5+5 mm laminated', add: 90 },
+    { name: 'DGU 6+12+6 mm toughened', add: 180 },
+    { name: '6 mm reflective toughened', add: 70 }
+  ],
+  finish: [
+    { name: 'Standard (anodised / white)', add: 0 },
+    { name: 'Powder coated - standard colour', add: 30 },
+    { name: 'Black matt', add: 35 },
+    { name: 'Wooden finish', add: 70 }
+  ],
+  accentColor: '#1e40af',
+  headerColor: '#000000'
+};
+
 // Get database - strictly tenant-isolated for company users
 app.get('/api/db', auth, (req, res) => {
   const data = getDb();
 
   if (req.userId === 'master') {
-    // Master sees all data, but auto-tag any orphaned records to 'master' namespace
+    // Auto-tag any orphaned records to 'master' namespace on first read
     let dirty = false;
     const knownCompanyIds = new Set((data.companies || []).map(c => c.id));
     knownCompanyIds.add('master');
 
     (data.quotes || []).forEach(q => {
       if (!q.companyId || !knownCompanyIds.has(q.companyId)) {
-        q.companyId = 'master';
-        dirty = true;
+        q.companyId = 'master'; dirty = true;
       }
     });
     (data.customers || []).forEach(c => {
       if (!c.companyId || !knownCompanyIds.has(c.companyId)) {
-        c.companyId = 'master';
-        dirty = true;
+        c.companyId = 'master'; dirty = true;
       }
     });
     (data.users || []).forEach(u => {
-      if (u.id !== 'master' && (!u.companyId || (!knownCompanyIds.has(u.companyId) && u.companyId !== 'master'))) {
-        u.companyId = 'master';
-        dirty = true;
+      if (u.id !== 'master' && (!u.companyId || !knownCompanyIds.has(u.companyId))) {
+        u.companyId = 'master'; dirty = true;
       }
     });
-
     if (dirty) saveDb(data);
-    return res.json(data);
+
+    // ── MASTER sees ONLY its own data — company client data is PRIVATE ──────────
+    // Master can manage companies/users (platform administration)
+    // but CANNOT read any company's private quotes or customers
+    return res.json({
+      settings:        data.settings,
+      companies:       data.companies || [],          // for management panel
+      users:           (data.users || []).filter(u => u.companyId === 'master' || !u.companyId),  // master-level users only
+      quotes:          (data.quotes    || []).filter(q => q.companyId === 'master'),  // master's own quotes only
+      customers:       (data.customers || []).filter(c => c.companyId === 'master'),  // master's own customers only
+      products:        data.products || [],
+      items:           data.items || [],
+      profiles:        data.profiles || [],
+      seq:             (data.companySeq && data.companySeq['master']) || data.seq || {},
+      companySettings: data.companySettings || {},     // for admin tools only
+      companySeq:      data.companySeq || {}           // for admin tools only
+    });
   }
 
+  // ── COMPANY USER ─────────────────────────────────────────────────────────────
   const user = (data.users || []).find(u => u.id === req.userId);
   if (!user || !user.companyId) {
-    // Unknown user - return empty safe workspace
+    // No company assigned — return empty safe shell
     return res.json({
-      settings: data.settings || {},
-      users: [],
-      quotes: [],
-      customers: [],
-      products: data.products || [],
-      items: data.items || [],
-      companies: [],
-      seq: {},
-      profiles: []
+      settings: { ...DEFAULT_COMPANY_SETTINGS },
+      users: [], quotes: [], customers: [],
+      products: [], items: [], companies: [],
+      seq: {}, profiles: []
     });
   }
 
   const coId = user.companyId;
   const targetCompany = (data.companies || []).find(c => c.id === coId);
 
-  // Return STRICTLY this company's workspace only - no orphaned data
+  // Load this company's OWN saved settings, falling back to blank defaults
+  // NEVER inherit master settings (bank details, terms, header/footer, etc.)
+  const companySettings = (data.companySettings && data.companySettings[coId])
+    ? { ...DEFAULT_COMPANY_SETTINGS, ...data.companySettings[coId] }
+    : { ...DEFAULT_COMPANY_SETTINGS };
+
+  // Always override company/gstin/state/prefix from the companies registry
+  // (master controls these fields when creating a company)
+  companySettings.company = (targetCompany && targetCompany.name) || companySettings.company || '';
+  companySettings.gstin   = (targetCompany && targetCompany.gstin)  || companySettings.gstin  || '';
+  companySettings.state   = (targetCompany && targetCompany.state)  || companySettings.state  || '';
+  companySettings.prefix  = (targetCompany && targetCompany.code)
+    ? targetCompany.code + '/Q'
+    : companySettings.prefix;
+
   const companyDb = {
-    settings: {
-      ...data.settings,
-      company: (targetCompany && targetCompany.name) || data.settings.company,
-      gstin: (targetCompany && targetCompany.gstin) || '',
-      state: (targetCompany && targetCompany.state) || data.settings.state,
-      prefix: (targetCompany && targetCompany.code ? targetCompany.code + '/Q' : data.settings.prefix)
-    },
-    users: (data.users || []).filter(u => u.companyId === coId),
-    quotes: (data.quotes || []).filter(q => q.companyId === coId),
+    settings: companySettings,
+    users:     (data.users     || []).filter(u => u.companyId === coId),
+    quotes:    (data.quotes    || []).filter(q => q.companyId === coId),
     customers: (data.customers || []).filter(c => c.companyId === coId),
-    products: (data.products || []).filter(p => !p.companyId || p.companyId === coId),
-    items: (data.items || []).filter(i => !i.companyId || i.companyId === coId),
+    products:  (data.products  || []).filter(p => !p.companyId || p.companyId === coId),
+    items:     (data.items     || []).filter(i => !i.companyId || i.companyId === coId),
     companies: targetCompany ? [targetCompany] : [],
-    seq: (data.companySeq && data.companySeq[coId]) || {},
-    profiles: []
+    seq:       (data.companySeq && data.companySeq[coId]) || {},
+    profiles:  []
   };
   res.json(companyDb);
 });
@@ -406,17 +470,66 @@ app.post('/api/db', auth, (req, res) => {
   if (!incoming || typeof incoming !== 'object') return res.status(400).json({ error: 'Invalid data' });
 
   if (req.userId === 'master') {
-    // Tag all master-level records with 'master' companyId before saving
+    // ── MASTER SAVE: surgical merge — only update master's own namespace ─────────
+    // NEVER overwrite company clients' private quotes, customers, settings, or users
+    const fullData = getDb();
+
+    // 1. Update master's own settings (bank, terms, etc.)
+    if (incoming.settings) {
+      fullData.settings = incoming.settings;
+    }
+
+    // 2. Replace master's own quotes only (companyId === 'master')
     if (Array.isArray(incoming.quotes)) {
-      incoming.quotes = incoming.quotes.map(q => q.companyId ? q : { ...q, companyId: 'master' });
+      const masterQuotes = incoming.quotes.map(q => ({ ...q, companyId: 'master' }));
+      fullData.quotes = [
+        ...(fullData.quotes || []).filter(q => q.companyId !== 'master'),
+        ...masterQuotes
+      ];
     }
+
+    // 3. Replace master's own customers only
     if (Array.isArray(incoming.customers)) {
-      incoming.customers = incoming.customers.map(c => c.companyId ? c : { ...c, companyId: 'master' });
+      const masterCustomers = incoming.customers.map(c => ({ ...c, companyId: 'master' }));
+      fullData.customers = [
+        ...(fullData.customers || []).filter(c => c.companyId !== 'master'),
+        ...masterCustomers
+      ];
     }
-    saveDb(incoming);
+
+    // 4. Update company list (master manages companies)
+    if (Array.isArray(incoming.companies)) {
+      fullData.companies = incoming.companies;
+    }
+
+    // 5. Update shared product catalog if sent
+    if (Array.isArray(incoming.products)) {
+      fullData.products = incoming.products;
+    }
+    if (Array.isArray(incoming.items)) {
+      fullData.items = incoming.items;
+    }
+
+    // 6. Save master's own seq separately
+    if (incoming.seq) {
+      if (!fullData.companySeq) fullData.companySeq = {};
+      fullData.companySeq['master'] = incoming.seq;
+    }
+
+    // 7. Update master-level users if sent (but preserve company users)
+    if (Array.isArray(incoming.users)) {
+      const masterUsers = incoming.users.map(u => ({ ...u, companyId: u.companyId || 'master' }));
+      // Only replace users that belong to master, keep all company users intact
+      const companyUsers = (fullData.users || []).filter(u => u.companyId && u.companyId !== 'master');
+      fullData.users = [...companyUsers, ...masterUsers.filter(u => u.companyId === 'master')];
+    }
+
+    // NOTE: fullData.companySettings and company-tagged quotes/customers/users are NEVER touched
+    saveDb(fullData);
     return res.json({ ok: true });
   }
 
+  // ── COMPANY USER SAVE ─────────────────────────────────────────────────────────
   const fullData = getDb();
   const user = (fullData.users || []).find(u => u.id === req.userId);
   const coId = user && user.companyId;
@@ -424,28 +537,36 @@ app.post('/api/db', auth, (req, res) => {
     return res.status(403).json({ error: 'No company assigned to user.' });
   }
 
-  // 1. Tag all incoming quotes with this companyId and merge
+  // 1. Save this company's settings into its own private namespace
+  if (incoming.settings) {
+    if (!fullData.companySettings) fullData.companySettings = {};
+    // Strip out company/gstin/state/prefix — those are controlled by master
+    const { company, gstin, state, prefix, ...ownSettings } = incoming.settings;
+    fullData.companySettings[coId] = ownSettings;
+  }
+
+  // 2. Tag and merge quotes
   const incomingQuotes = (incoming.quotes || []).map(q => ({ ...q, companyId: coId }));
   fullData.quotes = [
     ...(fullData.quotes || []).filter(q => q.companyId !== coId),
     ...incomingQuotes
   ];
 
-  // 2. Tag all incoming customers with this companyId and merge
+  // 3. Tag and merge customers
   const incomingCustomers = (incoming.customers || []).map(c => ({ ...c, companyId: coId }));
   fullData.customers = [
     ...(fullData.customers || []).filter(c => c.companyId !== coId),
     ...incomingCustomers
   ];
 
-  // 3. Tag all incoming users with this companyId and merge
+  // 4. Tag and merge users
   const incomingUsers = (incoming.users || []).map(u => ({ ...u, companyId: coId }));
   fullData.users = [
     ...(fullData.users || []).filter(u => u.companyId !== coId),
     ...incomingUsers
   ];
 
-  // 4. Save company sequence separately so numbers don't clash across companies
+  // 5. Save company quote sequence separately (no number clash across companies)
   if (!fullData.companySeq) fullData.companySeq = {};
   if (incoming.seq) fullData.companySeq[coId] = incoming.seq;
 
