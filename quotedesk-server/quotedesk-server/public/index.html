@@ -10,6 +10,7 @@
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     :root {
       --ink: #1b2a2f;
@@ -2445,7 +2446,7 @@
     function quoteRow(q) {
       const shared = q.shareToken ? `<span title="Viewed ${q.viewCount||0}×" style="font-size:0.75rem;color:var(--ok)">${q.viewCount ? '👁' + q.viewCount : '🔗'}</span>` : '';
       const accepted = q.acceptedBy ? `<span title="Accepted by ${q.acceptedBy}" style="font-size:0.75rem;color:var(--ok)">✅</span>` : '';
-      return `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)} ${shared}${accepted}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="shareLink" data-id="${q.id}" title="Client share link + track" style="color:var(--glass)">🔗</button></td></tr>`;
+      return `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)} ${shared}${accepted}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="shareLink" data-id="${q.id}" title="Client share link + track" style="color:var(--glass)">🔗</button><button class="btn sm ghost" data-act="delQuoteRow" data-id="${q.id}" title="Delete Quotation" style="color:var(--bad)">🗑️</button></td></tr>`;
     }
     function viewDash() {
       const qs = liveQuotes(), m = $('#main');
@@ -2549,7 +2550,7 @@
     function drawQuotes() {
       const base = filteredQuotes(true), list = filteredQuotes(false);
       $('#qchips').innerHTML = ['all', ...Object.keys(STATUS)].map(s => `<button class="chip ${qf.status === s ? 'on' : ''}" data-act="qstatus" data-s="${s}">${s === 'all' ? 'All' : STATUS[s]}<b>${s === 'all' ? base.length : base.filter(q => q.status === s).length}</b></button>`).join('');
-      $('#qtable').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer / project</th><th class="r">Total</th><th>Status</th><th>Owner</th><th class="r">Actions</th></tr></thead><tbody>${list.map(q => `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)}</td><td class="nowrap">${esc(userName(q.createdBy))}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button></td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="margin:10px">${db.quotes.length ? 'No quotes match this filter.' : 'No quotes yet. Select New quotation to start.'}</div>`;
+      $('#qtable').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer / project</th><th class="r">Total</th><th>Status</th><th>Owner</th><th class="r">Actions</th></tr></thead><tbody>${list.map(q => `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)}</td><td class="nowrap">${esc(userName(q.createdBy))}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="delQuoteRow" data-id="${q.id}" title="Delete Quotation" style="color:var(--bad)">🗑️</button></td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="margin:10px">${db.quotes.length ? 'No quotes match this filter.' : 'No quotes yet. Select New quotation to start.'}</div>`;
     }
     ACT.qstatus = b => { qf.status = b.dataset.s; drawQuotes() };
     ACT.csv = () => {
@@ -2593,20 +2594,77 @@
       download(`Quote_${safeNo}.html`, htmlDoc, 'text/html');
       toast('Downloaded Quotation document file.');
     }
+    async function generateQuotePdfBlob(q) {
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '210mm';
+      container.style.background = '#ffffff';
+      container.innerHTML = `<div class="sheet doc" style="box-shadow:none;margin:0;padding:0;width:100%">${docHTML(q)}</div>`;
+      document.body.appendChild(container);
+      renderDocQr(container, q);
+
+      const opt = {
+        margin: [6, 6, 6, 6],
+        filename: `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      try {
+        if (typeof html2pdf === 'undefined') {
+          throw new Error('PDF generator library loading, please try again in a moment.');
+        }
+        const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+        document.body.removeChild(container);
+        return pdfBlob;
+      } catch (e) {
+        if (container.parentNode) document.body.removeChild(container);
+        throw e;
+      }
+    }
+
+    async function downloadQuotePdf(q) {
+      toast('⏳ Generating official PDF document...');
+      try {
+        const blob = await generateQuotePdfBlob(q);
+        const safeName = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = safeName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        toast('✅ PDF downloaded successfully!');
+        return blob;
+      } catch (err) {
+        console.error('PDF generation error:', err);
+        toast('PDF direct save failed. Opening print window...', 'bad');
+        previewQuote(q);
+        return null;
+      }
+    }
+
     ACT.quickDownload = b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       modal({
         title: `Download & Export: ${q.no}`,
         noFooter: true,
         body: `<div class="grid g2" style="margin:12px 0;gap:12px">
-      <button class="btn pri" data-act="dlHtml" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📥 Download Quote File (.html)</button>
+      <button class="btn pri" data-act="dlRealPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📄 Download Official PDF Document</button>
+      <button class="btn" data-act="dlHtml" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📥 Download Quote File (.html)</button>
       <button class="btn" data-act="dlPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">🖨️ Print / Save as PDF Window</button>
       <button class="btn" data-act="dlCsv" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📊 Export Excel / CSV File</button>
       <button class="btn" data-act="dlJson" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📦 Backup JSON Data File</button>
     </div>
-    <div class="mute sm" style="text-align:center;margin-top:6px">Tip: "Download Quote File" saves a complete offline quotation you can send to customers or open anywhere.</div>`
+    <div class="mute sm" style="text-align:center;margin-top:6px">Tip: "Download Official PDF Document" saves the exact customer-ready PDF directly to your device.</div>`
       });
     };
+    ACT.dlRealPdf = async b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) await downloadQuotePdf(q); };
     ACT.dlHtml = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) downloadQuoteHtml(q); };
     ACT.dlPdf = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) previewQuote(q); };
     ACT.dlCsv = b => {
@@ -2632,41 +2690,161 @@
       closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       download(`Quote_${q.no.replace(/[/\\?%*:|"<>]/g, '_')}.json`, JSON.stringify(q, null, 2), 'application/json');
     };
+
+    ACT.delQuoteRow = b => {
+      const q = db.quotes.find(x => x.id === b.dataset.id);
+      if (!q) return;
+      if (!canWrite()) { toast('Your account is set to read-only.', 'bad'); return; }
+      confirmBox(`Are you sure you want to permanently delete quotation "${esc(q.no)}"?`, async () => {
+        if (q.rev > 0) {
+          const p = db.quotes.filter(x => x.groupId === q.groupId && x.rev < q.rev).sort((a, b) => b.rev - a.rev)[0];
+          if (p) p.superseded = false;
+        }
+        db.quotes = db.quotes.filter(x => x.id !== q.id);
+        await persist(true);
+        renderApp();
+        toast(`Quotation "${q.no}" deleted.`);
+      }, 'Delete Quotation', 'bad');
+    };
+
     ACT.shareMail = b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       const t = calcTotals(q);
-      const subject = encodeURIComponent(`Quotation Ref: ${q.no} - ${q.project || 'Supply & Installation'}`);
-      const body = encodeURIComponent(`Dear ${q.cust.name || 'Customer'},\n\nWe are pleased to share our quotation ${q.no} for ${q.project || 'your project'}.\n\nQuotation Details:\n- Quote No: ${q.no}\n- Date: ${fmtDate(q.date)}\n- Valid Until: ${fmtDate(addDays(q.date, q.validity || 30))}\n- Total Amount: ${rs(t.grand, 0)}\n\nPrepared By: ${userName(q.createdBy)}\nCompany: ${db.settings.company}\n\nPlease review the quote and let us know if you have any questions.\n\nBest Regards,\n${db.settings.company}`);
-      window.open(`mailto:${q.cust.email || ''}?subject=${subject}&body=${body}`, '_blank');
+      const defSub = `Quotation Ref: ${q.no} - ${q.project || 'Supply & Installation'}`;
+      const defMsg = `Dear ${q.cust.name || 'Customer'},\n\nWe are pleased to share our quotation ${q.no} for ${q.project || 'your project'}.\n\nQuotation Details:\n- Quote No: ${q.no}\n- Date: ${fmtDate(q.date)}\n- Valid Until: ${fmtDate(addDays(q.date, q.validity || 30))}\n- Total Amount: ${rs(t.grand, 0)}\n\nPrepared By: ${userName(q.createdBy)}\nCompany: ${db.settings.company}\n\nPlease find the official PDF quotation attached.\n\nBest Regards,\n${db.settings.company}`;
+
+      modal({
+        title: 'Share Quotation via Email',
+        noFooter: true,
+        body: `<div style="display:flex;flex-direction:column;gap:12px;margin:8px 0">
+          <label class="f"><span>Customer Email Address</span>
+            <input id="mail_to" type="email" value="${esc(q.cust.email || '')}" placeholder="customer@example.com" required autofocus>
+          </label>
+          <label class="f"><span>Subject Line</span>
+            <input id="mail_sub" value="${esc(defSub)}">
+          </label>
+          <label class="f"><span>Email Message Note</span>
+            <textarea id="mail_body" rows="6" style="font-size:0.88rem;line-height:1.45">${esc(defMsg)}</textarea>
+          </label>
+          <div style="background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px 14px;font-size:0.86rem;display:flex;align-items:center;gap:10px">
+            <span style="font-size:1.4rem">📎</span>
+            <div>
+              <b>Attachment:</b> Quotation_${esc(q.no.replace(/[/\\?%*:|"<>]/g, '_'))}.pdf
+              <div class="mute sm">Generated official PDF document with complete branding.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn pri" id="btn_send_smtp" style="flex:1;min-width:200px;justify-content:center;padding:10px">📤 Send Email with Attached PDF</button>
+            <button class="btn" id="btn_send_outlook" style="justify-content:center;padding:10px">💻 Download &amp; Open Outlook</button>
+          </div>
+        </div>`
+      });
+
+      // Handle direct send via server
+      $('#btn_send_smtp').onclick = async () => {
+        const to = $('#mail_to').value.trim();
+        if (!to) { toast('Please enter a recipient email address.', 'bad'); return; }
+        const btn = $('#btn_send_smtp');
+        btn.disabled = true;
+        btn.textContent = '⏳ Generating PDF & Sending...';
+        try {
+          const blob = await generateQuotePdfBlob(q);
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = async () => {
+            const base64data = reader.result;
+            try {
+              const res = await apiPost('/api/quotes/' + q.id + '/email-pdf', {
+                recipientEmail: to,
+                subject: $('#mail_sub').value.trim() || defSub,
+                message: $('#mail_body').value.trim() || defMsg,
+                pdfBase64: base64data
+              });
+              closeModal();
+              toast('✅ ' + (res.message || 'Quotation PDF sent successfully!'));
+            } catch (err) {
+              btn.disabled = false;
+              btn.textContent = '📤 Send Email with Attached PDF';
+              toast('Failed to send email: ' + err.message, 'bad');
+            }
+          };
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = '📤 Send Email with Attached PDF';
+          toast('Could not generate PDF: ' + e.message, 'bad');
+        }
+      };
+
+      // Handle download + open Outlook
+      $('#btn_send_outlook').onclick = async () => {
+        const to = $('#mail_to').value.trim();
+        const sub = encodeURIComponent($('#mail_sub').value.trim() || defSub);
+        const body = encodeURIComponent($('#mail_body').value.trim() || defMsg);
+        closeModal();
+        await downloadQuotePdf(q);
+        window.open(`mailto:${to}?subject=${sub}&body=${body}`, '_blank');
+        toast('📄 PDF downloaded! Click Attach File in Outlook to attach it.');
+      };
     };
-    ACT.shareWhatsapp = b => {
+
+    ACT.shareWhatsapp = async b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
-      // Use server-side share API for token-based link + tracking (cloud mode)
-      if (CLOUD && ['approved', 'sent', 'won'].includes(q.status)) {
-        apiPost('/api/quotes/' + q.id + '/share', {}).then(d => {
-          if (d.error) { toast(d.error, 'bad'); return; }
-          // Copy link to clipboard
-          if (navigator.clipboard) navigator.clipboard.writeText(d.url).catch(() => {});
-          // Open WhatsApp
-          window.open(d.whatsapp, '_blank');
-          // Update local quote status if changed
-          if (q.status === 'approved') { q.status = 'sent'; q.sentAt = Date.now(); }
-          if (!q.shareToken) q.shareToken = d.token;
-          toast('📱 WhatsApp opened! Client link copied to clipboard.');
-        }).catch(() => {
-          // fallback to basic WhatsApp
-          const t = calcTotals(q);
-          const msg = encodeURIComponent(`*QUOTATION*\n*Quote No:* ${q.no}\n*Customer:* ${q.cust.name || '-'}\n*Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}`);
-          const phone = (q.cust.phone || '').replace(/\D/g, '');
-          window.open(phone ? `https://wa.me/${phone.length === 10 ? '91'+phone : phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`, '_blank');
-        });
-      } else {
-        const t = calcTotals(q);
-        const msg = encodeURIComponent(`*QUOTATION SUMMARY*\n\n*Company:* ${db.settings.company}\n*Quote No:* ${q.no}\n*Date:* ${fmtDate(q.date)}\n*Customer:* ${q.cust.name || '-'}\n*Project:* ${q.project || '-'}\n*Grand Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}\n\n*Prepared By:* ${userName(q.createdBy)}\nThank you for choosing ${db.settings.company}!`);
-        const phone = (q.cust.phone || '').replace(/\D/g, '');
-        const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
-        window.open(url, '_blank');
+      toast('📄 Preparing PDF for WhatsApp...');
+      let blob = null;
+      try {
+        blob = await generateQuotePdfBlob(q);
+      } catch (e) {
+        console.warn('Could not generate PDF blob:', e);
       }
+
+      const safeName = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+
+      // 1. If Web Share API supports file sharing (Mobile devices & Windows 11 Edge/Chrome):
+      if (blob && navigator.canShare) {
+        try {
+          const pdfFile = new File([blob], safeName, { type: 'application/pdf' });
+          if (navigator.canShare({ files: [pdfFile] })) {
+            await navigator.share({
+              files: [pdfFile],
+              title: `Quotation ${q.no}`,
+              text: `Quotation ${q.no} from ${db.settings.company || 'Us'}`
+            });
+            toast('✅ PDF shared to WhatsApp!');
+            return;
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+
+      // 2. Desktop WhatsApp Web fallback:
+      // Download the PDF file directly to their Downloads folder
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = safeName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+
+      // Get share link if in cloud mode
+      let linkUrl = '';
+      if (CLOUD && ['approved', 'sent', 'won'].includes(q.status)) {
+        try {
+          const d = await apiPost('/api/quotes/' + q.id + '/share', {});
+          if (d && d.url) linkUrl = d.url;
+        } catch (e) {}
+      }
+
+      const t = calcTotals(q);
+      const msg = encodeURIComponent(`*QUOTATION: ${q.no}*\n*Company:* ${db.settings.company}\n*Customer:* ${q.cust.name || '-'}\n*Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}\n\n📄 *Official PDF Quotation generated and downloaded.*\n${linkUrl ? '🔗 *View & Download PDF Online:* ' + linkUrl + '\n\n' : ''}Please find the attached quotation PDF document.`);
+      const phone = (q.cust.phone || '').replace(/\D/g, '');
+      const waUrl = phone ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
+      window.open(waUrl, '_blank');
+      toast('📄 PDF downloaded! Drag & drop it into the WhatsApp chat.');
     };
     // Share link (copy shareable client link)
     ACT.shareLink = b => {

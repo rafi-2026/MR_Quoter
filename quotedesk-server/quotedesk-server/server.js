@@ -751,14 +751,63 @@ app.get('/api/me', auth, (req, res) => {
   res.json({ userId: req.userId });
 });
 
-// Cloud status
-app.get('/api/cloud-status', (req, res) => {
-  res.json({
-    ok: true,
-    cloud: mongoConnected,
-    mode: mongoConnected ? 'MongoDB Atlas (Free Cloud Database)' : 'Local File Storage',
-    mongoConfigured: !!MONGODB_URI
-  });
+function esc(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Send quotation email with PDF attachment
+app.post('/api/quotes/:id/email-pdf', auth, async (req, res) => {
+  const { recipientEmail, subject, message, pdfBase64 } = req.body || {};
+  if (!recipientEmail) return res.status(400).json({ error: 'Recipient email is required.' });
+  if (!pdfBase64) return res.status(400).json({ error: 'PDF data is required.' });
+
+  const data = getDb();
+  const q = (data && data.quotes || []).find(x => x.id === req.params.id);
+  const company = (data && data.settings && data.settings.company) || 'MR_Quoter';
+  const transporter = getTransporter();
+
+  if (!transporter) {
+    return res.status(500).json({ error: 'Email service is not configured with SMTP credentials.' });
+  }
+
+  const safeFilename = `Quotation_${(q ? q.no : 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+  const pdfBuffer = Buffer.from(pdfBase64.replace(/^data:application\/pdf;base64,/, ''), 'base64');
+
+  try {
+    await transporter.sendMail({
+      from: `"${company}" <${SMTP_USER}>`,
+      to: recipientEmail,
+      subject: subject || `Quotation ${q ? q.no : ''} from ${company}`,
+      html: `
+        <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:10px;background:#ffffff">
+          <h2 style="color:#1b2a2f;margin-top:0">${esc(company)}</h2>
+          <div style="color:#334155;font-size:15px;line-height:1.6;white-space:pre-line;margin-bottom:20px">${esc(message || '')}</div>
+          <div style="background:#f8fafc;padding:14px 18px;border-radius:8px;border:1px solid #cbd5e1;margin:20px 0;display:flex;align-items:center;gap:12px">
+            <span style="font-size:24px">📄</span>
+            <div>
+              <b style="color:#0f172a">${safeFilename}</b>
+              <div style="color:#64748b;font-size:13px">Official quotation document attached.</div>
+            </div>
+          </div>
+          <p style="color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:14px;margin-bottom:0">
+            Sent via MR_Quoter Platform.
+          </p>
+        </div>
+      `,
+      attachments: [
+        {
+          filename: safeFilename,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }
+      ]
+    });
+
+    res.json({ ok: true, message: `Quotation PDF sent successfully to ${recipientEmail}!` });
+  } catch (err) {
+    console.error('Email PDF send error:', err);
+    res.status(500).json({ error: 'Failed to send email: ' + err.message });
+  }
 });
 
 // ── Share quote: generate token + WhatsApp link ────────────────────────────
