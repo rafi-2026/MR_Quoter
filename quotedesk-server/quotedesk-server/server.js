@@ -375,6 +375,78 @@ const DEFAULT_COMPANY_SETTINGS = {
   headerColor: '#000000'
 };
 
+// ── Company Activity & Quotation Statistics Tracker for Master Admin ────────
+function getCompanyStats(data) {
+  const auditLogs = getAuditLogs() || [];
+  const stats = {};
+  const companies = data.companies || [];
+
+  companies.forEach(c => {
+    const coQuotes = (data.quotes || []).filter(q => q.companyId === c.id);
+    const coUsers = (data.users || []).filter(u => u.companyId === c.id);
+    const coAudits = auditLogs.filter(l => l.companyId === c.id || l.companyName === c.name);
+
+    const draftCount = coQuotes.filter(q => !q.status || q.status === 'draft' || q.status === 'pending').length;
+    const approvedCount = coQuotes.filter(q => q.status === 'approved').length;
+    const sentCount = coQuotes.filter(q => q.status === 'sent').length;
+    const wonCount = coQuotes.filter(q => q.status === 'won').length;
+    const lostCount = coQuotes.filter(q => q.status === 'lost').length;
+    const rejectedCount = coQuotes.filter(q => q.status === 'rejected').length;
+
+    let totalValue = 0;
+    coQuotes.forEach(q => {
+      let lineTotal = 0;
+      if (Array.isArray(q.lines)) {
+        lineTotal = q.lines.reduce((s, l) => s + ((Number(l.qty) || 0) * (Number(l.rate) || 0)), 0);
+      }
+      totalValue += (Number(q.total) || lineTotal || 0);
+    });
+
+    let lastQuote = null;
+    if (coQuotes.length > 0) {
+      const sorted = [...coQuotes].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+      const lq = sorted[0];
+      lastQuote = {
+        no: lq.no || '-',
+        date: lq.date || '-',
+        status: lq.status || 'draft',
+        createdAt: lq.createdAt || null,
+        preparedByName: lq.preparedByName || '-'
+      };
+    }
+
+    const lastSuccessLogin = coAudits.find(l => l.status === 'SUCCESS');
+    const lastLogin = lastSuccessLogin || coAudits[0] || null;
+    const uniqueIps = Array.from(new Set(coAudits.map(l => l.ip).filter(Boolean)));
+
+    stats[c.id] = {
+      companyId: c.id,
+      companyName: c.name,
+      companyCode: c.code || '',
+      quoteCount: coQuotes.length,
+      draftCount,
+      approvedCount,
+      sentCount,
+      wonCount,
+      lostCount,
+      rejectedCount,
+      totalValue,
+      lastQuote,
+      userCount: coUsers.length,
+      users: coUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, active: !!u.active })),
+      lastLoginIp: lastLogin ? lastLogin.ip : '-',
+      lastLoginTime: lastLogin ? (lastLogin.dateStr || new Date(lastLogin.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })) : '-',
+      lastLoginUser: lastLogin ? (lastLogin.username || '-') : '-',
+      lastLoginDevice: lastLogin ? (lastLogin.userAgent || '-') : '-',
+      recentIps: uniqueIps.slice(0, 5),
+      totalLogins: coAudits.length,
+      auditHistory: coAudits.slice(0, 25)
+    };
+  });
+
+  return stats;
+}
+
 // Get database - strictly tenant-isolated for company users
 app.get('/api/db', auth, (req, res) => {
   const data = getDb();
@@ -404,10 +476,12 @@ app.get('/api/db', auth, (req, res) => {
 
     // ── MASTER sees ONLY its own data — company client data is PRIVATE ──────────
     // Master can manage companies/users (platform administration)
-    // but CANNOT read any company's private quotes or customers
+    // Master sees company quotation preparation statistics & IP tracking metadata
+    // but CANNOT read any company's private quote content or customers
     return res.json({
       settings:        data.settings,
       companies:       data.companies || [],          // for management panel
+      companyStats:    getCompanyStats(data),         // preparation counts & login IP metrics per company
       users:           (data.users || []).filter(u => u.companyId === 'master' || !u.companyId),  // master-level users only
       quotes:          (data.quotes    || []).filter(q => q.companyId === 'master'),  // master's own quotes only
       customers:       (data.customers || []).filter(c => c.companyId === 'master'),  // master's own customers only
@@ -912,6 +986,28 @@ app.get('/api/admin/login-audit', auth, (req, res) => {
   }
   const logs = getAuditLogs();
   res.json({ ok: true, logs });
+});
+
+// Master Admin: View Company Statistics & Preparation Activity
+app.get('/api/admin/company-stats', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const data = getDb();
+  res.json({ ok: true, stats: getCompanyStats(data) });
+});
+
+// Master Admin: View detailed company activity and IP history
+app.get('/api/admin/company-activity/:id', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const data = getDb();
+  const c = (data.companies || []).find(co => co.id === req.params.id);
+  if (!c) return res.status(404).json({ error: 'Company not found' });
+  const stats = getCompanyStats(data);
+  const auditLogs = (getAuditLogs() || []).filter(l => l.companyId === c.id || l.companyName === c.name);
+  res.json({ ok: true, company: c, stats: stats[c.id], auditLogs });
 });
 
 // Master Admin: Delete Company

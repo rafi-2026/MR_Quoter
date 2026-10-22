@@ -2460,12 +2460,57 @@
       const stale = qs.filter(q => q.status === 'sent' && q.sentAt && (Date.now() - q.sentAt) > 7 * 864e5);
       const pend = qs.filter(q => q.status === 'pending');
       const recent = [...qs].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 7);
-      m.innerHTML = `<div class="ph"><div><h1>Dashboard</h1><div class="mute">Hello ${esc(me.name.split(' ')[0])}. ${isMgr() ? 'Showing all quotes.' : 'Showing your quotes.'}</div></div><div class="acts"><button class="btn pri" data-act="newQuote">New quotation</button></div></div>
+      m.innerHTML = `<div class="ph"><div><h1>Dashboard</h1><div class="mute">Hello ${esc(me.name.split(' ')[0])}. ${isMaster() ? 'Master Platform Admin session.' : (isMgr() ? 'Showing all quotes.' : 'Showing your quotes.')}</div></div><div class="acts">${isMaster() ? '<a href="#/companies" class="btn sm">🏢 Company Management</a><a href="#/audit" class="btn sm">🛡️ Login IP Audit</a>' : ''}<button class="btn pri" data-act="newQuote">New quotation</button></div></div>
   <div class="kpis">
    <div class="kpi"><small>Awaiting approval</small><b>${cnt(['pending'])}</b><span>${rs(sum(['pending']), 0)}</span></div>
    <div class="kpi"><small>Open (approved + sent)</small><b>${rs(sum(['approved', 'sent']), 0)}</b><span>${cnt(['approved', 'sent'])} quotes</span></div>
    <div class="kpi"><small>Won in FY ${fy}</small><b>${rs(wonFy.reduce((a, q) => a + quoteTotal(q), 0), 0)}</b><span>${wonFy.length} quotes</span></div>
    <div class="kpi"><small>Win rate</small><b>${rate}</b><span>${won} won, ${lost} lost</span></div></div>
+  ${isMaster() && (db.companies || []).length ? `
+  <div class="card" style="margin-bottom:18px;padding:12px 16px">
+    <div class="card-h" style="margin-bottom:10px">
+      <div>
+        <h3 style="margin:0">🏢 Client Companies: Quotations Prepared &amp; Staff Login Activity</h3>
+        <div class="mute sm">Real-time overview of how many quotations each company is preparing, along with their last logging IP details.</div>
+      </div>
+      <a href="#/companies" class="btn sm pri">View All Companies &rarr;</a>
+    </div>
+    <div class="scx">
+      <table class="tbl sm">
+        <thead>
+          <tr>
+            <th>Company Name</th>
+            <th>Code</th>
+            <th>Quotations Prepared</th>
+            <th>Staff Logins</th>
+            <th>Company Logging IP</th>
+            <th>Last Login Time</th>
+            <th class="r">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(db.companies || []).map(c => {
+            const s = (db.companyStats && db.companyStats[c.id]) || {};
+            const qCount = s.quoteCount != null ? s.quoteCount : 0;
+            const uCount = s.userCount != null ? s.userCount : 0;
+            const lastIp = s.lastLoginIp || '-';
+            return `<tr>
+              <td><b>${esc(c.name)}</b></td>
+              <td><span style="background:rgba(2,132,199,0.12);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700;font-size:0.8rem">${esc(c.code || '-')}</span></td>
+              <td>
+                <span class="bd" style="background:#e0f2fe;color:#0369a1;font-weight:700">${qCount} Quotes</span>
+                <span class="mute sm">(${s.approvedCount || 0} approved, ${s.draftCount || 0} in prep)</span>
+              </td>
+              <td><b>${uCount}</b> staff</td>
+              <td>${lastIp !== '-' ? `<code style="background:rgba(2,132,199,0.1);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700">${esc(lastIp)}</code>` : '<span class="mute sm">No login yet</span>'}</td>
+              <td class="sm mute">${esc(s.lastLoginTime || '-')}</td>
+              <td class="r"><button class="btn sm pri" data-act="compActivity" data-id="${c.id}">📊 Activity &amp; IP Logs</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>` : ''}
   <div class="two"><div>
     ${isMgr() && pend.length ? `<div class="card"><h3>Waiting for your approval</h3><div class="scx"><table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Status</th><th class="r">Actions</th></tr></thead><tbody>${pend.map(quoteRow).join('')}</tbody></table></div></div>` : ''}
     <div class="card"><div class="card-h"><h3>Recent quotes</h3><a href="#/quotes">View all</a></div>
@@ -3022,48 +3067,105 @@
     /* ========== Master Admin Companies ========== */
     function viewCompanies() {
       const m = $('#main'), list = db.companies || [];
+      const companyStats = db.companyStats || {};
+
+      let totalAllQuotes = 0, totalDraftQuotes = 0, totalApprovedQuotes = 0, totalAllUsers = 0;
+      const allIpsSet = new Set();
+
+      list.forEach(c => {
+        const s = companyStats[c.id] || {};
+        totalAllQuotes += (s.quoteCount || 0);
+        totalDraftQuotes += (s.draftCount || 0);
+        totalApprovedQuotes += (s.approvedCount || 0);
+        totalAllUsers += (s.userCount || 0);
+        (s.recentIps || []).forEach(ip => { if (ip && ip !== '-') allIpsSet.add(ip); });
+      });
+
       m.innerHTML = `<div class="ph">
         <div>
-          <h1>Company Management</h1>
-          <div class="mute">Master Admin Panel — Onboard companies, alter company details, manage status, and delete companies.</div>
+          <h1>Company Management &amp; Activity Tracking</h1>
+          <div class="mute">Master Admin Panel — Onboard companies, monitor quotation preparation volume, and track staff logging IP details.</div>
         </div>
         <div class="acts">
           <button class="btn bad sm" data-act="wipeAllDemoData">🗑️ Erase All Sample Data</button>
           <button class="btn pri" data-act="compAdd">+ Add New Company &amp; Admin</button>
         </div>
       </div>
+
+      <div class="kpis" style="margin-bottom:18px">
+        <div class="kpi">
+          <small>Total Client Companies</small>
+          <b>${list.length}</b>
+          <span>${list.filter(c => c.active).length} authorised active</span>
+        </div>
+        <div class="kpi">
+          <small>Quotations Prepared (All Companies)</small>
+          <b>${totalAllQuotes}</b>
+          <span>${totalDraftQuotes} in preparation &middot; ${totalApprovedQuotes} approved</span>
+        </div>
+        <div class="kpi">
+          <small>Client Staff Logins</small>
+          <b>${totalAllUsers}</b>
+          <span>Across ${list.length} onboarded companies</span>
+        </div>
+        <div class="kpi">
+          <small>Tracked Logging IPs</small>
+          <b>${allIpsSet.size}</b>
+          <span>Live security &amp; login audit active</span>
+        </div>
+      </div>
+
       <div class="card" style="padding:6px 10px">
         <div class="scx">
           <table class="tbl">
             <thead>
               <tr>
-                <th>Company Name</th>
+                <th>Company Name &amp; Details</th>
                 <th>Code</th>
-                <th>GSTIN</th>
-                <th>State</th>
+                <th>State &amp; GSTIN</th>
                 <th>Status</th>
+                <th style="min-width:180px">Quotations Prepared</th>
+                <th style="min-width:180px">Company Logging IP</th>
                 <th class="r">Users</th>
-                <th class="r">Quotes</th>
-                <th class="r">Actions</th>
+                <th class="r" style="min-width:240px">Actions</th>
               </tr>
             </thead>
             <tbody>
               ${list.map(c => {
-                const uCount = db.users.filter(u => u.companyId === c.id || (!u.companyId && c.id === 'k88ft5zx1un')).length;
-                const qCount = db.quotes.filter(q => q.companyId === c.id || (!q.companyId && c.id === 'k88ft5zx1un')).length;
+                const s = companyStats[c.id] || {};
+                const qCount = s.quoteCount != null ? s.quoteCount : 0;
+                const draftCount = s.draftCount || 0;
+                const approvedCount = s.approvedCount || 0;
+                const uCount = s.userCount != null ? s.userCount : 0;
+                const lastIp = s.lastLoginIp || '-';
+                const lastLoginTime = s.lastLoginTime || '-';
+                const lastUser = s.lastLoginUser || '-';
+                const lastQuote = s.lastQuote;
                 const codeBadge = c.code ? `<span style="background:rgba(2,132,199,0.12);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700;font-size:0.8rem;letter-spacing:0.5px">${esc(c.code)}</span>` : '<span class="mute sm">-</span>';
+
                 return `<tr>
                   <td>
                     <b>${esc(c.name)}</b>
                     <div class="mute sm">ID: ${esc(c.id)} &middot; Added ${fmtDate(new Date(c.createdAt || Date.now()).toISOString().slice(0, 10))}</div>
                   </td>
                   <td>${codeBadge}</td>
-                  <td>${esc(c.gstin || '-')}</td>
-                  <td>${esc(c.state || '-')}</td>
+                  <td>
+                    <div>${esc(c.state || 'Tamil Nadu')}</div>
+                    <div class="mute sm">GST: ${esc(c.gstin || 'Unregistered')}</div>
+                  </td>
                   <td>${c.active ? '<span class="bd approved">Authorised</span>' : '<span class="bd rejected">Disabled</span>'}</td>
+                  <td>
+                    <span class="bd" style="background:#e0f2fe;color:#0369a1;font-weight:700;font-size:0.82rem">📄 ${qCount} Quotes</span>
+                    <div class="sm mute" style="margin-top:3px">${approvedCount} approved &middot; ${draftCount} in prep</div>
+                    ${lastQuote ? `<div class="sm" style="color:var(--pri);margin-top:2px">Last: <b>${esc(lastQuote.no)}</b></div>` : '<div class="sm mute" style="margin-top:2px">No quotes prepared yet</div>'}
+                  </td>
+                  <td>
+                    ${lastIp !== '-' ? `<code style="background:rgba(2,132,199,0.1);color:#0284c7;padding:3px 8px;border-radius:4px;font-weight:700;font-size:0.82rem">${esc(lastIp)}</code>` : '<span class="mute sm">No login recorded</span>'}
+                    ${lastLoginTime !== '-' ? `<div class="sm mute" style="margin-top:3px">${lastUser !== '-' ? 'By <b>' + esc(lastUser) + '</b> &middot; ' : ''}${esc(lastLoginTime)}</div>` : ''}
+                  </td>
                   <td class="r"><b>${uCount}</b></td>
-                  <td class="r"><b>${qCount}</b></td>
                   <td class="r nowrap">
+                    <button class="btn sm pri" data-act="compActivity" data-id="${c.id}" title="Inspect Quotations Prepared &amp; IP Logs">📊 Activity &amp; IP Logs</button>
                     <button class="btn sm" data-act="compEdit" data-id="${c.id}" title="Alter Company Details">Edit</button>
                     <button class="btn sm ${c.active ? 'bad' : 'pri'}" data-act="compToggle" data-id="${c.id}">${c.active ? 'Disable' : 'Authorise'}</button>
                     <button class="btn sm bad" data-act="compDel" data-id="${c.id}" title="Delete Company">Delete</button>
@@ -3166,6 +3268,145 @@
       toast(`Company ${c.active ? 'authorised' : 'disabled'}.`);
     };
 
+    ACT.compActivity = async b => {
+      const coId = b.dataset.id;
+      const c = (db.companies || []).find(x => x.id === coId);
+      if (!c) return;
+      const stats = (db.companyStats && db.companyStats[coId]) || {};
+      const history = stats.auditHistory || [];
+      const staff = stats.users || [];
+
+      modal({
+        title: `🏢 ${esc(c.name)} — Quotation Preparation & Login IP Activity`,
+        wide: true,
+        body: `
+        <div style="margin-bottom:16px;padding:12px 16px;background:var(--bg2,#f8fafc);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700">${esc(c.name)}</div>
+            <div class="mute sm">Code: <b>${esc(c.code || '-')}</b> &middot; ID: <code>${esc(c.id)}</code> &middot; GSTIN: <b>${esc(c.gstin || 'None')}</b> &middot; State: <b>${esc(c.state || '-')}</b></div>
+          </div>
+          <div>
+            ${c.active ? '<span class="bd approved">Authorised &amp; Active</span>' : '<span class="bd rejected">Disabled by Admin</span>'}
+          </div>
+        </div>
+
+        <div style="font-weight:700;font-size:1rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <span>📄 Quotations Preparation Metrics</span>
+        </div>
+        <div class="kpis" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+          <div class="kpi" style="padding:10px 14px">
+            <small>Total Prepared</small>
+            <b style="font-size:1.4rem;color:#0369a1">${stats.quoteCount || 0}</b>
+            <span>All time</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>In Preparation (Draft)</small>
+            <b style="font-size:1.4rem;color:#d97706">${stats.draftCount || 0}</b>
+            <span>Pending finalisation</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Approved Quotations</small>
+            <b style="font-size:1.4rem;color:#16a34a">${stats.approvedCount || 0}</b>
+            <span>Ready for client</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Sent / Client In Review</small>
+            <b style="font-size:1.4rem;color:#2563eb">${stats.sentCount || 0}</b>
+            <span>Issued quotes</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Won / Orders</small>
+            <b style="font-size:1.4rem;color:#059669">${stats.wonCount || 0}</b>
+            <span>Closed projects</span>
+          </div>
+        </div>
+
+        <div style="background:var(--bg2,#f8fafc);border-radius:6px;padding:10px 14px;margin-bottom:20px;border:1px solid var(--line)">
+          <div style="font-weight:600;font-size:0.88rem;margin-bottom:4px">Last Quotation Prepared:</div>
+          ${stats.lastQuote ? `
+            <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:0.85rem">
+              <div>Quote Number: <b>${esc(stats.lastQuote.no)}</b></div>
+              <div>Date: <b>${fmtDate(stats.lastQuote.date)}</b></div>
+              <div>Status: <span class="bd ${stats.lastQuote.status}">${STATUS[stats.lastQuote.status] || stats.lastQuote.status}</span></div>
+              <div>Prepared By: <b>${esc(stats.lastQuote.preparedByName || '-')}</b></div>
+            </div>
+          ` : '<div class="mute sm">No quotations have been prepared yet by this company.</div>'}
+        </div>
+
+        <div style="font-weight:700;font-size:1rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <span>🌐 Company Logging IP &amp; Authentication Tracking</span>
+        </div>
+        <div class="kpis" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+          <div class="kpi" style="padding:10px 14px">
+            <small>Last Login IP</small>
+            <code style="font-size:1.05rem;color:#0284c7;font-weight:700;background:rgba(2,132,199,0.1);padding:2px 6px;border-radius:4px">${esc(stats.lastLoginIp || '-')}</code>
+            <span style="font-size:0.75rem">${esc(stats.lastLoginTime || '-')}</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Last Logged-In User</small>
+            <b style="font-size:1.15rem">${esc(stats.lastLoginUser || '-')}</b>
+            <span>Device: ${esc(stats.lastLoginDevice || 'PC/Browser')}</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>All Unique Logging IPs</small>
+            <div style="margin-top:4px">${(stats.recentIps || []).map(ip => `<code style="background:rgba(2,132,199,0.08);color:#0284c7;padding:1px 5px;border-radius:3px;font-size:0.8rem;margin-right:4px">${esc(ip)}</code>`).join('') || '<span class="mute sm">-</span>'}</div>
+            <span>${(stats.recentIps || []).length} distinct IPs recorded</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Total Login Events</small>
+            <b style="font-size:1.3rem">${stats.totalLogins || 0}</b>
+            <span>Audit log history</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <div style="font-weight:600;font-size:0.9rem;margin-bottom:6px">Recent Staff Login &amp; IP Audit History</div>
+          <div class="scx" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
+            <table class="tbl sm">
+              <thead>
+                <tr>
+                  <th>Timestamp (IST)</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Client IP Address</th>
+                  <th>Status</th>
+                  <th>Reason / Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${history.map(l => {
+                  let badge = '<span class="bd approved sm">SUCCESS</span>';
+                  if (l.status === 'FAILED') badge = '<span class="bd rejected sm">FAILED</span>';
+                  else if (l.status === 'BLOCKED') badge = '<span class="bd rejected sm">BLOCKED</span>';
+                  return `<tr>
+                    <td class="nowrap">${esc(l.dateStr || '-')}</td>
+                    <td><b>${esc(l.username || '-')}</b></td>
+                    <td><span class="mute sm">${esc(l.role || '-')}</span></td>
+                    <td><code style="background:rgba(2,132,199,0.1);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700">${esc(l.ip || '-')}</code></td>
+                    <td>${badge}</td>
+                    <td class="sm mute">${esc(l.reason || '-')}</td>
+                  </tr>`;
+                }).join('') || '<tr><td colspan="6" class="mute" style="text-align:center;padding:12px">No login history recorded yet for this company.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-weight:600;font-size:0.9rem;margin-bottom:6px">👥 Registered Staff Logins (${staff.length})</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${staff.map(u => `
+              <div style="border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:var(--bg2,#f8fafc);font-size:0.85rem">
+                <b>${esc(u.name)}</b> <span class="mute sm">(@${esc(u.username)})</span>
+                <div class="mute sm">Role: <b>${esc(ROLES[u.role] || u.role)}</b> &middot; ${u.active ? '<span style="color:var(--ok)">Active</span>' : '<span style="color:var(--bad)">Disabled</span>'}</div>
+              </div>
+            `).join('') || '<div class="mute sm">No staff logins found.</div>'}
+          </div>
+        </div>
+        `
+      });
+    };
+
     ACT.compDel = b => {
       const c = (db.companies || []).find(x => x.id === b.dataset.id);
       if (!c) return;
@@ -3212,18 +3453,32 @@
 
     async function viewAudit() {
       const m = $('#main');
+      const companies = db.companies || [];
       m.innerHTML = `<div class="ph">
         <div>
           <h1>Company Login Activity &amp; IP Tracker</h1>
-          <div class="mute">Security audit logger tracking all company user logins, timestamps, client IP addresses, and authentication status.</div>
+          <div class="mute">Security audit logger tracking all company staff logins, timestamps, client IP addresses, and authentication status.</div>
         </div>
         <div class="acts">
           <button class="btn" id="auditRefreshBtn">🔄 Refresh Activity</button>
         </div>
       </div>
+
+      <div class="kpis" id="auditKpis" style="margin-bottom:18px">
+        <div class="kpi"><small>Total Login Events</small><b id="auditKpiTotal">-</b><span>Audit trail</span></div>
+        <div class="kpi"><small>Successful Logins</small><b id="auditKpiSuccess" style="color:#16a34a">-</b><span>Authenticated</span></div>
+        <div class="kpi"><small>Failed / Blocked</small><b id="auditKpiFailed" style="color:#dc2626">-</b><span>Security flags</span></div>
+        <div class="kpi"><small>Tracked Unique IPs</small><b id="auditKpiIps" style="color:#0284c7">-</b><span>Distinct locations</span></div>
+      </div>
+
       <div class="card" style="padding:14px 18px;margin-bottom:18px">
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-          <input id="auditSearchInput" placeholder="🔍 Search company name, username, or IP address..." style="flex:1;min-width:240px;padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
+          <input id="auditSearchInput" placeholder="🔍 Search company name, username, or IP address..." style="flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
+          <select id="auditCompanySelect" style="padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
+            <option value="">All Companies</option>
+            <option value="Master Platform Admin">Master Platform Admin</option>
+            ${companies.map(c => `<option value="${esc(c.name)}">${esc(c.name)} (${esc(c.code || c.id)})</option>`).join('')}
+          </select>
           <select id="auditStatusSelect" style="padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
             <option value="">All Statuses</option>
             <option value="SUCCESS">Success Only</option>
@@ -3255,6 +3510,7 @@
 
       $('#auditRefreshBtn').onclick = () => loadAuditRecords();
       $('#auditSearchInput').oninput = () => renderAuditRows();
+      $('#auditCompanySelect').onchange = () => renderAuditRows();
       $('#auditStatusSelect').onchange = () => renderAuditRows();
 
       await loadAuditRecords();
@@ -3266,20 +3522,36 @@
       try {
         const res = await apiGet('/api/admin/login-audit');
         _auditData = (res && res.logs) || [];
+        updateAuditKpis();
         renderAuditRows();
       } catch (e) {
         if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--bad)">Could not load audit logs: ${esc(e.message)}</td></tr>`;
       }
     }
 
+    function updateAuditKpis() {
+      const totalEl = $('#auditKpiTotal'), succEl = $('#auditKpiSuccess'), failEl = $('#auditKpiFailed'), ipsEl = $('#auditKpiIps');
+      if (!totalEl) return;
+      const total = _auditData.length;
+      const succ = _auditData.filter(x => x.status === 'SUCCESS').length;
+      const fail = _auditData.filter(x => x.status === 'FAILED' || x.status === 'BLOCKED').length;
+      const ips = new Set(_auditData.map(x => x.ip).filter(Boolean)).size;
+      totalEl.textContent = total;
+      succEl.textContent = succ;
+      failEl.textContent = fail;
+      ipsEl.textContent = ips;
+    }
+
     function renderAuditRows() {
       const tbody = $('#auditRows');
       if (!tbody) return;
       const q = ($('#auditSearchInput') ? $('#auditSearchInput').value.trim().toLowerCase() : '');
+      const co = ($('#auditCompanySelect') ? $('#auditCompanySelect').value : '');
       const stat = ($('#auditStatusSelect') ? $('#auditStatusSelect').value : '');
 
       let filtered = _auditData.filter(log => {
         if (stat && log.status !== stat) return false;
+        if (co && (log.companyName || '') !== co && (log.companyId || '') !== co) return false;
         if (!q) return true;
         return (
           (log.companyName || '').toLowerCase().includes(q) ||
