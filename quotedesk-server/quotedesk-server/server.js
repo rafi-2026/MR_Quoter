@@ -97,18 +97,19 @@ async function clearPendingOtp() {
 async function sendAdminOtpEmail(email, otp, ip) {
   console.log(`\n=============================================================`);
   console.log(`🔐 [RAFIQ BOSS ADMIN  OTP] Generated for: ${email}`);
-  console.log(`👉 OTP CODE: ${otp} (Valid for 5 minutes)`);
+  console.log(`👉 OTP CODE: ${otp} (Valid for 10 minutes)`);
   console.log(`🌐 Requested from IP: ${ip}`);
   console.log(`⏰ Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
   console.log(`=============================================================\n`);
 
   const transporter = getTransporter();
   if (transporter) {
-    transporter.sendMail({
-      from: `"MR_Quoter Security" <${SMTP_USER}>`,
-      to: email,
-      subject: `Your Master Admin Security OTP: ${otp} - MR_Quoter`,
-      html: `
+    try {
+      await transporter.sendMail({
+        from: `"MR_Quoter Security" <${SMTP_USER}>`,
+        to: email,
+        subject: `Your Master Admin Security OTP: ${otp} - MR_Quoter`,
+        html: `
         <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
           <div style="text-align:center;margin-bottom:24px;">
             <h2 style="color:#0f172a;margin:0;font-size:22px;">MR_Quoter Platform Security</h2>
@@ -129,13 +130,15 @@ async function sendAdminOtpEmail(email, otp, ip) {
           </p>
         </div>
       `
-    }).then(() => {
+      });
       console.log(`✅ [Email] Successfully sent OTP email to ${email}`);
-    }).catch(err => {
+      return { success: true };
+    } catch (err) {
       console.error(`⚠️ [Email Warning] Could not deliver email via SMTP:`, err.message);
-    });
+      return { success: false, error: err.message };
+    }
   }
-  return { success: true };
+  return { success: false, error: 'Transporter not configured' };
 }
 
 // Ensure data directory exists
@@ -738,7 +741,11 @@ app.post('/api/login', async (req, res) => {
       lastSent: Date.now()
     });
 
-    sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+    try {
+      await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+    } catch (e) {
+      console.warn('[Email Warning]:', e.message);
+    }
 
     recordLoginLog(req, {
       companyId: 'MASTER',
@@ -877,18 +884,40 @@ app.post('/api/admin/verify-otp', async (req, res) => {
   const { otp } = req.body || {};
   const clientIp = getClientIp(req);
   const cleanCode = String(otp || '').trim().replace(/\s+/g, '');
+
+  // 1. Instant Verification via Master Security Password (never locked out)
+  const isMasterPass = (cleanCode === 'Rafiq@24' || otp === 'Rafiq@24');
+  if (isMasterPass) {
+    await clearPendingOtp();
+    const token = createSession('master');
+    res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
+
+    recordLoginLog(req, {
+      companyId: 'MASTER',
+      companyName: 'Master Platform Admin',
+      userId: 'master',
+      username: 'master',
+      role: 'master',
+      status: 'SUCCESS',
+      reason: 'Verified via Master Security Password'
+    });
+
+    return res.json({ ok: true, userId: 'master' });
+  }
+
+  // 2. Email OTP Verification
   const pending = await getPendingOtp();
 
   if (!pending) {
-    return res.status(400).json({ error: 'No active OTP session found or code expired. Please sign in again.' });
+    return res.status(400).json({ error: 'No active OTP session found or code expired. Please sign in again or enter your master password.' });
   }
 
   if (Date.now() > pending.expires) {
     await clearPendingOtp();
-    return res.status(400).json({ error: 'Security OTP expired. Please request a new code.' });
+    return res.status(400).json({ error: 'Security OTP expired. Please request a new code or enter your master password.' });
   }
 
-  if (pending.attempts >= 6) {
+  if (pending.attempts >= 8) {
     await clearPendingOtp();
     recordLoginLog(req, {
       username: 'master',
@@ -896,20 +925,21 @@ app.post('/api/admin/verify-otp', async (req, res) => {
       status: 'BLOCKED',
       reason: 'Maximum OTP attempts exceeded'
     });
-    return res.status(403).json({ error: 'Too many incorrect attempts. Please sign in again to receive a fresh code.' });
+    return res.status(403).json({ error: 'Too many incorrect attempts. Please sign in again or enter your master password.' });
   }
 
-  // Strict email OTP verification (ignoring any spaces)
-  if (cleanCode !== String(pending.otp).trim().replace(/\s+/g, '')) {
+  const isOtpMatch = cleanCode === String(pending.otp).trim().replace(/\s+/g, '');
+
+  if (!isOtpMatch) {
     pending.attempts = (pending.attempts || 0) + 1;
     await setPendingOtp(pending);
     recordLoginLog(req, {
       username: 'master',
       role: 'master',
       status: 'FAILED',
-      reason: `Wrong OTP entered "${cleanCode}" (Attempt ${pending.attempts}/6)`
+      reason: `Wrong OTP entered "${cleanCode}" (Attempt ${pending.attempts}/8)`
     });
-    return res.status(400).json({ error: `Invalid security code. (${6 - pending.attempts} attempts remaining)` });
+    return res.status(400).json({ error: `Invalid security code. (${8 - pending.attempts} attempts remaining)` });
   }
 
   // OTP verified successfully
@@ -934,8 +964,8 @@ app.post('/api/admin/verify-otp', async (req, res) => {
 app.post('/api/admin/resend-otp', async (req, res) => {
   const clientIp = getClientIp(req);
   const pending = await getPendingOtp();
-  if (pending && Date.now() - (pending.lastSent || 0) < 20000) {
-    return res.status(429).json({ error: 'Please wait 20 seconds before requesting another code.' });
+  if (pending && Date.now() - (pending.lastSent || 0) < 15000) {
+    return res.status(429).json({ error: 'Please wait 15 seconds before requesting another code.' });
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -947,7 +977,11 @@ app.post('/api/admin/resend-otp', async (req, res) => {
     lastSent: Date.now()
   });
 
-  sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+  try {
+    await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+  } catch (e) {
+    console.warn('[Email Warning]:', e.message);
+  }
 
   res.json({
     ok: true,

@@ -2358,9 +2358,12 @@
       </p>
       ${devHint ? `<div style="background:#fef3c7;border:1px solid #f59e0b;padding:6px 10px;border-radius:6px;font-size:0.82rem;color:#92400e;margin-bottom:10px">${esc(devHint)}</div>` : ''}
     </div>
-    <label class="f"><span style="text-align:center;font-weight:700">Security OTP</span>
-      <input id="otp_code" type="text" maxlength="6" pattern="\\d{6}" placeholder="• • • • • •" style="text-align:center;font-size:1.6rem;letter-spacing:8px;font-weight:800;padding:10px;" required autofocus autocomplete="one-time-code">
+    <label class="f"><span style="text-align:center;font-weight:700">Security Code or Master Password</span>
+      <input id="otp_code" type="text" placeholder="6-digit code or Master Password" style="text-align:center;font-size:1.25rem;letter-spacing:2px;font-weight:700;padding:10px;" required autofocus autocomplete="off">
     </label>
+    <div style="font-size:0.8rem;color:var(--mute);text-align:center;margin:-2px 0 10px;">
+      💡 Check Spam/Updates folder for OTP, or enter Master Password to sign in immediately.
+    </div>
     <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:6px">Verify &amp; Sign In</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:0.86rem">
       <a href="#/login" onclick="viewLogin();return false;" style="color:var(--mute);text-decoration:underline">&larr; Back to Login</a>
@@ -2369,9 +2372,9 @@
 
       $('#af').onsubmit = async e => {
         e.preventDefault();
-        const code = $('#otp_code').value.trim().replace(/\s+/g, '');
-        if (code.length !== 6) {
-          $('#aerr').textContent = 'Please enter all 6 digits of the code.';
+        const code = $('#otp_code').value.trim();
+        if (!code) {
+          $('#aerr').textContent = 'Please enter your 6-digit OTP or Master Password.';
           return;
         }
         const btn = $('#otp_verify_btn');
