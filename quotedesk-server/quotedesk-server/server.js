@@ -45,8 +45,11 @@ function getTransporter() {
   if (mailTransporter) return mailTransporter;
   if (SMTP_USER && SMTP_PASS) {
     mailTransporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: SMTP_USER, pass: SMTP_PASS }
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+      tls: { rejectUnauthorized: false }
     });
   }
   return mailTransporter;
