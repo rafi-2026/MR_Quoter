@@ -2287,9 +2287,8 @@
       };
     }
     function viewLogin() {
-      const cname = (db && db.settings && db.settings.company) ? db.settings.company : '';
-      authShell('Sign in', cname ? esc(cname) : 'Enter your credentials to continue', `
-   <label class="f"><span>Company Code <small style="color:var(--mute)">(Leave empty for primary company)</small></span><input id="l_co" placeholder="e.g. CTB (Optional)" autocapitalize="characters"></label>
+      authShell('Sign in', 'Sign in to your account', `
+   <label class="f"><span>Company Code <small style="color:var(--mute)">(Leave empty for primary company)</small></span><input id="l_co" placeholder="e.g. Company Code (Optional)" autocapitalize="characters"></label>
    <label class="f"><span>Username</span><input id="l_un" placeholder="Username" required autocapitalize="none" autofocus></label>
    <label class="f"><span>Password</span><input id="l_pw" type="password" placeholder="Password" required></label>
    <button class="btn pri" id="login_btn" type="submit" style="justify-content:center">Sign in</button>
@@ -3361,7 +3360,7 @@
   <div class="card" id="set1">
     <h3>Company Profile &amp; Branding</h3>
     <div class="grid g2">
-      <label class="f"><span>Company name (used for signature &amp; quotes)</span><input name="company" value="${esc(s.company)}" placeholder="e.g. Crescent Technobuild Pvt Ltd" required></label>
+      <label class="f"><span>Company name (used for signature &amp; quotes)</span><input name="company" value="${esc(s.company)}" placeholder="e.g. Your Company Name Pvt Ltd" required></label>
       <label class="f"><span>Tagline / Slogan</span><input name="tagline" value="${esc(s.tagline || '')}" placeholder="e.g. Architectural Facades &amp; High Performance Glazing"></label>
       <label class="f"><span>Quote number prefix</span><input name="prefix" value="${esc(s.prefix || 'QT/Q')}"></label>
       <label class="f"><span>Default validity (days)</span><input name="validity" type="number" value="${s.validity || 30}"></label>

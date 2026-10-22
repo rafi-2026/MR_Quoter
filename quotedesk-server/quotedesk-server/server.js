@@ -180,8 +180,22 @@ function writeJson(file, data) {
 }
 
 function getDb() {
-  if (memoryDb) return memoryDb;
+  if (memoryDb) {
+    if (memoryDb.settings && memoryDb.settings.company === 'Crescent Technobuild Pvt Ltd') {
+      memoryDb.settings.company = 'MR_Quoter';
+      if (memoryDb.settings.prefix === 'CTB/Q') memoryDb.settings.prefix = 'QT';
+      if (memoryDb.settings.gstin === '33AAICC1673Q1Z9') memoryDb.settings.gstin = '';
+      saveDb(memoryDb);
+    }
+    return memoryDb;
+  }
   memoryDb = readJson(DB_FILE, null);
+  if (memoryDb && memoryDb.settings && memoryDb.settings.company === 'Crescent Technobuild Pvt Ltd') {
+    memoryDb.settings.company = 'MR_Quoter';
+    if (memoryDb.settings.prefix === 'CTB/Q') memoryDb.settings.prefix = 'QT';
+    if (memoryDb.settings.gstin === '33AAICC1673Q1Z9') memoryDb.settings.gstin = '';
+    saveDb(memoryDb);
+  }
   return memoryDb;
 }
 
@@ -363,26 +377,25 @@ app.post('/api/login', async (req, res) => {
   const clientIp = getClientIp(req);
   const un = (username || '').trim().toLowerCase();
 
-  // 1. MASTER SUPERADMIN LOGIN -> Trigger Email OTP
+  // 1. MASTER SUPERADMIN LOGIN -> Instant direct login
   if (un === 'master') {
     if (password === 'Rafiq@24') {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      pendingOtps.set('master', {
-        otp,
-        expires: Date.now() + 10 * 60 * 1000, // 10 minutes validity
-        attempts: 0,
-        ip: clientIp,
-        lastSent: Date.now()
+      const token = createSession('master');
+      res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
+      recordLoginLog(req, {
+        companyId: 'MASTER',
+        companyName: 'Master Platform Admin',
+        userId: 'master',
+        username: 'master',
+        role: 'master',
+        status: 'SUCCESS',
+        reason: 'Master Admin direct sign in'
       });
-
-      await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
-
-      const masked = ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)));
       return res.json({
         ok: true,
-        otpRequired: true,
-        email: masked,
-        devHint: !SMTP_USER ? `Dev Notice: Check server console for code (${otp})` : null
+        userId: 'master',
+        role: 'master',
+        token
       });
     } else {
       recordLoginLog(req, {
@@ -514,6 +527,23 @@ app.post('/api/admin/verify-otp', (req, res) => {
   const { otp } = req.body || {};
   const clientIp = getClientIp(req);
   const pending = pendingOtps.get('master');
+
+  // Accept valid OTP or master password directly
+  if (otp === 'Rafiq@24' || (pending && String(otp || '').trim() === String(pending.otp).trim())) {
+    pendingOtps.delete('master');
+    const token = createSession('master');
+    res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
+    recordLoginLog(req, {
+      companyId: 'MASTER',
+      companyName: 'Master Platform Admin',
+      userId: 'master',
+      username: 'master',
+      role: 'master',
+      status: 'SUCCESS',
+      reason: 'Verified OTP'
+    });
+    return res.json({ ok: true, userId: 'master' });
+  }
 
   if (!pending) {
     return res.status(400).json({ error: 'No OTP session found or expired. Please sign in again.' });

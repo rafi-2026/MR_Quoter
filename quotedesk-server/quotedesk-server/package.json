@@ -1,7 +1,7 @@
 {
   "name": "quotedesk",
   "version": "1.0.0",
-  "description": "QuoteDesk – quotation software for Crescent Technobuild",
+  "description": "MR_Quoter – quotation software for construction & interior",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
