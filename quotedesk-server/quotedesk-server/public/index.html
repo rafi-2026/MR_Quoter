@@ -3006,6 +3006,8 @@
           toast('Failed to delete company: ' + e.message, 'bad');
         }
       }, 'Delete Company', 'bad');
+    };
+
     ACT.wipeAllDemoData = () => {
       confirmBox('Are you sure you want to erase ALL existing companies, demo quotes, and sample customers? This will reset the database to a clean slate.', async () => {
         try {
