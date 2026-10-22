@@ -2369,7 +2369,7 @@
 
       $('#af').onsubmit = async e => {
         e.preventDefault();
-        const code = $('#otp_code').value.trim();
+        const code = $('#otp_code').value.trim().replace(/\s+/g, '');
         if (code.length !== 6) {
           $('#aerr').textContent = 'Please enter all 6 digits of the code.';
           return;

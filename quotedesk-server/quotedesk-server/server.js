@@ -52,8 +52,44 @@ function getTransporter() {
   return mailTransporter;
 }
 
-// In-memory OTP storage: username => { otp, expires, attempts, ip, lastSent }
+// In-memory & Cloud DB persistent OTP storage
 const pendingOtps = new Map();
+
+async function getPendingOtp() {
+  if (mongoConnected && mongoDb) {
+    try {
+      const doc = await mongoDb.collection('admin_security').findOne({ _id: 'master_otp' });
+      if (doc) return doc;
+    } catch (e) {
+      console.warn('[Security] MongoDB OTP fetch fallback:', e.message);
+    }
+  }
+  return pendingOtps.get('master') || null;
+}
+
+async function setPendingOtp(record) {
+  pendingOtps.set('master', record);
+  if (mongoConnected && mongoDb) {
+    try {
+      await mongoDb.collection('admin_security').updateOne(
+        { _id: 'master_otp' },
+        { $set: { ...record, _id: 'master_otp', updatedAt: new Date() } },
+        { upsert: true }
+      );
+    } catch (e) {
+      console.warn('[Security] MongoDB OTP save fallback:', e.message);
+    }
+  }
+}
+
+async function clearPendingOtp() {
+  pendingOtps.delete('master');
+  if (mongoConnected && mongoDb) {
+    try {
+      await mongoDb.collection('admin_security').deleteOne({ _id: 'master_otp' });
+    } catch (e) {}
+  }
+}
 
 async function sendAdminOtpEmail(email, otp, ip) {
   console.log(`\n=============================================================`);
@@ -691,15 +727,15 @@ app.post('/api/login', async (req, res) => {
 
     // Password valid -> Generate secure 6-digit email OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    pendingOtps.set('master', {
-      otp,
+    await setPendingOtp({
+      otp: String(otp).trim(),
       expires: Date.now() + 10 * 60 * 1000,
       attempts: 0,
       ip: clientIp,
       lastSent: Date.now()
     });
 
-    await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+    sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
 
     recordLoginLog(req, {
       companyId: 'MASTER',
@@ -834,45 +870,47 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Master Admin OTP Verification
-app.post('/api/admin/verify-otp', (req, res) => {
+app.post('/api/admin/verify-otp', async (req, res) => {
   const { otp } = req.body || {};
   const clientIp = getClientIp(req);
-  const pending = pendingOtps.get('master');
+  const cleanCode = String(otp || '').trim().replace(/\s+/g, '');
+  const pending = await getPendingOtp();
 
   if (!pending) {
     return res.status(400).json({ error: 'No active OTP session found or code expired. Please sign in again.' });
   }
 
   if (Date.now() > pending.expires) {
-    pendingOtps.delete('master');
+    await clearPendingOtp();
     return res.status(400).json({ error: 'Security OTP expired. Please request a new code.' });
   }
 
-  if (pending.attempts >= 4) {
-    pendingOtps.delete('master');
+  if (pending.attempts >= 6) {
+    await clearPendingOtp();
     recordLoginLog(req, {
       username: 'master',
       role: 'master',
       status: 'BLOCKED',
       reason: 'Maximum OTP attempts exceeded'
     });
-    return res.status(403).json({ error: 'Too many incorrect attempts. Please sign in again.' });
+    return res.status(403).json({ error: 'Too many incorrect attempts. Please sign in again to receive a fresh code.' });
   }
 
-  // Strict email OTP verification only
-  if (String(otp || '').trim() !== String(pending.otp).trim()) {
-    pending.attempts += 1;
+  // Strict email OTP verification (ignoring any spaces)
+  if (cleanCode !== String(pending.otp).trim().replace(/\s+/g, '')) {
+    pending.attempts = (pending.attempts || 0) + 1;
+    await setPendingOtp(pending);
     recordLoginLog(req, {
       username: 'master',
       role: 'master',
       status: 'FAILED',
-      reason: `Wrong OTP entered (Attempt ${pending.attempts}/4)`
+      reason: `Wrong OTP entered "${cleanCode}" (Attempt ${pending.attempts}/6)`
     });
-    return res.status(400).json({ error: `Invalid security code. (${4 - pending.attempts} attempts remaining)` });
+    return res.status(400).json({ error: `Invalid security code. (${6 - pending.attempts} attempts remaining)` });
   }
 
   // OTP verified successfully
-  pendingOtps.delete('master');
+  await clearPendingOtp();
   const token = createSession('master');
   res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
 
@@ -892,26 +930,25 @@ app.post('/api/admin/verify-otp', (req, res) => {
 // Resend Admin OTP
 app.post('/api/admin/resend-otp', async (req, res) => {
   const clientIp = getClientIp(req);
-  const pending = pendingOtps.get('master');
-  if (pending && Date.now() - (pending.lastSent || 0) < 30000) {
-    return res.status(429).json({ error: 'Please wait 30 seconds before requesting another code.' });
+  const pending = await getPendingOtp();
+  if (pending && Date.now() - (pending.lastSent || 0) < 20000) {
+    return res.status(429).json({ error: 'Please wait 20 seconds before requesting another code.' });
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  pendingOtps.set('master', {
-    otp,
+  await setPendingOtp({
+    otp: String(otp).trim(),
     expires: Date.now() + 10 * 60 * 1000,
     attempts: 0,
     ip: clientIp,
     lastSent: Date.now()
   });
 
-  await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+  sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
 
   res.json({
     ok: true,
-    message: 'New security code sent to ' + ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length))),
-    devHint: !SMTP_USER ? `Dev Notice: Check server console for code (${otp})` : null
+    message: 'New security code sent to ' + ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)))
   });
 });
 
