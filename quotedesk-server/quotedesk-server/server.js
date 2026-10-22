@@ -33,12 +33,12 @@ const MONGODB_URI = process.env.MONGODB_URI || '';
 const BASE_URL = process.env.BASE_URL || '';
 
 // Master Admin Security & Mail OTP Configuration
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'RAFIQTN70@GMAIL.COM';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'rafioffl20@gmail.com';
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
+const SMTP_USER = process.env.SMTP_USER || 'rafioffl20@gmail.com';
+const SMTP_PASS = process.env.SMTP_PASS || 'lchtgoajiakktwhb';
+const SMTP_SECURE = process.env.SMTP_SECURE !== 'false';
 
 let mailTransporter = null;
 function getTransporter() {
@@ -134,25 +134,21 @@ async function initMongo() {
 
     // Initialize data from Cloud or seed local to cloud
     const cloudDoc = await mongoDb.collection('app_data').findOne({ _id: 'quotedesk_main' });
-    const local = readJson(DB_FILE, null);
-    if (cloudDoc && cloudDoc.data && cloudDoc.data.users && cloudDoc.data.users.length > 0) {
+    if (cloudDoc && cloudDoc.data) {
       memoryDb = cloudDoc.data;
-      // also keep local replica updated
       try { fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb), 'utf8'); } catch (e) {}
       console.log('[Storage] Loaded latest client data from Cloud Database.');
-    } else if (local && local.users && local.users.length > 0) {
-      memoryDb = local;
-      await mongoDb.collection('app_data').updateOne(
-        { _id: 'quotedesk_main' },
-        { $set: { _id: 'quotedesk_main', data: local, updatedAt: new Date() } },
-        { upsert: true }
-      );
-      console.log('[Storage] Synced local company data with users to MongoDB Cloud Database!');
-    } else if (cloudDoc && cloudDoc.data) {
-      memoryDb = cloudDoc.data;
-      try { fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb), 'utf8'); } catch (e) {}
-    } else if (local) {
-      memoryDb = local;
+    } else {
+      const local = readJson(DB_FILE, null);
+      if (local) {
+        memoryDb = local;
+        await mongoDb.collection('app_data').updateOne(
+          { _id: 'quotedesk_main' },
+          { $set: { _id: 'quotedesk_main', data: local, updatedAt: new Date() } },
+          { upsert: true }
+        );
+        console.log('[Storage] Initialized MongoDB Cloud Database from local!');
+      }
     }
   } catch (err) {
     mongoConnected = false;
@@ -362,7 +358,7 @@ app.post('/api/setup', (req, res) => {
 });
 
 // Login with IP tracking & Multi-Company support
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password, companyCode } = req.body || {};
   const clientIp = getClientIp(req);
   const un = (username || '').trim().toLowerCase();
@@ -379,7 +375,7 @@ app.post('/api/login', (req, res) => {
         lastSent: Date.now()
       });
 
-      sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+      await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
 
       const masked = ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)));
       return res.json({
@@ -569,7 +565,7 @@ app.post('/api/admin/verify-otp', (req, res) => {
 });
 
 // Resend Admin OTP
-app.post('/api/admin/resend-otp', (req, res) => {
+app.post('/api/admin/resend-otp', async (req, res) => {
   const clientIp = getClientIp(req);
   const pending = pendingOtps.get('master');
   if (pending && Date.now() - (pending.lastSent || 0) < 30000) {
@@ -585,13 +581,65 @@ app.post('/api/admin/resend-otp', (req, res) => {
     lastSent: Date.now()
   });
 
-  sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+  await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
 
   res.json({
     ok: true,
     message: 'New security code sent to ' + ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length))),
     devHint: !SMTP_USER ? `Dev Notice: Check server console for code (${otp})` : null
   });
+});
+
+// Master Admin: Reset all demo/sample data to clean state
+app.post('/api/admin/reset-data', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const cleanDb = {
+    settings: {
+      company: '',
+      tagline: '',
+      prefix: 'QT/Q',
+      validity: 30,
+      gstRate: 18,
+      approvalMode: 'rules',
+      approvalAbove: 500000,
+      maxDisc: 10,
+      terms: 'Prices are valid for the period stated in this quotation.\nGST is charged as shown in the totals of this quotation.\nFinal sizes and quantities will be confirmed after site measurement; billing will follow executed work.\nDelivery and completion schedule will be confirmed after receipt of advance and approval of drawings.\nThe client will provide clear site access, power, water and safe storage during execution.\nWork not mentioned in this quotation will be charged extra.\nWarranty and defect liability will be as per our standard terms confirmed in the work order.',
+      pay: [{ label: 'Advance with order', pct: 50 }, { label: 'On material delivery at site', pct: 40 }, { label: 'On completion and handover', pct: 10 }],
+      bank: { acName: '', bank: '', acNo: '', ifsc: '', branch: '' },
+      headerImg: '',
+      footerImg: '',
+      authorisedDefault: 'Managing Director',
+      authorisedTitleDefault: 'Authorised Signatory',
+      glass: [{ name: '5 mm clear glass', add: 0 }, { name: '5 mm tinted glass', add: 25 }, { name: '6 mm toughened clear', add: 45 }, { name: '5+5 mm laminated', add: 90 }, { name: 'DGU 6+12+6 mm toughened', add: 180 }, { name: '6 mm reflective toughened', add: 70 }],
+      finish: [{ name: 'Standard (anodised / white)', add: 0 }, { name: 'Powder coated - standard colour', add: 30 }, { name: 'Black matt', add: 35 }, { name: 'Wooden finish', add: 70 }],
+      accentColor: '#1e40af',
+      headerColor: '#000000'
+    },
+    companies: [],
+    users: [],
+    customers: [],
+    quotes: [],
+    products: [],
+    items: [],
+    profiles: [],
+    seq: {}
+  };
+
+  saveDb(cleanDb);
+
+  recordLoginLog(req, {
+    companyId: 'MASTER',
+    companyName: 'Master Platform Admin',
+    userId: 'master',
+    username: 'master',
+    role: 'master',
+    status: 'SUCCESS',
+    reason: 'Wiped all company and quote data to clean slate'
+  });
+
+  res.json({ ok: true, message: 'All demo and existing data erased. Software is now a clean slate.' });
 });
 
 // Master Admin: View Login Audit Logs with IP Tracker

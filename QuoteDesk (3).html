@@ -2851,6 +2851,7 @@
           <div class="mute">Master Admin Panel — Onboard companies, alter company details, manage status, and delete companies.</div>
         </div>
         <div class="acts">
+          <button class="btn bad sm" data-act="wipeAllDemoData">🗑️ Erase All Sample Data</button>
           <button class="btn pri" data-act="compAdd">+ Add New Company &amp; Admin</button>
         </div>
       </div>
@@ -3005,6 +3006,26 @@
           toast('Failed to delete company: ' + e.message, 'bad');
         }
       }, 'Delete Company', 'bad');
+    ACT.wipeAllDemoData = () => {
+      confirmBox('Are you sure you want to erase ALL existing companies, demo quotes, and sample customers? This will reset the database to a clean slate.', async () => {
+        try {
+          if (CLOUD) {
+            await apiPost('/api/admin/reset-data', {});
+            db = await loadDbCloud();
+          } else {
+            db = seedData();
+            db.companies = [];
+            db.users = [];
+            db.quotes = [];
+            db.customers = [];
+            persist(true);
+          }
+          renderApp();
+          toast('All data erased successfully! Starting with a clean slate.');
+        } catch (e) {
+          toast('Failed to reset: ' + e.message, 'bad');
+        }
+      }, 'Erase All Data', 'bad');
     };
 
     /* ========== Login Audit & IP Activity Log ========== */
