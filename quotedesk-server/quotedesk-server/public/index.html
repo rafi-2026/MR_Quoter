@@ -4464,7 +4464,7 @@
     ${t.round ? `<tr><td>Round off</td><td class="r">${t.round > 0 ? '+' : '&minus;'}${rs(Math.abs(t.round))}</td></tr>` : ''}
     <tr class="gt"><td>Grand total</td><td class="r">${rs(t.grand)}</td></tr></table></div>
    ${pays.length ? `<h4>Payment schedule</h4><table class="doc-pay"><tbody>${pays.map(p => `<tr><td>${esc(p.label)}</td><td class="r">${num(p.pct)}%</td><td class="r">${rs(t.grand * num(p.pct) / 100, 0)}</td></tr>`).join('')}</tbody></table>` : ''}
-   ${hasBank ? `<h4>Bank details</h4><div class="doc-bank">${[b.acName && 'Account name: ' + esc(b.acName), b.bank && 'Bank: ' + esc(b.bank), b.acNo && 'A/C no.: ' + esc(b.acNo), b.ifsc && 'IFSC: ' + esc(b.ifsc), b.branch && 'Branch: ' + esc(b.branch)].filter(Boolean).join(' &nbsp;|&nbsp; ')}${b.upiId ? `<div style="display:flex;align-items:center;gap:12px;margin-top:8px"><div><b>UPI:</b> ${esc(b.upiId)}</div><canvas id="upiQrCanvas" width="90" height="90" style="border:1px solid #eee;border-radius:4px"></canvas></div><script>try{const cv=document.getElementById('upiQrCanvas');if(cv&&typeof QRCode!=='undefined'){const uri='upi://pay?pa='+encodeURIComponent('${esc(b.upiId)}')+'&pn='+encodeURIComponent('${esc(s.company||'')}')+'&cu=INR&tn='+encodeURIComponent('${esc(q.no||'')} advance');QRCode.toCanvas(cv,uri,{width:90,margin:1});}}catch(e){}<\/script>` : ''}</div>` : ''}
+   ${hasBank ? `<h4>Bank details</h4><div class="doc-bank">${[b.acName && 'Account name: ' + esc(b.acName), b.bank && 'Bank: ' + esc(b.bank), b.acNo && 'A/C no.: ' + esc(b.acNo), b.ifsc && 'IFSC: ' + esc(b.ifsc), b.branch && 'Branch: ' + esc(b.branch)].filter(Boolean).join(' &nbsp;|&nbsp; ')}${b.upiId ? `<div style="display:flex;align-items:center;gap:12px;margin-top:8px"><div><b>UPI:</b> ${esc(b.upiId)}</div><canvas id="upiQrCanvas" width="90" height="90" style="border:1px solid #eee;border-radius:4px"></canvas></div>` : ''}</div>` : ''}
    ${terms.length ? `<h4>Terms and conditions</h4><ol>${terms.map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
    ${q.notes ? `<h4>Notes</h4><div>${nl2(q.notes)}</div>` : ''}
    <div class="doc-sign">
@@ -4501,12 +4501,11 @@
       const cv = document.getElementById('upiQrCanvas');
       const b = (db && db.settings && db.settings.bank) || {};
       if (cv && b.upiId && typeof QRCode !== 'undefined') {
-        const t = calcTotals(q);
-        const advance = (q.pay && q.pay.length) ? Math.round(t.grand * (num(q.pay[0].pct) || 50) / 100) : t.grand;
-        const uri = `upi://pay?pa=${encodeURIComponent(b.upiId)}&pn=${encodeURIComponent((db.settings && db.settings.company) || 'Company')}&am=${advance}&cu=INR&tn=${encodeURIComponent((q.no || 'Quote') + ' Advance')}`;
+        const uri = `upi://pay?pa=${encodeURIComponent(b.upiId)}&pn=${encodeURIComponent((db.settings && db.settings.company) || 'Company')}&cu=INR&tn=${encodeURIComponent((q.no || 'Quote') + ' Payment')}`;
         QRCode.toCanvas(cv, uri, { width: 90, margin: 1 }, () => {});
       }
     }
+
     function previewQuote(q) {
       const p = $('#preview');
       p.innerHTML = `<div class="pv-bar"><button class="btn sm" data-act="closePreview">Close</button><button class="btn sm pri" data-act="printNow">Print or save as PDF</button><small>In the print window choose &ldquo;Save as PDF&rdquo; and turn off &ldquo;Headers and footers&rdquo;.</small></div><div class="sheet doc">${docHTML(q)}</div>`;

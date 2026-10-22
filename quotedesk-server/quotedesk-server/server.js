@@ -1087,8 +1087,7 @@ app.get('/q/:token', (req, res) => {
             try {
               const cv = document.getElementById('upiQr');
               if (cv && typeof QRCode !== 'undefined') {
-                const advance = ${q.pay && q.pay.length ? Math.round(grandTotal * (parseFloat(q.pay[0].pct) || 50) / 100) : grandTotal};
-                const uri = 'upi://pay?pa=' + encodeURIComponent('${b.upiId}') + '&pn=' + encodeURIComponent('${s.company || 'Company'}') + '&am=' + advance + '&cu=INR&tn=' + encodeURIComponent('${q.no} Advance');
+                const uri = 'upi://pay?pa=' + encodeURIComponent('${b.upiId}') + '&pn=' + encodeURIComponent('${s.company || 'Company'}') + '&cu=INR&tn=' + encodeURIComponent('${q.no} Payment');
                 QRCode.toCanvas(cv, uri, { width: 96, margin: 1 });
               }
             } catch(e) {}
