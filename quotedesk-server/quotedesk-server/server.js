@@ -21,7 +21,7 @@ if (fs.existsSync(envPath)) {
         if (!process.env[k]) process.env[k] = v;
       }
     });
-  } catch (e) {}
+  } catch (e) { }
 }
 
 const PORT = process.env.PORT || 3000;
@@ -45,9 +45,7 @@ function getTransporter() {
   if (mailTransporter) return mailTransporter;
   if (SMTP_USER && SMTP_PASS) {
     mailTransporter = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_SECURE,
+      service: 'gmail',
       auth: { user: SMTP_USER, pass: SMTP_PASS }
     });
   }
@@ -59,51 +57,46 @@ const pendingOtps = new Map();
 
 async function sendAdminOtpEmail(email, otp, ip) {
   console.log(`\n=============================================================`);
-  console.log(`🔐 [MASTER ADMIN OTP] Generated for: ${email}`);
-  console.log(`👉 OTP CODE: ${otp} (Valid for 10 minutes)`);
+  console.log(`🔐 [RAFIQ BOSS ADMIN  OTP] Generated for: ${email}`);
+  console.log(`👉 OTP CODE: ${otp} (Valid for 5 minutes)`);
   console.log(`🌐 Requested from IP: ${ip}`);
   console.log(`⏰ Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
   console.log(`=============================================================\n`);
 
   const transporter = getTransporter();
   if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: `"MR_Quoter Security" <${SMTP_USER}>`,
-        to: email,
-        subject: `Your Master Admin Security OTP: ${otp} - MR_Quoter`,
-        html: `
-          <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
-            <div style="text-align:center;margin-bottom:24px;">
-              <h2 style="color:#0f172a;margin:0;font-size:22px;">MR_Quoter Platform Security</h2>
-              <p style="color:#64748b;font-size:14px;margin-top:4px;">Master Admin Verification</p>
-            </div>
-            <div style="background:#f8fafc;border-radius:8px;padding:20px;text-align:center;margin-bottom:20px;border:1px solid #cbd5e1;">
-              <p style="margin:0 0 10px;color:#475569;font-size:14px;">Your one-time security code is:</p>
-              <div style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0284c7;padding:6px 0;">${otp}</div>
-              <p style="margin:10px 0 0;color:#dc2626;font-size:13px;font-weight:600;">Valid for 10 minutes</p>
-            </div>
-            <div style="font-size:13px;color:#64748b;line-height:1.5;margin-bottom:20px;">
-              <p style="margin:0 0 6px;"><b>Login Details:</b></p>
-              <p style="margin:0 0 4px;">• IP Address: <code>${ip}</code></p>
-              <p style="margin:0 0 4px;">• Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
-            </div>
-            <p style="color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:14px;margin:0;">
-              If you did not request this login code, please review your server logs and secure your account immediately.
-            </p>
+    transporter.sendMail({
+      from: `"MR_Quoter Security" <${SMTP_USER}>`,
+      to: email,
+      subject: `Your Master Admin Security OTP: ${otp} - MR_Quoter`,
+      html: `
+        <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <h2 style="color:#0f172a;margin:0;font-size:22px;">MR_Quoter Platform Security</h2>
+            <p style="color:#64748b;font-size:14px;margin-top:4px;">Master Admin Verification</p>
           </div>
-        `
-      });
+          <div style="background:#f8fafc;border-radius:8px;padding:20px;text-align:center;margin-bottom:20px;border:1px solid #cbd5e1;">
+            <p style="margin:0 0 10px;color:#475569;font-size:14px;">Your one-time security code is:</p>
+            <div style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0284c7;padding:6px 0;">${otp}</div>
+            <p style="margin:10px 0 0;color:#dc2626;font-size:13px;font-weight:600;">Valid for 10 minutes</p>
+          </div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5;margin-bottom:20px;">
+            <p style="margin:0 0 6px;"><b>Login Details:</b></p>
+            <p style="margin:0 0 4px;">• IP Address: <code>${ip}</code></p>
+            <p style="margin:0 0 4px;">• Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
+          </div>
+          <p style="color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:14px;margin:0;">
+            If you did not request this login code, please review your server logs and secure your account immediately.
+          </p>
+        </div>
+      `
+    }).then(() => {
       console.log(`✅ [Email] Successfully sent OTP email to ${email}`);
-      return { success: true };
-    } catch (err) {
-      console.error(`⚠️ [Email Error] Could not send OTP email via SMTP:`, err.message);
-      return { success: false, error: err.message, fallbackConsole: true };
-    }
-  } else {
-    console.log(`ℹ️ [Email Notice] SMTP credentials not set in .env. OTP printed to server log above for direct access.`);
-    return { success: true, fallbackConsole: true };
+    }).catch(err => {
+      console.error(`⚠️ [Email Warning] Could not deliver email via SMTP:`, err.message);
+    });
   }
+  return { success: true };
 }
 
 // Ensure data directory exists
@@ -136,7 +129,7 @@ async function initMongo() {
     const cloudDoc = await mongoDb.collection('app_data').findOne({ _id: 'quotedesk_main' });
     if (cloudDoc && cloudDoc.data) {
       memoryDb = cloudDoc.data;
-      try { fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb), 'utf8'); } catch (e) {}
+      try { fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb), 'utf8'); } catch (e) { }
       console.log('[Storage] Loaded latest client data from Cloud Database.');
     } else {
       const local = readJson(DB_FILE, null);
@@ -176,7 +169,7 @@ function readJson(file, def) {
   catch (e) { return def; }
 }
 function writeJson(file, data) {
-  try { fs.writeFileSync(file, JSON.stringify(data), 'utf8'); } catch (e) {}
+  try { fs.writeFileSync(file, JSON.stringify(data), 'utf8'); } catch (e) { }
 }
 
 function getDb() {
@@ -479,18 +472,18 @@ app.get('/api/db', auth, (req, res) => {
     // Master sees company quotation preparation statistics & IP tracking metadata
     // but CANNOT read any company's private quote content or customers
     return res.json({
-      settings:        data.settings,
-      companies:       data.companies || [],          // for management panel
-      companyStats:    getCompanyStats(data),         // preparation counts & login IP metrics per company
-      users:           (data.users || []).filter(u => u.companyId === 'master' || !u.companyId),  // master-level users only
-      quotes:          (data.quotes    || []).filter(q => q.companyId === 'master'),  // master's own quotes only
-      customers:       (data.customers || []).filter(c => c.companyId === 'master'),  // master's own customers only
-      products:        data.products || [],
-      items:           data.items || [],
-      profiles:        data.profiles || [],
-      seq:             (data.companySeq && data.companySeq['master']) || data.seq || {},
+      settings: data.settings,
+      companies: data.companies || [],          // for management panel
+      companyStats: getCompanyStats(data),         // preparation counts & login IP metrics per company
+      users: (data.users || []).filter(u => u.companyId === 'master' || !u.companyId),  // master-level users only
+      quotes: (data.quotes || []).filter(q => q.companyId === 'master'),  // master's own quotes only
+      customers: (data.customers || []).filter(c => c.companyId === 'master'),  // master's own customers only
+      products: data.products || [],
+      items: data.items || [],
+      profiles: data.profiles || [],
+      seq: (data.companySeq && data.companySeq['master']) || data.seq || {},
       companySettings: data.companySettings || {},     // for admin tools only
-      companySeq:      data.companySeq || {}           // for admin tools only
+      companySeq: data.companySeq || {}           // for admin tools only
     });
   }
 
@@ -518,22 +511,22 @@ app.get('/api/db', auth, (req, res) => {
   // Always override company/gstin/state/prefix from the companies registry
   // (master controls these fields when creating a company)
   companySettings.company = (targetCompany && targetCompany.name) || companySettings.company || '';
-  companySettings.gstin   = (targetCompany && targetCompany.gstin)  || companySettings.gstin  || '';
-  companySettings.state   = (targetCompany && targetCompany.state)  || companySettings.state  || '';
-  companySettings.prefix  = (targetCompany && targetCompany.code)
+  companySettings.gstin = (targetCompany && targetCompany.gstin) || companySettings.gstin || '';
+  companySettings.state = (targetCompany && targetCompany.state) || companySettings.state || '';
+  companySettings.prefix = (targetCompany && targetCompany.code)
     ? targetCompany.code + '/Q'
     : companySettings.prefix;
 
   const companyDb = {
     settings: companySettings,
-    users:     (data.users     || []).filter(u => u.companyId === coId),
-    quotes:    (data.quotes    || []).filter(q => q.companyId === coId),
+    users: (data.users || []).filter(u => u.companyId === coId),
+    quotes: (data.quotes || []).filter(q => q.companyId === coId),
     customers: (data.customers || []).filter(c => c.companyId === coId),
-    products:  (data.products  || []).filter(p => !p.companyId || p.companyId === coId),
-    items:     (data.items     || []).filter(i => !i.companyId || i.companyId === coId),
+    products: (data.products || []).filter(p => !p.companyId || p.companyId === coId),
+    items: (data.items || []).filter(i => !i.companyId || i.companyId === coId),
     companies: targetCompany ? [targetCompany] : [],
-    seq:       (data.companySeq && data.companySeq[coId]) || {},
-    profiles:  []
+    seq: (data.companySeq && data.companySeq[coId]) || {},
+    profiles: []
   };
   res.json(companyDb);
 });
@@ -1613,8 +1606,8 @@ Use standard mm for width and height (e.g. 1500 x 1200). If dimensions given in 
     else if (lower.includes('slid')) glyph = 'slider';
 
     const prod = catalog.find(p => p.glyph === glyph) ||
-                 catalog.find(p => lower.includes(p.name.toLowerCase())) ||
-                 catalog[0];
+      catalog.find(p => lower.includes(p.name.toLowerCase())) ||
+      catalog[0];
 
     const name = prod ? prod.name : (glyph.charAt(0).toUpperCase() + glyph.slice(1) + ' Window');
     const rate = prod ? prod.rate : 450;

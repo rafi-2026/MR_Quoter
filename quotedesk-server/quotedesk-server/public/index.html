@@ -2193,13 +2193,12 @@
         const sid = getSess();
         if (sid && db && db.users) me = db.users.find(u => u.id === sid && u.active) || null;
       }
-      // Restore master admin session from sessionStorage (works in both modes)
-      if (!me && getMasterSess()) {
-        if (!db) db = seedData();
-        me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
+      if (r.name === 'login') {
+        me = null;
+        setMasterSess(false);
+        return viewLogin();
       }
       if (!me) {
-        if (r.name === 'login') return viewLogin();
         if (!db || !db.users || !db.users.length) return viewSetup();
         return viewLogin();
       }
@@ -2308,13 +2307,8 @@
               return showOtpScreen(un, res.email, res.devHint);
             }
             if (un === 'master') {
-              let d = await loadDbCloud();
-              if (d) { db = d; db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {}; ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {}; }
-              else { db = seedData(); await apiPost('/api/db', db); }
-              me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
-              setMasterSess(true);
-              go('#/dash');
-              renderApp();
+              $('#aerr').textContent = 'Security OTP required. Please try again.';
+              if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
               return;
             }
             db = await loadDbCloud();
@@ -2335,12 +2329,9 @@
         }
 
         // Offline / local fallback
-        if (un === 'master' && pw === MASTER_PASS) {
-          if (!db) { db = seedData(); persist(true); }
-          me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
-          setMasterSess(true);
-          go('#/dash');
-          renderApp();
+        if (un === 'master') {
+          $('#aerr').textContent = 'Master Admin login requires active cloud server connection for email OTP verification.';
+          if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
           return;
         }
         const u = db.users.find(x => x.username === un);
@@ -2435,7 +2426,14 @@
 
     /* ========== global click actions ========== */
     const ACT = {
-      logout() { setMasterSess(false); if (CLOUD) { apiPost('/api/logout', {}).catch(() => { }); me = null; db = null; renderApp(); } else { me = null; setSess(null); renderApp(); } },
+      logout() {
+        setMasterSess(false);
+        me = null;
+        if (CLOUD) { apiPost('/api/logout', {}).catch(() => { }); }
+        else { setSess(null); }
+        go('#/login');
+        renderApp();
+      },
       mypw() { pwModal(me, true) }
     };
     document.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && ACT[b.dataset.act]) { e.preventDefault(); ACT[b.dataset.act](b, e) } });
