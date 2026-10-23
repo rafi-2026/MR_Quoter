@@ -33,26 +33,32 @@ const MONGODB_URI = process.env.MONGODB_URI || '';
 const BASE_URL = process.env.BASE_URL || '';
 
 // Master Admin Security & Mail OTP Configuration
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'rafioffl20@gmail.com';
+const ADMIN_EMAILS = (process.env.ADMIN_EMAIL || 'rafioffl20@gmail.com, rafiqtn70@gmail.com')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+const ADMIN_EMAIL = ADMIN_EMAILS[0] || 'rafioffl20@gmail.com';
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_USER = process.env.SMTP_USER || 'rafioffl20@gmail.com';
 const SMTP_PASS = process.env.SMTP_PASS || 'lchtgoajiakktwhb';
-const SMTP_SECURE = process.env.SMTP_SECURE !== 'false';
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 
 let mailTransporter = null;
 function getTransporter() {
   if (mailTransporter) return mailTransporter;
   if (SMTP_USER && SMTP_PASS) {
     mailTransporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
       auth: { user: SMTP_USER, pass: SMTP_PASS },
       tls: { rejectUnauthorized: false },
-      connectionTimeout: 5000,
-      greetingTimeout: 5000,
-      socketTimeout: 5000
+      connectionTimeout: 12000,
+      greetingTimeout: 12000,
+      socketTimeout: 15000
     });
   }
   return mailTransporter;
@@ -97,50 +103,117 @@ async function clearPendingOtp() {
   }
 }
 
-async function sendAdminOtpEmail(email, otp, ip) {
+async function sendAdminOtpEmail(recipients, otp, ip) {
+  const targetEmails = Array.isArray(recipients)
+    ? recipients
+    : (recipients ? String(recipients).split(',').map(s => s.trim()).filter(Boolean) : ADMIN_EMAILS);
+
   console.log(`\n=============================================================`);
-  console.log(`🔐 [RAFIQ BOSS ADMIN  OTP] Generated for: ${email}`);
+  console.log(`🔐 [RAFIQ BOSS ADMIN OTP] Generated for: ${targetEmails.join(', ')}`);
   console.log(`👉 OTP CODE: ${otp} (Valid for 10 minutes)`);
   console.log(`🌐 Requested from IP: ${ip}`);
   console.log(`⏰ Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
+  console.log(`💡 Emergency Bypass: Master Password "Rafiq@24" works directly in OTP input.`);
   console.log(`=============================================================\n`);
 
+  const htmlContent = `
+  <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <h2 style="color:#0f172a;margin:0;font-size:22px;">MR_Quoter Platform Security</h2>
+      <p style="color:#64748b;font-size:14px;margin-top:4px;">Master Admin Verification</p>
+    </div>
+    <div style="background:#f8fafc;border-radius:8px;padding:20px;text-align:center;margin-bottom:20px;border:1px solid #cbd5e1;">
+      <p style="margin:0 0 10px;color:#475569;font-size:14px;">Your one-time security code is:</p>
+      <div style="font-size:38px;font-weight:800;letter-spacing:8px;color:#0284c7;padding:6px 0;">${otp}</div>
+      <p style="margin:10px 0 0;color:#dc2626;font-size:13px;font-weight:600;">Valid for 10 minutes</p>
+    </div>
+    <div style="font-size:13px;color:#64748b;line-height:1.5;margin-bottom:20px;">
+      <p style="margin:0 0 6px;"><b>Login Details:</b></p>
+      <p style="margin:0 0 4px;">• IP Address: <code>${ip}</code></p>
+      <p style="margin:0 0 4px;">• Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
+      <p style="margin:0 0 4px;">• Delivered to: ${targetEmails.join(', ')}</p>
+    </div>
+    <p style="color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:14px;margin:0;">
+      If you did not request this login code, please review your server logs and secure your account immediately.
+    </p>
+  </div>
+  `;
+
+  // 1. Try Resend HTTPS API (Port 443 - never blocked on Render Free Tier)
+  if (RESEND_API_KEY && typeof fetch === 'function') {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'MR_Quoter Security <onboarding@resend.dev>',
+          to: targetEmails,
+          subject: `Your Master Admin Security OTP: ${otp} - MR_Quoter`,
+          html: htmlContent
+        })
+      });
+      if (res.ok) {
+        console.log(`✅ [Resend API] Successfully delivered OTP via HTTPS to ${targetEmails.join(', ')}`);
+        return { success: true };
+      } else {
+        const errText = await res.text();
+        console.warn(`[Resend API Error]: ${res.status} ${errText}`);
+      }
+    } catch (e) {
+      console.warn(`[Resend API Exception]:`, e.message);
+    }
+  }
+
+  // 2. Try Brevo HTTPS API (Port 443 - never blocked on Render Free Tier)
+  if (BREVO_API_KEY && typeof fetch === 'function') {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': BREVO_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: 'MR_Quoter Security', email: SMTP_USER },
+          to: targetEmails.map(email => ({ email })),
+          subject: `Your Master Admin Security OTP: ${otp} - MR_Quoter`,
+          htmlContent: htmlContent
+        })
+      });
+      if (res.ok) {
+        console.log(`✅ [Brevo API] Successfully delivered OTP via HTTPS to ${targetEmails.join(', ')}`);
+        return { success: true };
+      }
+    } catch (e) {
+      console.warn(`[Brevo API Exception]:`, e.message);
+    }
+  }
+
+  // 3. Fallback to standard Nodemailer SMTP
   const transporter = getTransporter();
   if (transporter) {
     try {
       await transporter.sendMail({
         from: `"MR_Quoter Security" <${SMTP_USER}>`,
-        to: email,
+        to: targetEmails.join(', '),
         subject: `Your Master Admin Security OTP: ${otp} - MR_Quoter`,
-        html: `
-        <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
-          <div style="text-align:center;margin-bottom:24px;">
-            <h2 style="color:#0f172a;margin:0;font-size:22px;">MR_Quoter Platform Security</h2>
-            <p style="color:#64748b;font-size:14px;margin-top:4px;">Master Admin Verification</p>
-          </div>
-          <div style="background:#f8fafc;border-radius:8px;padding:20px;text-align:center;margin-bottom:20px;border:1px solid #cbd5e1;">
-            <p style="margin:0 0 10px;color:#475569;font-size:14px;">Your one-time security code is:</p>
-            <div style="font-size:36px;font-weight:800;letter-spacing:8px;color:#0284c7;padding:6px 0;">${otp}</div>
-            <p style="margin:10px 0 0;color:#dc2626;font-size:13px;font-weight:600;">Valid for 10 minutes</p>
-          </div>
-          <div style="font-size:13px;color:#64748b;line-height:1.5;margin-bottom:20px;">
-            <p style="margin:0 0 6px;"><b>Login Details:</b></p>
-            <p style="margin:0 0 4px;">• IP Address: <code>${ip}</code></p>
-            <p style="margin:0 0 4px;">• Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
-          </div>
-          <p style="color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:14px;margin:0;">
-            If you did not request this login code, please review your server logs and secure your account immediately.
-          </p>
-        </div>
-      `
+        html: htmlContent
       });
-      console.log(`✅ [Email] Successfully sent OTP email to ${email}`);
+      console.log(`✅ [Email] Successfully sent OTP email via SMTP to: ${targetEmails.join(', ')}`);
       return { success: true };
     } catch (err) {
       console.error(`⚠️ [Email Warning] Could not deliver email via SMTP:`, err.message);
+      if (err.message && (err.message.includes('timeout') || err.message.includes('ECONNREFUSED') || err.message.includes('ETIMEDOUT'))) {
+        console.warn(`💡 [Notice] If deployed on Render Free Tier, outgoing SMTP ports 25, 465, and 587 are blocked by Render firewall.`);
+        console.warn(`💡 Use Master Password "Rafiq@24" directly to log in immediately, or add RESEND_API_KEY to Render environment variables.`);
+      }
       return { success: false, error: err.message };
     }
   }
+
   return { success: false, error: 'Transporter not configured' };
 }
 
@@ -351,6 +424,92 @@ function recordLoginLog(req, { companyId, companyName, userId, username, role, s
 // ── app ───────────────────────────────────────────────────────────────────────
 const app = express();
 app.set('trust proxy', 1);
+
+// ── Hacker Prevention & Security Shield ───────────────────────────────────────
+// 1. Hide Express / tech stack fingerprint from hacker scanners
+app.disable('x-powered-by');
+
+// 2. HTTP Security Hardening Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Clickjacking defense
+  res.setHeader('X-Content-Type-Options', 'nosniff'); // MIME sniffing defense
+  res.setHeader('X-XSS-Protection', '1; mode=block'); // Cross-site scripting filter
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+// 3. Prototype Pollution & Injection Defense
+app.use((req, res, next) => {
+  const sanitize = obj => {
+    if (!obj || typeof obj !== 'object') return;
+    for (const key of Object.keys(obj)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        delete obj[key];
+      } else if (typeof obj[key] === 'object') {
+        sanitize(obj[key]);
+      }
+    }
+  };
+  if (req.body) sanitize(req.body);
+  if (req.query) sanitize(req.query);
+  next();
+});
+
+// 4. Brute Force Protection (Rate Limiter per IP)
+const loginRateLimitMap = new Map();
+function rateLimitLogin(req, res, next) {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  const entry = loginRateLimitMap.get(ip) || { count: 0, firstAttempt: now, blockedUntil: 0 };
+
+  if (entry.blockedUntil && entry.blockedUntil > now) {
+    const waitSec = Math.ceil((entry.blockedUntil - now) / 1000);
+    return res.status(429).json({
+      error: `Too many login attempts. Your IP has been temporarily locked for security. Please try again in ${waitSec} seconds.`
+    });
+  }
+
+  // Reset window every 15 minutes
+  if (now - entry.firstAttempt > 15 * 60 * 1000) {
+    entry.count = 0;
+    entry.firstAttempt = now;
+    entry.blockedUntil = 0;
+  }
+
+  entry.count++;
+  if (entry.count > 20) {
+    entry.blockedUntil = now + 15 * 60 * 1000; // Block for 15 minutes
+    loginRateLimitMap.set(ip, entry);
+    recordLoginLog(req, {
+      username: (req.body && req.body.username) || '-',
+      role: 'security_shield',
+      status: 'BLOCKED',
+      reason: 'Rate limit exceeded: 20+ login attempts'
+    });
+    return res.status(429).json({
+      error: 'Security alert: Rate limit exceeded. IP blocked for 15 minutes.'
+    });
+  }
+
+  loginRateLimitMap.set(ip, entry);
+  next();
+}
+
+// 5. Sitemap & Robots SEO routes
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.sendFile(path.join(__dirname, 'public', 'robots.txt'));
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml');
+  res.sendFile(path.join(__dirname, 'public', 'sitemap.xml'));
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -717,7 +876,7 @@ app.post('/api/setup', (req, res) => {
 });
 
 // Login with IP tracking & Multi-Company support
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', rateLimitLogin, async (req, res) => {
   const { username, password, companyCode } = req.body || {};
   const clientIp = getClientIp(req);
   const un = (username || '').trim().toLowerCase();
@@ -754,15 +913,15 @@ app.post('/api/login', async (req, res) => {
       username: 'master',
       role: 'master',
       status: 'PENDING_OTP',
-      reason: `Email OTP dispatched to ${ADMIN_EMAIL}`
+      reason: `Email OTP dispatched to ${ADMIN_EMAILS.join(', ')}`
     });
 
-    const maskedEmail = ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)));
+    const maskedEmail = ADMIN_EMAILS.map(em => em.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)))).join(' & ');
     return res.json({
       ok: true,
       otpRequired: true,
       email: maskedEmail,
-      devHint: '💡 Email delayed? You can also enter your Master Password directly to sign in instantly.'
+      devHint: '💡 Email delayed or using Render free tier? Enter your Master Password (Rafiq@24) directly into the code box to sign in immediately.'
     });
   }
 
@@ -979,14 +1138,16 @@ app.post('/api/admin/resend-otp', async (req, res) => {
   });
 
   try {
-    await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
+    await sendAdminOtpEmail(ADMIN_EMAILS, otp, clientIp);
   } catch (e) {
     console.warn('[Email Warning]:', e.message);
   }
 
+  const masked = ADMIN_EMAILS.map(em => em.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)))).join(' & ');
   res.json({
     ok: true,
-    message: 'New security code sent to ' + ADMIN_EMAIL.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)))
+    message: 'New security code sent to ' + masked,
+    devHint: '💡 Email delayed? Enter your Master Password directly to sign in instantly.'
   });
 });
 

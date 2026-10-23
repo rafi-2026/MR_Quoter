@@ -1,0 +1,12 @@
+# Robots.txt for MR_Quoter (QuoteDesk)
+# https://mr-quoter.onrender.com
+
+User-agent: *
+Allow: /
+Allow: /index.html
+Disallow: /api/
+Disallow: /data/
+
+# Host & Sitemap
+Host: https://mr-quoter.onrender.com
+Sitemap: https://mr-quoter.onrender.com/sitemap.xml

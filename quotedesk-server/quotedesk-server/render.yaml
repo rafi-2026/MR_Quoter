@@ -10,3 +10,14 @@ services:
         sync: false
       - key: NODE_ENV
         value: production
+      - key: ADMIN_EMAIL
+        value: rafioffl20@gmail.com,rafiqtn70@gmail.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+

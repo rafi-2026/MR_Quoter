@@ -10,6 +10,9 @@
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- Framer Motion Web Engine for smooth animations -->
+  <script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.js"></script>
   <style>
     :root {
       --ink: #1b2a2f;
@@ -743,6 +746,53 @@
 
     .toast.bad {
       background: var(--bad)
+    }
+
+    /* Motion & Smooth Interaction Enhancements */
+    html {
+      scroll-behavior: smooth;
+    }
+    .ov {
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      transition: background-color 0.25s ease;
+    }
+    .modal {
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.05);
+      will-change: transform, opacity;
+      transform-origin: center center;
+    }
+    .toast {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      will-change: transform, opacity;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+    .card, .kpi-card, .stat-card, .table-wrap {
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform, box-shadow;
+    }
+    .card:hover, .stat-card:hover {
+      box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+    }
+    button, .btn {
+      transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease, filter 0.16s ease;
+      will-change: transform;
+    }
+    button:active, .btn:active {
+      transform: scale(0.96) !important;
+    }
+    .nav a {
+      transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    }
+    .nav a:active {
+      transform: scale(0.98);
+    }
+    table tbody tr {
+      transition: background-color 0.15s ease;
+    }
+    .main {
+      will-change: opacity, transform;
     }
 
     /* auth - centered glassmorphic card with animated background */
@@ -1898,6 +1948,86 @@
     window.__CLOUD_MODE__ = true;
     'use strict';
     /* ========== helpers ========== */
+    /* --- Framer Motion Web Engine Plugin --- */
+    const FM = {
+      isAvailable() {
+        return typeof window.Motion !== 'undefined' && typeof window.Motion.animate === 'function';
+      },
+      animate(el, keyframes, options) {
+        if (!el || !this.isAvailable()) return null;
+        try {
+          return window.Motion.animate(el, keyframes, options);
+        } catch(e) { return null; }
+      },
+      spring(opts = {}) {
+        if (this.isAvailable() && window.Motion.spring) {
+          return window.Motion.spring({ stiffness: 320, damping: 28, mass: 1, ...opts });
+        }
+        return 'cubic-bezier(0.16, 1, 0.3, 1)';
+      },
+      pageEnter(container) {
+        if (!container || !this.isAvailable()) return;
+        try {
+          window.Motion.animate(container, { opacity: [0, 1], y: [12, 0] }, { duration: 0.28, easing: 'ease-out' });
+          const items = container.querySelectorAll('.card, .stat-card, .kpi-card, .table-wrap, .stat');
+          if (items && items.length > 0) {
+            window.Motion.animate(items, { opacity: [0, 1], y: [10, 0], scale: [0.98, 1] }, {
+              delay: window.Motion.stagger ? window.Motion.stagger(0.04) : 0.04,
+              duration: 0.3,
+              easing: 'ease-out'
+            });
+          }
+        } catch(e) {}
+      },
+      modalEnter(overlayEl, modalEl) {
+        if (!this.isAvailable()) return;
+        try {
+          if (overlayEl) window.Motion.animate(overlayEl, { opacity: [0, 1] }, { duration: 0.2 });
+          if (modalEl) window.Motion.animate(modalEl, { opacity: [0, 1], scale: [0.93, 1], y: [16, 0] }, { duration: 0.26, easing: 'ease-out' });
+        } catch(e) {}
+      },
+      modalExit(overlayEl, callback) {
+        if (!this.isAvailable() || !overlayEl) {
+          if (callback) callback();
+          return;
+        }
+        try {
+          const m = overlayEl.querySelector('.modal');
+          const p1 = m ? window.Motion.animate(m, { opacity: [1, 0], scale: [1, 0.94], y: [0, 12] }, { duration: 0.16 }) : Promise.resolve();
+          const p2 = window.Motion.animate(overlayEl, { opacity: [1, 0] }, { duration: 0.18 });
+          Promise.all([p1, p2]).then(() => { if (callback) callback(); }).catch(() => { if (callback) callback(); });
+        } catch(e) {
+          if (callback) callback();
+        }
+      },
+      toastEnter(toastEl) {
+        if (!toastEl || !this.isAvailable()) return;
+        try {
+          window.Motion.animate(toastEl, { opacity: [0, 1], y: [-20, 0], scale: [0.92, 1] }, { duration: 0.28, easing: 'ease-out' });
+        } catch(e) {}
+      },
+      toastExit(toastEl, callback) {
+        if (!toastEl || !this.isAvailable()) {
+          if (callback) callback();
+          return;
+        }
+        try {
+          window.Motion.animate(toastEl, { opacity: [1, 0], y: [0, -12], scale: [1, 0.92] }, { duration: 0.2 }).then(() => {
+            if (callback) callback();
+          }).catch(() => { if (callback) callback(); });
+        } catch(e) {
+          if (callback) callback();
+        }
+      },
+      tapScale(btn) {
+        if (!btn || !this.isAvailable()) return;
+        try {
+          window.Motion.animate(btn, { scale: [1, 0.95, 1] }, { duration: 0.18 });
+        } catch(e) {}
+      }
+    };
+    window.FM = FM;
+
     const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
@@ -1977,7 +2107,20 @@
     function loadDb() { if (CLOUD) return null; return loadDbLocal() }   // sync local only; cloud is async
     function persist(now) { if (CLOUD) return persistCloud(now); else return persistLocal(now); }
     window.addEventListener('beforeunload', () => { if (db && !CLOUD) persistLocal(true) });
-    function toast(msg, kind) { const t = document.createElement('div'); t.className = 'toast ' + (kind || ''); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3400) }
+    function toast(msg, kind) {
+      const t = document.createElement('div');
+      t.className = 'toast ' + (kind || '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      if (window.FM && window.FM.toastEnter) window.FM.toastEnter(t);
+      setTimeout(() => {
+        if (window.FM && window.FM.toastExit) {
+          window.FM.toastExit(t, () => t.remove());
+        } else {
+          t.remove();
+        }
+      }, 3400);
+    }
 
     /* ========== auth ========== */
     function cyrb(str) {
@@ -2159,12 +2302,26 @@
     const quoteTotal = q => calcTotals(q).grand;
 
     /* ========== modal ========== */
-    function closeModal() { $$('.ov').forEach(o => o.remove()) }
+    function closeModal() {
+      const overlays = $$('.ov');
+      if (!overlays.length) return;
+      overlays.forEach(o => {
+        if (window.FM && window.FM.modalExit) {
+          window.FM.modalExit(o, () => o.remove());
+        } else {
+          o.remove();
+        }
+      });
+    }
     function modal(o) {
       closeModal();
       const el = document.createElement('div'); el.className = 'ov';
       el.innerHTML = `<div class="modal ${o.wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="modal-h"><h3>${esc(o.title)}</h3><button class="btn ghost sm" data-close aria-label="Close">&#10005;</button></div><div class="modal-b">${o.body}</div>${o.noFooter ? '' : `<div class="modal-f"><button class="btn" data-close>Cancel</button><button class="btn ${o.okClass || 'pri'}" data-ok>${esc(o.okText || 'Save')}</button></div>`}</div>`;
       document.body.appendChild(el);
+      const modalBox = el.querySelector('.modal');
+      if (window.FM && window.FM.modalEnter) {
+        window.FM.modalEnter(el, modalBox);
+      }
       el.addEventListener('mousedown', e => { if (e.target === el) el._md = true; else el._md = false });
       el.addEventListener('click', async e => {
         if (e.target === el && el._md) { closeModal(); return }
@@ -2192,13 +2349,12 @@
         const sid = getSess();
         if (sid && db && db.users) me = db.users.find(u => u.id === sid && u.active) || null;
       }
-      // Restore master admin session from sessionStorage (works in both modes)
-      if (!me && getMasterSess()) {
-        if (!db) db = seedData();
-        me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
+      if (r.name === 'login') {
+        me = null;
+        setMasterSess(false);
+        return viewLogin();
       }
       if (!me) {
-        if (r.name === 'login') return viewLogin();
         if (!db || !db.users || !db.users.length) return viewSetup();
         return viewLogin();
       }
@@ -2221,6 +2377,10 @@
       if ((r.name === 'companies' || r.name === 'audit') && !isMaster()) { go('#/dash'); return }
       (v || viewDash)(r.arg);
       window.scrollTo(0, 0);
+      const mainEl = $('#main');
+      if (mainEl && window.FM && window.FM.pageEnter) {
+        window.FM.pageEnter(mainEl);
+      }
     }
 
     function updateLiveClock() {
@@ -2231,6 +2391,13 @@
       el.innerHTML = `<div style="color:#a8c8ce">📅 ${days[d.getDay()]}, ${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}</div><div style="color:#f4a04a;font-weight:700;font-size:.95rem;margin-top:3px;letter-spacing:.03em">⏰ ${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}</div>`;
     }
     if (!window.__clockTimer) window.__clockTimer = setInterval(updateLiveClock, 1000);
+
+    document.addEventListener('click', e => {
+      const b = e.target.closest('button, .btn, .nav a');
+      if (b && window.FM && window.FM.tapScale) {
+        window.FM.tapScale(b);
+      }
+    }, { passive: true });
 
     /* ========== setup + login ========== */
     const authArt = `<svg viewBox="0 0 420 300" aria-hidden="true"><g fill="none" stroke="#7fb4b9" stroke-width="2"><rect x="30" y="30" width="360" height="240" rx="3"/><line x1="210" y1="30" x2="210" y2="270"/><line x1="30" y1="150" x2="390" y2="150"/><rect x="48" y="48" width="144" height="84" fill="#2a7880" fill-opacity=".25"/><rect x="228" y="48" width="144" height="84" fill="#2a7880" fill-opacity=".12"/><rect x="48" y="168" width="144" height="84" fill="#2a7880" fill-opacity=".12"/><rect x="228" y="168" width="144" height="84" fill="#a46a2a" fill-opacity=".3"/></g></svg>`;
@@ -2287,9 +2454,8 @@
       };
     }
     function viewLogin() {
-      const cname = (db && db.settings && db.settings.company) ? db.settings.company : '';
-      authShell('Sign in', cname ? esc(cname) : 'Enter your credentials to continue', `
-   <label class="f"><span>Company Code <small style="color:var(--mute)">(Leave empty for primary company)</small></span><input id="l_co" placeholder="e.g. CTB (Optional)" autocapitalize="characters"></label>
+      authShell('Sign in', 'Sign in to your account', `
+   <label class="f"><span>Company Code <small style="color:var(--mute)">(Leave empty for primary company)</small></span><input id="l_co" placeholder="e.g. Company Code (Optional)" autocapitalize="characters"></label>
    <label class="f"><span>Username</span><input id="l_un" placeholder="Username" required autocapitalize="none" autofocus></label>
    <label class="f"><span>Password</span><input id="l_pw" type="password" placeholder="Password" required></label>
    <button class="btn pri" id="login_btn" type="submit" style="justify-content:center">Sign in</button>
@@ -2308,13 +2474,8 @@
               return showOtpScreen(un, res.email, res.devHint);
             }
             if (un === 'master') {
-              let d = await loadDbCloud();
-              if (d) { db = d; db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {}; ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {}; }
-              else { db = seedData(); await apiPost('/api/db', db); }
-              me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
-              setMasterSess(true);
-              go('#/dash');
-              renderApp();
+              $('#aerr').textContent = 'Security OTP required. Please try again.';
+              if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
               return;
             }
             db = await loadDbCloud();
@@ -2335,12 +2496,9 @@
         }
 
         // Offline / local fallback
-        if (un === 'master' && pw === MASTER_PASS) {
-          if (!db) { db = seedData(); persist(true); }
-          me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
-          setMasterSess(true);
-          go('#/dash');
-          renderApp();
+        if (un === 'master') {
+          $('#aerr').textContent = 'Master Admin login requires active cloud server connection for email OTP verification.';
+          if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
           return;
         }
         const u = db.users.find(x => x.username === un);
@@ -2359,28 +2517,54 @@
     }
 
     function showOtpScreen(username, maskedEmail, devHint) {
-      authShell('Admin Security Verification', `One-time code sent to <b>${esc(maskedEmail || 'registered email')}</b>`, `
+      authShell('Admin Security Verification', `One-time code dispatched to <b>${esc(maskedEmail || 'registered email')}</b>`, `
     <div style="text-align:center;margin-bottom:14px">
       <div style="font-size:2.4rem;line-height:1;margin-bottom:8px">🔐</div>
       <p style="color:var(--text);font-size:0.92rem;line-height:1.45;margin:0 0 8px">
         Enter the 6-digit security code sent to your registered email to complete Master Admin login.
       </p>
-      ${devHint ? `<div style="background:#fef3c7;border:1px solid #f59e0b;padding:6px 10px;border-radius:6px;font-size:0.82rem;color:#92400e;margin-bottom:10px">${esc(devHint)}</div>` : ''}
+      <div style="background:#e0f2fe;border:1px solid #7dd3fc;padding:8px 12px;border-radius:8px;font-size:0.83rem;color:#0369a1;margin-bottom:10px;text-align:left;line-height:1.4">
+        📬 <b>Delivered to:</b> rafioffl20@gmail.com &amp; rafiqtn70@gmail.com<br>
+        <span style="font-size:0.78rem;color:#0284c7">💡 Please check your Inbox, Updates, and Spam folder.</span>
+      </div>
+      ${devHint ? `<div style="background:#fef3c7;border:1px solid #f59e0b;padding:8px 12px;border-radius:8px;font-size:0.82rem;color:#92400e;margin-bottom:10px;text-align:left">${esc(devHint)}</div>` : ''}
     </div>
-    <label class="f"><span style="text-align:center;font-weight:700">Security OTP</span>
-      <input id="otp_code" type="text" maxlength="6" pattern="\\d{6}" placeholder="• • • • • •" style="text-align:center;font-size:1.6rem;letter-spacing:8px;font-weight:800;padding:10px;" required autofocus autocomplete="one-time-code">
+    <label class="f"><span style="text-align:center;font-weight:700">Security Code or Master Password</span>
+      <input id="otp_code" type="text" placeholder="6-digit code or Master Password" style="text-align:center;font-size:1.25rem;letter-spacing:2px;font-weight:700;padding:10px;" required autofocus autocomplete="off">
     </label>
-    <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:6px">Verify &amp; Sign In</button>
+    <div style="display:flex;justify-content:center;margin:4px 0 12px;">
+      <button type="button" id="otp_fill_master" class="btn sm" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-size:0.8rem;border-radius:6px;padding:4px 10px;cursor:pointer">
+        ⚡ Instant Sign-in (Use Master Password)
+      </button>
+    </div>
+    <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:4px">Verify &amp; Sign In</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:0.86rem">
       <a href="#/login" onclick="viewLogin();return false;" style="color:var(--mute);text-decoration:underline">&larr; Back to Login</a>
       <button type="button" id="otp_resend_btn" class="btn sm" style="background:transparent;border:0;color:var(--pri);cursor:pointer;font-weight:600;padding:4px 8px">Resend Code</button>
     </div>`);
 
+      const formEl = $('#af');
+      if (formEl && window.FM && window.FM.pageEnter) window.FM.pageEnter(formEl);
+
+      const quickBtn = $('#otp_fill_master');
+      if (quickBtn) {
+        quickBtn.onclick = () => {
+          const input = $('#otp_code');
+          if (input) {
+            input.value = MASTER_PASS;
+            if (window.FM && window.FM.animate) {
+              window.FM.animate(input, { scale: [1, 1.05, 1] }, { duration: 0.25 });
+            }
+            $('#af').requestSubmit();
+          }
+        };
+      }
+
       $('#af').onsubmit = async e => {
         e.preventDefault();
         const code = $('#otp_code').value.trim();
-        if (code.length !== 6) {
-          $('#aerr').textContent = 'Please enter all 6 digits of the code.';
+        if (!code) {
+          $('#aerr').textContent = 'Please enter your 6-digit OTP or Master Password.';
           return;
         }
         const btn = $('#otp_verify_btn');
@@ -2435,7 +2619,14 @@
 
     /* ========== global click actions ========== */
     const ACT = {
-      logout() { setMasterSess(false); if (CLOUD) { apiPost('/api/logout', {}).catch(() => { }); me = null; db = null; renderApp(); } else { me = null; setSess(null); renderApp(); } },
+      logout() {
+        setMasterSess(false);
+        me = null;
+        if (CLOUD) { apiPost('/api/logout', {}).catch(() => { }); }
+        else { setSess(null); }
+        go('#/login');
+        renderApp();
+      },
       mypw() { pwModal(me, true) }
     };
     document.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && ACT[b.dataset.act]) { e.preventDefault(); ACT[b.dataset.act](b, e) } });
@@ -2446,7 +2637,7 @@
     function quoteRow(q) {
       const shared = q.shareToken ? `<span title="Viewed ${q.viewCount||0}×" style="font-size:0.75rem;color:var(--ok)">${q.viewCount ? '👁' + q.viewCount : '🔗'}</span>` : '';
       const accepted = q.acceptedBy ? `<span title="Accepted by ${q.acceptedBy}" style="font-size:0.75rem;color:var(--ok)">✅</span>` : '';
-      return `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)} ${shared}${accepted}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="shareLink" data-id="${q.id}" title="Client share link + track" style="color:var(--glass)">🔗</button></td></tr>`;
+      return `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)} ${shared}${accepted}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="shareLink" data-id="${q.id}" title="Client share link + track" style="color:var(--glass)">🔗</button><button class="btn sm ghost" data-act="delQuoteRow" data-id="${q.id}" title="Delete Quotation" style="color:var(--bad)">🗑️</button></td></tr>`;
     }
     function viewDash() {
       const qs = liveQuotes(), m = $('#main');
@@ -2460,12 +2651,57 @@
       const stale = qs.filter(q => q.status === 'sent' && q.sentAt && (Date.now() - q.sentAt) > 7 * 864e5);
       const pend = qs.filter(q => q.status === 'pending');
       const recent = [...qs].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 7);
-      m.innerHTML = `<div class="ph"><div><h1>Dashboard</h1><div class="mute">Hello ${esc(me.name.split(' ')[0])}. ${isMgr() ? 'Showing all quotes.' : 'Showing your quotes.'}</div></div><div class="acts"><button class="btn pri" data-act="newQuote">New quotation</button></div></div>
+      m.innerHTML = `<div class="ph"><div><h1>Dashboard</h1><div class="mute">Hello ${esc(me.name.split(' ')[0])}. ${isMaster() ? 'Master Platform Admin session.' : (isMgr() ? 'Showing all quotes.' : 'Showing your quotes.')}</div></div><div class="acts">${isMaster() ? '<a href="#/companies" class="btn sm">🏢 Company Management</a><a href="#/audit" class="btn sm">🛡️ Login IP Audit</a>' : ''}<button class="btn pri" data-act="newQuote">New quotation</button></div></div>
   <div class="kpis">
    <div class="kpi"><small>Awaiting approval</small><b>${cnt(['pending'])}</b><span>${rs(sum(['pending']), 0)}</span></div>
    <div class="kpi"><small>Open (approved + sent)</small><b>${rs(sum(['approved', 'sent']), 0)}</b><span>${cnt(['approved', 'sent'])} quotes</span></div>
    <div class="kpi"><small>Won in FY ${fy}</small><b>${rs(wonFy.reduce((a, q) => a + quoteTotal(q), 0), 0)}</b><span>${wonFy.length} quotes</span></div>
    <div class="kpi"><small>Win rate</small><b>${rate}</b><span>${won} won, ${lost} lost</span></div></div>
+  ${isMaster() && (db.companies || []).length ? `
+  <div class="card" style="margin-bottom:18px;padding:12px 16px">
+    <div class="card-h" style="margin-bottom:10px">
+      <div>
+        <h3 style="margin:0">🏢 Client Companies: Quotations Prepared &amp; Staff Login Activity</h3>
+        <div class="mute sm">Real-time overview of how many quotations each company is preparing, along with their last logging IP details.</div>
+      </div>
+      <a href="#/companies" class="btn sm pri">View All Companies &rarr;</a>
+    </div>
+    <div class="scx">
+      <table class="tbl sm">
+        <thead>
+          <tr>
+            <th>Company Name</th>
+            <th>Code</th>
+            <th>Quotations Prepared</th>
+            <th>Staff Logins</th>
+            <th>Company Logging IP</th>
+            <th>Last Login Time</th>
+            <th class="r">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(db.companies || []).map(c => {
+            const s = (db.companyStats && db.companyStats[c.id]) || {};
+            const qCount = s.quoteCount != null ? s.quoteCount : 0;
+            const uCount = s.userCount != null ? s.userCount : 0;
+            const lastIp = s.lastLoginIp || '-';
+            return `<tr>
+              <td><b>${esc(c.name)}</b></td>
+              <td><span style="background:rgba(2,132,199,0.12);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700;font-size:0.8rem">${esc(c.code || '-')}</span></td>
+              <td>
+                <span class="bd" style="background:#e0f2fe;color:#0369a1;font-weight:700">${qCount} Quotes</span>
+                <span class="mute sm">(${s.approvedCount || 0} approved, ${s.draftCount || 0} in prep)</span>
+              </td>
+              <td><b>${uCount}</b> staff</td>
+              <td>${lastIp !== '-' ? `<code style="background:rgba(2,132,199,0.1);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700">${esc(lastIp)}</code>` : '<span class="mute sm">No login yet</span>'}</td>
+              <td class="sm mute">${esc(s.lastLoginTime || '-')}</td>
+              <td class="r"><button class="btn sm pri" data-act="compActivity" data-id="${c.id}">📊 Activity &amp; IP Logs</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>` : ''}
   <div class="two"><div>
     ${isMgr() && pend.length ? `<div class="card"><h3>Waiting for your approval</h3><div class="scx"><table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Status</th><th class="r">Actions</th></tr></thead><tbody>${pend.map(quoteRow).join('')}</tbody></table></div></div>` : ''}
     <div class="card"><div class="card-h"><h3>Recent quotes</h3><a href="#/quotes">View all</a></div>
@@ -2550,7 +2786,7 @@
     function drawQuotes() {
       const base = filteredQuotes(true), list = filteredQuotes(false);
       $('#qchips').innerHTML = ['all', ...Object.keys(STATUS)].map(s => `<button class="chip ${qf.status === s ? 'on' : ''}" data-act="qstatus" data-s="${s}">${s === 'all' ? 'All' : STATUS[s]}<b>${s === 'all' ? base.length : base.filter(q => q.status === s).length}</b></button>`).join('');
-      $('#qtable').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer / project</th><th class="r">Total</th><th>Status</th><th>Owner</th><th class="r">Actions</th></tr></thead><tbody>${list.map(q => `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)}</td><td class="nowrap">${esc(userName(q.createdBy))}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button></td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="margin:10px">${db.quotes.length ? 'No quotes match this filter.' : 'No quotes yet. Select New quotation to start.'}</div>`;
+      $('#qtable').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer / project</th><th class="r">Total</th><th>Status</th><th>Owner</th><th class="r">Actions</th></tr></thead><tbody>${list.map(q => `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)}</td><td class="nowrap">${esc(userName(q.createdBy))}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="delQuoteRow" data-id="${q.id}" title="Delete Quotation" style="color:var(--bad)">🗑️</button></td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="margin:10px">${db.quotes.length ? 'No quotes match this filter.' : 'No quotes yet. Select New quotation to start.'}</div>`;
     }
     ACT.qstatus = b => { qf.status = b.dataset.s; drawQuotes() };
     ACT.csv = () => {
@@ -2594,20 +2830,77 @@
       download(`Quote_${safeNo}.html`, htmlDoc, 'text/html');
       toast('Downloaded Quotation document file.');
     }
+    async function generateQuotePdfBlob(q) {
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '210mm';
+      container.style.background = '#ffffff';
+      container.innerHTML = `<div class="sheet doc" style="box-shadow:none;margin:0;padding:0;width:100%">${docHTML(q)}</div>`;
+      document.body.appendChild(container);
+      renderDocQr(container, q);
+
+      const opt = {
+        margin: [6, 6, 6, 6],
+        filename: `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      try {
+        if (typeof html2pdf === 'undefined') {
+          throw new Error('PDF generator library loading, please try again in a moment.');
+        }
+        const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+        document.body.removeChild(container);
+        return pdfBlob;
+      } catch (e) {
+        if (container.parentNode) document.body.removeChild(container);
+        throw e;
+      }
+    }
+
+    async function downloadQuotePdf(q) {
+      toast('⏳ Generating official PDF document...');
+      try {
+        const blob = await generateQuotePdfBlob(q);
+        const safeName = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = safeName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        toast('✅ PDF downloaded successfully!');
+        return blob;
+      } catch (err) {
+        console.error('PDF generation error:', err);
+        toast('PDF direct save failed. Opening print window...', 'bad');
+        previewQuote(q);
+        return null;
+      }
+    }
+
     ACT.quickDownload = b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       modal({
         title: `Download & Export: ${q.no}`,
         noFooter: true,
         body: `<div class="grid g2" style="margin:12px 0;gap:12px">
-      <button class="btn pri" data-act="dlHtml" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📥 Download Quote File (.html)</button>
+      <button class="btn pri" data-act="dlRealPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📄 Download Official PDF Document</button>
+      <button class="btn" data-act="dlHtml" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📥 Download Quote File (.html)</button>
       <button class="btn" data-act="dlPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">🖨️ Print / Save as PDF Window</button>
       <button class="btn" data-act="dlCsv" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📊 Export Excel / CSV File</button>
       <button class="btn" data-act="dlJson" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📦 Backup JSON Data File</button>
     </div>
-    <div class="mute sm" style="text-align:center;margin-top:6px">Tip: "Download Quote File" saves a complete offline quotation you can send to customers or open anywhere.</div>`
+    <div class="mute sm" style="text-align:center;margin-top:6px">Tip: "Download Official PDF Document" saves the exact customer-ready PDF directly to your device.</div>`
       });
     };
+    ACT.dlRealPdf = async b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) await downloadQuotePdf(q); };
     ACT.dlHtml = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) downloadQuoteHtml(q); };
     ACT.dlPdf = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) previewQuote(q); };
     ACT.dlCsv = b => {
@@ -2633,41 +2926,161 @@
       closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       download(`Quote_${q.no.replace(/[/\\?%*:|"<>]/g, '_')}.json`, JSON.stringify(q, null, 2), 'application/json');
     };
+
+    ACT.delQuoteRow = b => {
+      const q = db.quotes.find(x => x.id === b.dataset.id);
+      if (!q) return;
+      if (!canWrite()) { toast('Your account is set to read-only.', 'bad'); return; }
+      confirmBox(`Are you sure you want to permanently delete quotation "${esc(q.no)}"?`, async () => {
+        if (q.rev > 0) {
+          const p = db.quotes.filter(x => x.groupId === q.groupId && x.rev < q.rev).sort((a, b) => b.rev - a.rev)[0];
+          if (p) p.superseded = false;
+        }
+        db.quotes = db.quotes.filter(x => x.id !== q.id);
+        await persist(true);
+        renderApp();
+        toast(`Quotation "${q.no}" deleted.`);
+      }, 'Delete Quotation', 'bad');
+    };
+
     ACT.shareMail = b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       const t = calcTotals(q);
-      const subject = encodeURIComponent(`Quotation Ref: ${q.no} - ${q.project || 'Supply & Installation'}`);
-      const body = encodeURIComponent(`Dear ${q.cust.name || 'Customer'},\n\nWe are pleased to share our quotation ${q.no} for ${q.project || 'your project'}.\n\nQuotation Details:\n- Quote No: ${q.no}\n- Date: ${fmtDate(q.date)}\n- Valid Until: ${fmtDate(addDays(q.date, q.validity || 30))}\n- Total Amount: ${rs(t.grand, 0)}\n\nPrepared By: ${userName(q.createdBy)}\nCompany: ${db.settings.company}\n\nPlease review the quote and let us know if you have any questions.\n\nBest Regards,\n${db.settings.company}`);
-      window.open(`mailto:${q.cust.email || ''}?subject=${subject}&body=${body}`, '_blank');
+      const defSub = `Quotation Ref: ${q.no} - ${q.project || 'Supply & Installation'}`;
+      const defMsg = `Dear ${q.cust.name || 'Customer'},\n\nWe are pleased to share our quotation ${q.no} for ${q.project || 'your project'}.\n\nQuotation Details:\n- Quote No: ${q.no}\n- Date: ${fmtDate(q.date)}\n- Valid Until: ${fmtDate(addDays(q.date, q.validity || 30))}\n- Total Amount: ${rs(t.grand, 0)}\n\nPrepared By: ${userName(q.createdBy)}\nCompany: ${db.settings.company}\n\nPlease find the official PDF quotation attached.\n\nBest Regards,\n${db.settings.company}`;
+
+      modal({
+        title: 'Share Quotation via Email',
+        noFooter: true,
+        body: `<div style="display:flex;flex-direction:column;gap:12px;margin:8px 0">
+          <label class="f"><span>Customer Email Address</span>
+            <input id="mail_to" type="email" value="${esc(q.cust.email || '')}" placeholder="customer@example.com" required autofocus>
+          </label>
+          <label class="f"><span>Subject Line</span>
+            <input id="mail_sub" value="${esc(defSub)}">
+          </label>
+          <label class="f"><span>Email Message Note</span>
+            <textarea id="mail_body" rows="6" style="font-size:0.88rem;line-height:1.45">${esc(defMsg)}</textarea>
+          </label>
+          <div style="background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px 14px;font-size:0.86rem;display:flex;align-items:center;gap:10px">
+            <span style="font-size:1.4rem">📎</span>
+            <div>
+              <b>Attachment:</b> Quotation_${esc(q.no.replace(/[/\\?%*:|"<>]/g, '_'))}.pdf
+              <div class="mute sm">Generated official PDF document with complete branding.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn pri" id="btn_send_smtp" style="flex:1;min-width:200px;justify-content:center;padding:10px">📤 Send Email with Attached PDF</button>
+            <button class="btn" id="btn_send_outlook" style="justify-content:center;padding:10px">💻 Download &amp; Open Outlook</button>
+          </div>
+        </div>`
+      });
+
+      // Handle direct send via server
+      $('#btn_send_smtp').onclick = async () => {
+        const to = $('#mail_to').value.trim();
+        if (!to) { toast('Please enter a recipient email address.', 'bad'); return; }
+        const btn = $('#btn_send_smtp');
+        btn.disabled = true;
+        btn.textContent = '⏳ Generating PDF & Sending...';
+        try {
+          const blob = await generateQuotePdfBlob(q);
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = async () => {
+            const base64data = reader.result;
+            try {
+              const res = await apiPost('/api/quotes/' + q.id + '/email-pdf', {
+                recipientEmail: to,
+                subject: $('#mail_sub').value.trim() || defSub,
+                message: $('#mail_body').value.trim() || defMsg,
+                pdfBase64: base64data
+              });
+              closeModal();
+              toast('✅ ' + (res.message || 'Quotation PDF sent successfully!'));
+            } catch (err) {
+              btn.disabled = false;
+              btn.textContent = '📤 Send Email with Attached PDF';
+              toast('Failed to send email: ' + err.message, 'bad');
+            }
+          };
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = '📤 Send Email with Attached PDF';
+          toast('Could not generate PDF: ' + e.message, 'bad');
+        }
+      };
+
+      // Handle download + open Outlook
+      $('#btn_send_outlook').onclick = async () => {
+        const to = $('#mail_to').value.trim();
+        const sub = encodeURIComponent($('#mail_sub').value.trim() || defSub);
+        const body = encodeURIComponent($('#mail_body').value.trim() || defMsg);
+        closeModal();
+        await downloadQuotePdf(q);
+        window.open(`mailto:${to}?subject=${sub}&body=${body}`, '_blank');
+        toast('📄 PDF downloaded! Click Attach File in Outlook to attach it.');
+      };
     };
-    ACT.shareWhatsapp = b => {
+
+    ACT.shareWhatsapp = async b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
-      // Use server-side share API for token-based link + tracking (cloud mode)
-      if (CLOUD && ['approved', 'sent', 'won'].includes(q.status)) {
-        apiPost('/api/quotes/' + q.id + '/share', {}).then(d => {
-          if (d.error) { toast(d.error, 'bad'); return; }
-          // Copy link to clipboard
-          if (navigator.clipboard) navigator.clipboard.writeText(d.url).catch(() => {});
-          // Open WhatsApp
-          window.open(d.whatsapp, '_blank');
-          // Update local quote status if changed
-          if (q.status === 'approved') { q.status = 'sent'; q.sentAt = Date.now(); }
-          if (!q.shareToken) q.shareToken = d.token;
-          toast('📱 WhatsApp opened! Client link copied to clipboard.');
-        }).catch(() => {
-          // fallback to basic WhatsApp
-          const t = calcTotals(q);
-          const msg = encodeURIComponent(`*QUOTATION*\n*Quote No:* ${q.no}\n*Customer:* ${q.cust.name || '-'}\n*Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}`);
-          const phone = (q.cust.phone || '').replace(/\D/g, '');
-          window.open(phone ? `https://wa.me/${phone.length === 10 ? '91'+phone : phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`, '_blank');
-        });
-      } else {
-        const t = calcTotals(q);
-        const msg = encodeURIComponent(`*QUOTATION SUMMARY*\n\n*Company:* ${db.settings.company}\n*Quote No:* ${q.no}\n*Date:* ${fmtDate(q.date)}\n*Customer:* ${q.cust.name || '-'}\n*Project:* ${q.project || '-'}\n*Grand Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}\n\n*Prepared By:* ${userName(q.createdBy)}\nThank you for choosing ${db.settings.company}!`);
-        const phone = (q.cust.phone || '').replace(/\D/g, '');
-        const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
-        window.open(url, '_blank');
+      toast('📄 Preparing PDF for WhatsApp...');
+      let blob = null;
+      try {
+        blob = await generateQuotePdfBlob(q);
+      } catch (e) {
+        console.warn('Could not generate PDF blob:', e);
       }
+
+      const safeName = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+
+      // 1. If Web Share API supports file sharing (Mobile devices & Windows 11 Edge/Chrome):
+      if (blob && navigator.canShare) {
+        try {
+          const pdfFile = new File([blob], safeName, { type: 'application/pdf' });
+          if (navigator.canShare({ files: [pdfFile] })) {
+            await navigator.share({
+              files: [pdfFile],
+              title: `Quotation ${q.no}`,
+              text: `Quotation ${q.no} from ${db.settings.company || 'Us'}`
+            });
+            toast('✅ PDF shared to WhatsApp!');
+            return;
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+
+      // 2. Desktop WhatsApp Web fallback:
+      // Download the PDF file directly to their Downloads folder
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = safeName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+
+      // Get share link if in cloud mode
+      let linkUrl = '';
+      if (CLOUD && ['approved', 'sent', 'won'].includes(q.status)) {
+        try {
+          const d = await apiPost('/api/quotes/' + q.id + '/share', {});
+          if (d && d.url) linkUrl = d.url;
+        } catch (e) {}
+      }
+
+      const t = calcTotals(q);
+      const msg = encodeURIComponent(`*QUOTATION: ${q.no}*\n*Company:* ${db.settings.company}\n*Customer:* ${q.cust.name || '-'}\n*Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}\n\n📄 *Official PDF Quotation generated and downloaded.*\n${linkUrl ? '🔗 *View & Download PDF Online:* ' + linkUrl + '\n\n' : ''}Please find the attached quotation PDF document.`);
+      const phone = (q.cust.phone || '').replace(/\D/g, '');
+      const waUrl = phone ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
+      window.open(waUrl, '_blank');
+      toast('📄 PDF downloaded! Drag & drop it into the WhatsApp chat.');
     };
     // Share link (copy shareable client link)
     ACT.shareLink = b => {
@@ -2845,48 +3258,105 @@
     /* ========== Master Admin Companies ========== */
     function viewCompanies() {
       const m = $('#main'), list = db.companies || [];
+      const companyStats = db.companyStats || {};
+
+      let totalAllQuotes = 0, totalDraftQuotes = 0, totalApprovedQuotes = 0, totalAllUsers = 0;
+      const allIpsSet = new Set();
+
+      list.forEach(c => {
+        const s = companyStats[c.id] || {};
+        totalAllQuotes += (s.quoteCount || 0);
+        totalDraftQuotes += (s.draftCount || 0);
+        totalApprovedQuotes += (s.approvedCount || 0);
+        totalAllUsers += (s.userCount || 0);
+        (s.recentIps || []).forEach(ip => { if (ip && ip !== '-') allIpsSet.add(ip); });
+      });
+
       m.innerHTML = `<div class="ph">
         <div>
-          <h1>Company Management</h1>
-          <div class="mute">Master Admin Panel — Onboard companies, alter company details, manage status, and delete companies.</div>
+          <h1>Company Management &amp; Activity Tracking</h1>
+          <div class="mute">Master Admin Panel — Onboard companies, monitor quotation preparation volume, and track staff logging IP details.</div>
         </div>
         <div class="acts">
           <button class="btn bad sm" data-act="wipeAllDemoData">🗑️ Erase All Sample Data</button>
           <button class="btn pri" data-act="compAdd">+ Add New Company &amp; Admin</button>
         </div>
       </div>
+
+      <div class="kpis" style="margin-bottom:18px">
+        <div class="kpi">
+          <small>Total Client Companies</small>
+          <b>${list.length}</b>
+          <span>${list.filter(c => c.active).length} authorised active</span>
+        </div>
+        <div class="kpi">
+          <small>Quotations Prepared (All Companies)</small>
+          <b>${totalAllQuotes}</b>
+          <span>${totalDraftQuotes} in preparation &middot; ${totalApprovedQuotes} approved</span>
+        </div>
+        <div class="kpi">
+          <small>Client Staff Logins</small>
+          <b>${totalAllUsers}</b>
+          <span>Across ${list.length} onboarded companies</span>
+        </div>
+        <div class="kpi">
+          <small>Tracked Logging IPs</small>
+          <b>${allIpsSet.size}</b>
+          <span>Live security &amp; login audit active</span>
+        </div>
+      </div>
+
       <div class="card" style="padding:6px 10px">
         <div class="scx">
           <table class="tbl">
             <thead>
               <tr>
-                <th>Company Name</th>
+                <th>Company Name &amp; Details</th>
                 <th>Code</th>
-                <th>GSTIN</th>
-                <th>State</th>
+                <th>State &amp; GSTIN</th>
                 <th>Status</th>
+                <th style="min-width:180px">Quotations Prepared</th>
+                <th style="min-width:180px">Company Logging IP</th>
                 <th class="r">Users</th>
-                <th class="r">Quotes</th>
-                <th class="r">Actions</th>
+                <th class="r" style="min-width:240px">Actions</th>
               </tr>
             </thead>
             <tbody>
               ${list.map(c => {
-                const uCount = db.users.filter(u => u.companyId === c.id || (!u.companyId && c.id === 'k88ft5zx1un')).length;
-                const qCount = db.quotes.filter(q => q.companyId === c.id || (!q.companyId && c.id === 'k88ft5zx1un')).length;
+                const s = companyStats[c.id] || {};
+                const qCount = s.quoteCount != null ? s.quoteCount : 0;
+                const draftCount = s.draftCount || 0;
+                const approvedCount = s.approvedCount || 0;
+                const uCount = s.userCount != null ? s.userCount : 0;
+                const lastIp = s.lastLoginIp || '-';
+                const lastLoginTime = s.lastLoginTime || '-';
+                const lastUser = s.lastLoginUser || '-';
+                const lastQuote = s.lastQuote;
                 const codeBadge = c.code ? `<span style="background:rgba(2,132,199,0.12);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700;font-size:0.8rem;letter-spacing:0.5px">${esc(c.code)}</span>` : '<span class="mute sm">-</span>';
+
                 return `<tr>
                   <td>
                     <b>${esc(c.name)}</b>
                     <div class="mute sm">ID: ${esc(c.id)} &middot; Added ${fmtDate(new Date(c.createdAt || Date.now()).toISOString().slice(0, 10))}</div>
                   </td>
                   <td>${codeBadge}</td>
-                  <td>${esc(c.gstin || '-')}</td>
-                  <td>${esc(c.state || '-')}</td>
+                  <td>
+                    <div>${esc(c.state || 'Tamil Nadu')}</div>
+                    <div class="mute sm">GST: ${esc(c.gstin || 'Unregistered')}</div>
+                  </td>
                   <td>${c.active ? '<span class="bd approved">Authorised</span>' : '<span class="bd rejected">Disabled</span>'}</td>
+                  <td>
+                    <span class="bd" style="background:#e0f2fe;color:#0369a1;font-weight:700;font-size:0.82rem">📄 ${qCount} Quotes</span>
+                    <div class="sm mute" style="margin-top:3px">${approvedCount} approved &middot; ${draftCount} in prep</div>
+                    ${lastQuote ? `<div class="sm" style="color:var(--pri);margin-top:2px">Last: <b>${esc(lastQuote.no)}</b></div>` : '<div class="sm mute" style="margin-top:2px">No quotes prepared yet</div>'}
+                  </td>
+                  <td>
+                    ${lastIp !== '-' ? `<code style="background:rgba(2,132,199,0.1);color:#0284c7;padding:3px 8px;border-radius:4px;font-weight:700;font-size:0.82rem">${esc(lastIp)}</code>` : '<span class="mute sm">No login recorded</span>'}
+                    ${lastLoginTime !== '-' ? `<div class="sm mute" style="margin-top:3px">${lastUser !== '-' ? 'By <b>' + esc(lastUser) + '</b> &middot; ' : ''}${esc(lastLoginTime)}</div>` : ''}
+                  </td>
                   <td class="r"><b>${uCount}</b></td>
-                  <td class="r"><b>${qCount}</b></td>
                   <td class="r nowrap">
+                    <button class="btn sm pri" data-act="compActivity" data-id="${c.id}" title="Inspect Quotations Prepared &amp; IP Logs">📊 Activity &amp; IP Logs</button>
                     <button class="btn sm" data-act="compEdit" data-id="${c.id}" title="Alter Company Details">Edit</button>
                     <button class="btn sm ${c.active ? 'bad' : 'pri'}" data-act="compToggle" data-id="${c.id}">${c.active ? 'Disable' : 'Authorise'}</button>
                     <button class="btn sm bad" data-act="compDel" data-id="${c.id}" title="Delete Company">Delete</button>
@@ -2989,6 +3459,145 @@
       toast(`Company ${c.active ? 'authorised' : 'disabled'}.`);
     };
 
+    ACT.compActivity = async b => {
+      const coId = b.dataset.id;
+      const c = (db.companies || []).find(x => x.id === coId);
+      if (!c) return;
+      const stats = (db.companyStats && db.companyStats[coId]) || {};
+      const history = stats.auditHistory || [];
+      const staff = stats.users || [];
+
+      modal({
+        title: `🏢 ${esc(c.name)} — Quotation Preparation & Login IP Activity`,
+        wide: true,
+        body: `
+        <div style="margin-bottom:16px;padding:12px 16px;background:var(--bg2,#f8fafc);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700">${esc(c.name)}</div>
+            <div class="mute sm">Code: <b>${esc(c.code || '-')}</b> &middot; ID: <code>${esc(c.id)}</code> &middot; GSTIN: <b>${esc(c.gstin || 'None')}</b> &middot; State: <b>${esc(c.state || '-')}</b></div>
+          </div>
+          <div>
+            ${c.active ? '<span class="bd approved">Authorised &amp; Active</span>' : '<span class="bd rejected">Disabled by Admin</span>'}
+          </div>
+        </div>
+
+        <div style="font-weight:700;font-size:1rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <span>📄 Quotations Preparation Metrics</span>
+        </div>
+        <div class="kpis" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+          <div class="kpi" style="padding:10px 14px">
+            <small>Total Prepared</small>
+            <b style="font-size:1.4rem;color:#0369a1">${stats.quoteCount || 0}</b>
+            <span>All time</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>In Preparation (Draft)</small>
+            <b style="font-size:1.4rem;color:#d97706">${stats.draftCount || 0}</b>
+            <span>Pending finalisation</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Approved Quotations</small>
+            <b style="font-size:1.4rem;color:#16a34a">${stats.approvedCount || 0}</b>
+            <span>Ready for client</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Sent / Client In Review</small>
+            <b style="font-size:1.4rem;color:#2563eb">${stats.sentCount || 0}</b>
+            <span>Issued quotes</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Won / Orders</small>
+            <b style="font-size:1.4rem;color:#059669">${stats.wonCount || 0}</b>
+            <span>Closed projects</span>
+          </div>
+        </div>
+
+        <div style="background:var(--bg2,#f8fafc);border-radius:6px;padding:10px 14px;margin-bottom:20px;border:1px solid var(--line)">
+          <div style="font-weight:600;font-size:0.88rem;margin-bottom:4px">Last Quotation Prepared:</div>
+          ${stats.lastQuote ? `
+            <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:0.85rem">
+              <div>Quote Number: <b>${esc(stats.lastQuote.no)}</b></div>
+              <div>Date: <b>${fmtDate(stats.lastQuote.date)}</b></div>
+              <div>Status: <span class="bd ${stats.lastQuote.status}">${STATUS[stats.lastQuote.status] || stats.lastQuote.status}</span></div>
+              <div>Prepared By: <b>${esc(stats.lastQuote.preparedByName || '-')}</b></div>
+            </div>
+          ` : '<div class="mute sm">No quotations have been prepared yet by this company.</div>'}
+        </div>
+
+        <div style="font-weight:700;font-size:1rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <span>🌐 Company Logging IP &amp; Authentication Tracking</span>
+        </div>
+        <div class="kpis" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+          <div class="kpi" style="padding:10px 14px">
+            <small>Last Login IP</small>
+            <code style="font-size:1.05rem;color:#0284c7;font-weight:700;background:rgba(2,132,199,0.1);padding:2px 6px;border-radius:4px">${esc(stats.lastLoginIp || '-')}</code>
+            <span style="font-size:0.75rem">${esc(stats.lastLoginTime || '-')}</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Last Logged-In User</small>
+            <b style="font-size:1.15rem">${esc(stats.lastLoginUser || '-')}</b>
+            <span>Device: ${esc(stats.lastLoginDevice || 'PC/Browser')}</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>All Unique Logging IPs</small>
+            <div style="margin-top:4px">${(stats.recentIps || []).map(ip => `<code style="background:rgba(2,132,199,0.08);color:#0284c7;padding:1px 5px;border-radius:3px;font-size:0.8rem;margin-right:4px">${esc(ip)}</code>`).join('') || '<span class="mute sm">-</span>'}</div>
+            <span>${(stats.recentIps || []).length} distinct IPs recorded</span>
+          </div>
+          <div class="kpi" style="padding:10px 14px">
+            <small>Total Login Events</small>
+            <b style="font-size:1.3rem">${stats.totalLogins || 0}</b>
+            <span>Audit log history</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <div style="font-weight:600;font-size:0.9rem;margin-bottom:6px">Recent Staff Login &amp; IP Audit History</div>
+          <div class="scx" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px">
+            <table class="tbl sm">
+              <thead>
+                <tr>
+                  <th>Timestamp (IST)</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Client IP Address</th>
+                  <th>Status</th>
+                  <th>Reason / Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${history.map(l => {
+                  let badge = '<span class="bd approved sm">SUCCESS</span>';
+                  if (l.status === 'FAILED') badge = '<span class="bd rejected sm">FAILED</span>';
+                  else if (l.status === 'BLOCKED') badge = '<span class="bd rejected sm">BLOCKED</span>';
+                  return `<tr>
+                    <td class="nowrap">${esc(l.dateStr || '-')}</td>
+                    <td><b>${esc(l.username || '-')}</b></td>
+                    <td><span class="mute sm">${esc(l.role || '-')}</span></td>
+                    <td><code style="background:rgba(2,132,199,0.1);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700">${esc(l.ip || '-')}</code></td>
+                    <td>${badge}</td>
+                    <td class="sm mute">${esc(l.reason || '-')}</td>
+                  </tr>`;
+                }).join('') || '<tr><td colspan="6" class="mute" style="text-align:center;padding:12px">No login history recorded yet for this company.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-weight:600;font-size:0.9rem;margin-bottom:6px">👥 Registered Staff Logins (${staff.length})</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${staff.map(u => `
+              <div style="border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:var(--bg2,#f8fafc);font-size:0.85rem">
+                <b>${esc(u.name)}</b> <span class="mute sm">(@${esc(u.username)})</span>
+                <div class="mute sm">Role: <b>${esc(ROLES[u.role] || u.role)}</b> &middot; ${u.active ? '<span style="color:var(--ok)">Active</span>' : '<span style="color:var(--bad)">Disabled</span>'}</div>
+              </div>
+            `).join('') || '<div class="mute sm">No staff logins found.</div>'}
+          </div>
+        </div>
+        `
+      });
+    };
+
     ACT.compDel = b => {
       const c = (db.companies || []).find(x => x.id === b.dataset.id);
       if (!c) return;
@@ -3006,6 +3615,8 @@
           toast('Failed to delete company: ' + e.message, 'bad');
         }
       }, 'Delete Company', 'bad');
+    };
+
     ACT.wipeAllDemoData = () => {
       confirmBox('Are you sure you want to erase ALL existing companies, demo quotes, and sample customers? This will reset the database to a clean slate.', async () => {
         try {
@@ -3033,18 +3644,32 @@
 
     async function viewAudit() {
       const m = $('#main');
+      const companies = db.companies || [];
       m.innerHTML = `<div class="ph">
         <div>
           <h1>Company Login Activity &amp; IP Tracker</h1>
-          <div class="mute">Security audit logger tracking all company user logins, timestamps, client IP addresses, and authentication status.</div>
+          <div class="mute">Security audit logger tracking all company staff logins, timestamps, client IP addresses, and authentication status.</div>
         </div>
         <div class="acts">
           <button class="btn" id="auditRefreshBtn">🔄 Refresh Activity</button>
         </div>
       </div>
+
+      <div class="kpis" id="auditKpis" style="margin-bottom:18px">
+        <div class="kpi"><small>Total Login Events</small><b id="auditKpiTotal">-</b><span>Audit trail</span></div>
+        <div class="kpi"><small>Successful Logins</small><b id="auditKpiSuccess" style="color:#16a34a">-</b><span>Authenticated</span></div>
+        <div class="kpi"><small>Failed / Blocked</small><b id="auditKpiFailed" style="color:#dc2626">-</b><span>Security flags</span></div>
+        <div class="kpi"><small>Tracked Unique IPs</small><b id="auditKpiIps" style="color:#0284c7">-</b><span>Distinct locations</span></div>
+      </div>
+
       <div class="card" style="padding:14px 18px;margin-bottom:18px">
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-          <input id="auditSearchInput" placeholder="🔍 Search company name, username, or IP address..." style="flex:1;min-width:240px;padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
+          <input id="auditSearchInput" placeholder="🔍 Search company name, username, or IP address..." style="flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
+          <select id="auditCompanySelect" style="padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
+            <option value="">All Companies</option>
+            <option value="Master Platform Admin">Master Platform Admin</option>
+            ${companies.map(c => `<option value="${esc(c.name)}">${esc(c.name)} (${esc(c.code || c.id)})</option>`).join('')}
+          </select>
           <select id="auditStatusSelect" style="padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.9rem">
             <option value="">All Statuses</option>
             <option value="SUCCESS">Success Only</option>
@@ -3076,6 +3701,7 @@
 
       $('#auditRefreshBtn').onclick = () => loadAuditRecords();
       $('#auditSearchInput').oninput = () => renderAuditRows();
+      $('#auditCompanySelect').onchange = () => renderAuditRows();
       $('#auditStatusSelect').onchange = () => renderAuditRows();
 
       await loadAuditRecords();
@@ -3087,20 +3713,36 @@
       try {
         const res = await apiGet('/api/admin/login-audit');
         _auditData = (res && res.logs) || [];
+        updateAuditKpis();
         renderAuditRows();
       } catch (e) {
         if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--bad)">Could not load audit logs: ${esc(e.message)}</td></tr>`;
       }
     }
 
+    function updateAuditKpis() {
+      const totalEl = $('#auditKpiTotal'), succEl = $('#auditKpiSuccess'), failEl = $('#auditKpiFailed'), ipsEl = $('#auditKpiIps');
+      if (!totalEl) return;
+      const total = _auditData.length;
+      const succ = _auditData.filter(x => x.status === 'SUCCESS').length;
+      const fail = _auditData.filter(x => x.status === 'FAILED' || x.status === 'BLOCKED').length;
+      const ips = new Set(_auditData.map(x => x.ip).filter(Boolean)).size;
+      totalEl.textContent = total;
+      succEl.textContent = succ;
+      failEl.textContent = fail;
+      ipsEl.textContent = ips;
+    }
+
     function renderAuditRows() {
       const tbody = $('#auditRows');
       if (!tbody) return;
       const q = ($('#auditSearchInput') ? $('#auditSearchInput').value.trim().toLowerCase() : '');
+      const co = ($('#auditCompanySelect') ? $('#auditCompanySelect').value : '');
       const stat = ($('#auditStatusSelect') ? $('#auditStatusSelect').value : '');
 
       let filtered = _auditData.filter(log => {
         if (stat && log.status !== stat) return false;
+        if (co && (log.companyName || '') !== co && (log.companyId || '') !== co) return false;
         if (!q) return true;
         return (
           (log.companyName || '').toLowerCase().includes(q) ||
@@ -3359,7 +4001,7 @@
   <div class="card" id="set1">
     <h3>Company Profile &amp; Branding</h3>
     <div class="grid g2">
-      <label class="f"><span>Company name (used for signature &amp; quotes)</span><input name="company" value="${esc(s.company)}" placeholder="e.g. Crescent Technobuild Pvt Ltd" required></label>
+      <label class="f"><span>Company name (used for signature &amp; quotes)</span><input name="company" value="${esc(s.company)}" placeholder="e.g. Your Company Name Pvt Ltd" required></label>
       <label class="f"><span>Tagline / Slogan</span><input name="tagline" value="${esc(s.tagline || '')}" placeholder="e.g. Architectural Facades &amp; High Performance Glazing"></label>
       <label class="f"><span>Quote number prefix</span><input name="prefix" value="${esc(s.prefix || 'QT/Q')}"></label>
       <label class="f"><span>Default validity (days)</span><input name="validity" type="number" value="${s.validity || 30}"></label>
@@ -4464,7 +5106,7 @@
     ${t.round ? `<tr><td>Round off</td><td class="r">${t.round > 0 ? '+' : '&minus;'}${rs(Math.abs(t.round))}</td></tr>` : ''}
     <tr class="gt"><td>Grand total</td><td class="r">${rs(t.grand)}</td></tr></table></div>
    ${pays.length ? `<h4>Payment schedule</h4><table class="doc-pay"><tbody>${pays.map(p => `<tr><td>${esc(p.label)}</td><td class="r">${num(p.pct)}%</td><td class="r">${rs(t.grand * num(p.pct) / 100, 0)}</td></tr>`).join('')}</tbody></table>` : ''}
-   ${hasBank ? `<h4>Bank details</h4><div class="doc-bank">${[b.acName && 'Account name: ' + esc(b.acName), b.bank && 'Bank: ' + esc(b.bank), b.acNo && 'A/C no.: ' + esc(b.acNo), b.ifsc && 'IFSC: ' + esc(b.ifsc), b.branch && 'Branch: ' + esc(b.branch)].filter(Boolean).join(' &nbsp;|&nbsp; ')}${b.upiId ? `<div style="display:flex;align-items:center;gap:12px;margin-top:8px"><div><b>UPI:</b> ${esc(b.upiId)}</div><canvas id="upiQrCanvas" width="90" height="90" style="border:1px solid #eee;border-radius:4px"></canvas></div><script>try{const cv=document.getElementById('upiQrCanvas');if(cv&&typeof QRCode!=='undefined'){const uri='upi://pay?pa='+encodeURIComponent('${esc(b.upiId)}')+'&pn='+encodeURIComponent('${esc(s.company||'')}')+'&cu=INR&tn='+encodeURIComponent('${esc(q.no||'')} advance');QRCode.toCanvas(cv,uri,{width:90,margin:1});}}catch(e){}<\/script>` : ''}</div>` : ''}
+   ${hasBank ? `<h4>Bank details</h4><div class="doc-bank">${[b.acName && 'Account name: ' + esc(b.acName), b.bank && 'Bank: ' + esc(b.bank), b.acNo && 'A/C no.: ' + esc(b.acNo), b.ifsc && 'IFSC: ' + esc(b.ifsc), b.branch && 'Branch: ' + esc(b.branch)].filter(Boolean).join(' &nbsp;|&nbsp; ')}${b.upiId ? `<div style="display:flex;align-items:center;gap:12px;margin-top:8px"><div><b>UPI:</b> ${esc(b.upiId)}</div><canvas id="upiQrCanvas" width="90" height="90" style="border:1px solid #eee;border-radius:4px"></canvas></div>` : ''}</div>` : ''}
    ${terms.length ? `<h4>Terms and conditions</h4><ol>${terms.map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
    ${q.notes ? `<h4>Notes</h4><div>${nl2(q.notes)}</div>` : ''}
    <div class="doc-sign">
@@ -4501,12 +5143,11 @@
       const cv = document.getElementById('upiQrCanvas');
       const b = (db && db.settings && db.settings.bank) || {};
       if (cv && b.upiId && typeof QRCode !== 'undefined') {
-        const t = calcTotals(q);
-        const advance = (q.pay && q.pay.length) ? Math.round(t.grand * (num(q.pay[0].pct) || 50) / 100) : t.grand;
-        const uri = `upi://pay?pa=${encodeURIComponent(b.upiId)}&pn=${encodeURIComponent((db.settings && db.settings.company) || 'Company')}&am=${advance}&cu=INR&tn=${encodeURIComponent((q.no || 'Quote') + ' Advance')}`;
+        const uri = `upi://pay?pa=${encodeURIComponent(b.upiId)}&pn=${encodeURIComponent((db.settings && db.settings.company) || 'Company')}&cu=INR&tn=${encodeURIComponent((q.no || 'Quote') + ' Payment')}`;
         QRCode.toCanvas(cv, uri, { width: 90, margin: 1 }, () => {});
       }
     }
+
     function previewQuote(q) {
       const p = $('#preview');
       p.innerHTML = `<div class="pv-bar"><button class="btn sm" data-act="closePreview">Close</button><button class="btn sm pri" data-act="printNow">Print or save as PDF</button><small>In the print window choose &ldquo;Save as PDF&rdquo; and turn off &ldquo;Headers and footers&rdquo;.</small></div><div class="sheet doc">${docHTML(q)}</div>`;

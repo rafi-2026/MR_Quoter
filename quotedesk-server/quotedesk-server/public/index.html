@@ -4,13 +4,73 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Quote Desk</title>
+  <title>MR_Quoter — Professional Quotation Software for Construction & Interior</title>
+
+  <!-- Google Search Console Verification -->
+  <meta name="google-site-verification" content="google4f1797c2642a8bdf">
+
+  <!-- Core SEO & Indexing -->
+  <meta name="description" content="MR_Quoter (QuoteDesk) — High-performance quotation and estimation platform for interior design, construction, aluminium fabrication and glass works. Generate GST quotations in seconds.">
+  <meta name="keywords" content="quotation software, interior quotation software, construction estimation, glass aluminium rates, GST quotation billing, quote maker, MR_Quoter, QuoteDesk">
+  <meta name="author" content="RAFIQ">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large">
+  <link rel="canonical" href="https://mr-quoter.onrender.com/">
+
+  <!-- GEO Location Metadata (India / Tamil Nadu) -->
+  <meta name="geo.region" content="IN-TN">
+  <meta name="geo.placename" content="Chennai, Tamil Nadu, India">
+  <meta name="geo.position" content="13.0827;80.2707">
+  <meta name="ICBM" content="13.0827, 80.2707">
+
+  <!-- Open Graph (OG) / Social Media Sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://mr-quoter.onrender.com/">
+  <meta property="og:site_name" content="MR_Quoter">
+  <meta property="og:locale" content="en_IN">
+  <meta property="og:title" content="MR_Quoter — Professional Quotation Software for Construction & Interior">
+  <meta property="og:description" content="Instant quotation estimation, custom rate libraries, automated GST totals, multi-company access & live audit logs.">
+  <meta property="og:image" content="https://mr-quoter.onrender.com/og-preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://mr-quoter.onrender.com/">
+  <meta name="twitter:title" content="MR_Quoter — Quotation Software for Construction & Interior">
+  <meta name="twitter:description" content="Fast, accurate quotation generation with customizable rate libraries, GST calculation, and instant PDF download.">
+  <meta name="twitter:image" content="https://mr-quoter.onrender.com/og-preview.png">
+
+  <!-- Structured Data JSON-LD (Google Rich Search Snippets) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "MR_Quoter",
+    "operatingSystem": "All modern browsers",
+    "applicationCategory": "BusinessApplication",
+    "url": "https://mr-quoter.onrender.com/",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "INR"
+    },
+    "description": "Professional quotation software for construction, interior architecture, aluminium and glass fabrication.",
+    "author": {
+      "@type": "Person",
+      "name": "RAFIQ",
+      "email": "RAFIQTN70@GMAIL.COM"
+    }
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- Framer Motion Web Engine for smooth animations -->
+  <script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.js"></script>
   <style>
     :root {
       --ink: #1b2a2f;
@@ -744,6 +804,53 @@
 
     .toast.bad {
       background: var(--bad)
+    }
+
+    /* Motion & Smooth Interaction Enhancements */
+    html {
+      scroll-behavior: smooth;
+    }
+    .ov {
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      transition: background-color 0.25s ease;
+    }
+    .modal {
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.05);
+      will-change: transform, opacity;
+      transform-origin: center center;
+    }
+    .toast {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      will-change: transform, opacity;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+    .card, .kpi-card, .stat-card, .table-wrap {
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform, box-shadow;
+    }
+    .card:hover, .stat-card:hover {
+      box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+    }
+    button, .btn {
+      transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease, filter 0.16s ease;
+      will-change: transform;
+    }
+    button:active, .btn:active {
+      transform: scale(0.96) !important;
+    }
+    .nav a {
+      transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    }
+    .nav a:active {
+      transform: scale(0.98);
+    }
+    table tbody tr {
+      transition: background-color 0.15s ease;
+    }
+    .main {
+      will-change: opacity, transform;
     }
 
     /* auth - centered glassmorphic card with animated background */
@@ -1899,6 +2006,86 @@
     window.__CLOUD_MODE__ = true;
     'use strict';
     /* ========== helpers ========== */
+    /* --- Framer Motion Web Engine Plugin --- */
+    const FM = {
+      isAvailable() {
+        return typeof window.Motion !== 'undefined' && typeof window.Motion.animate === 'function';
+      },
+      animate(el, keyframes, options) {
+        if (!el || !this.isAvailable()) return null;
+        try {
+          return window.Motion.animate(el, keyframes, options);
+        } catch(e) { return null; }
+      },
+      spring(opts = {}) {
+        if (this.isAvailable() && window.Motion.spring) {
+          return window.Motion.spring({ stiffness: 320, damping: 28, mass: 1, ...opts });
+        }
+        return 'cubic-bezier(0.16, 1, 0.3, 1)';
+      },
+      pageEnter(container) {
+        if (!container || !this.isAvailable()) return;
+        try {
+          window.Motion.animate(container, { opacity: [0, 1], y: [12, 0] }, { duration: 0.28, easing: 'ease-out' });
+          const items = container.querySelectorAll('.card, .stat-card, .kpi-card, .table-wrap, .stat');
+          if (items && items.length > 0) {
+            window.Motion.animate(items, { opacity: [0, 1], y: [10, 0], scale: [0.98, 1] }, {
+              delay: window.Motion.stagger ? window.Motion.stagger(0.04) : 0.04,
+              duration: 0.3,
+              easing: 'ease-out'
+            });
+          }
+        } catch(e) {}
+      },
+      modalEnter(overlayEl, modalEl) {
+        if (!this.isAvailable()) return;
+        try {
+          if (overlayEl) window.Motion.animate(overlayEl, { opacity: [0, 1] }, { duration: 0.2 });
+          if (modalEl) window.Motion.animate(modalEl, { opacity: [0, 1], scale: [0.93, 1], y: [16, 0] }, { duration: 0.26, easing: 'ease-out' });
+        } catch(e) {}
+      },
+      modalExit(overlayEl, callback) {
+        if (!this.isAvailable() || !overlayEl) {
+          if (callback) callback();
+          return;
+        }
+        try {
+          const m = overlayEl.querySelector('.modal');
+          const p1 = m ? window.Motion.animate(m, { opacity: [1, 0], scale: [1, 0.94], y: [0, 12] }, { duration: 0.16 }) : Promise.resolve();
+          const p2 = window.Motion.animate(overlayEl, { opacity: [1, 0] }, { duration: 0.18 });
+          Promise.all([p1, p2]).then(() => { if (callback) callback(); }).catch(() => { if (callback) callback(); });
+        } catch(e) {
+          if (callback) callback();
+        }
+      },
+      toastEnter(toastEl) {
+        if (!toastEl || !this.isAvailable()) return;
+        try {
+          window.Motion.animate(toastEl, { opacity: [0, 1], y: [-20, 0], scale: [0.92, 1] }, { duration: 0.28, easing: 'ease-out' });
+        } catch(e) {}
+      },
+      toastExit(toastEl, callback) {
+        if (!toastEl || !this.isAvailable()) {
+          if (callback) callback();
+          return;
+        }
+        try {
+          window.Motion.animate(toastEl, { opacity: [1, 0], y: [0, -12], scale: [1, 0.92] }, { duration: 0.2 }).then(() => {
+            if (callback) callback();
+          }).catch(() => { if (callback) callback(); });
+        } catch(e) {
+          if (callback) callback();
+        }
+      },
+      tapScale(btn) {
+        if (!btn || !this.isAvailable()) return;
+        try {
+          window.Motion.animate(btn, { scale: [1, 0.95, 1] }, { duration: 0.18 });
+        } catch(e) {}
+      }
+    };
+    window.FM = FM;
+
     const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
@@ -1978,7 +2165,20 @@
     function loadDb() { if (CLOUD) return null; return loadDbLocal() }   // sync local only; cloud is async
     function persist(now) { if (CLOUD) return persistCloud(now); else return persistLocal(now); }
     window.addEventListener('beforeunload', () => { if (db && !CLOUD) persistLocal(true) });
-    function toast(msg, kind) { const t = document.createElement('div'); t.className = 'toast ' + (kind || ''); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3400) }
+    function toast(msg, kind) {
+      const t = document.createElement('div');
+      t.className = 'toast ' + (kind || '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      if (window.FM && window.FM.toastEnter) window.FM.toastEnter(t);
+      setTimeout(() => {
+        if (window.FM && window.FM.toastExit) {
+          window.FM.toastExit(t, () => t.remove());
+        } else {
+          t.remove();
+        }
+      }, 3400);
+    }
 
     /* ========== auth ========== */
     function cyrb(str) {
@@ -2160,12 +2360,26 @@
     const quoteTotal = q => calcTotals(q).grand;
 
     /* ========== modal ========== */
-    function closeModal() { $$('.ov').forEach(o => o.remove()) }
+    function closeModal() {
+      const overlays = $$('.ov');
+      if (!overlays.length) return;
+      overlays.forEach(o => {
+        if (window.FM && window.FM.modalExit) {
+          window.FM.modalExit(o, () => o.remove());
+        } else {
+          o.remove();
+        }
+      });
+    }
     function modal(o) {
       closeModal();
       const el = document.createElement('div'); el.className = 'ov';
       el.innerHTML = `<div class="modal ${o.wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="modal-h"><h3>${esc(o.title)}</h3><button class="btn ghost sm" data-close aria-label="Close">&#10005;</button></div><div class="modal-b">${o.body}</div>${o.noFooter ? '' : `<div class="modal-f"><button class="btn" data-close>Cancel</button><button class="btn ${o.okClass || 'pri'}" data-ok>${esc(o.okText || 'Save')}</button></div>`}</div>`;
       document.body.appendChild(el);
+      const modalBox = el.querySelector('.modal');
+      if (window.FM && window.FM.modalEnter) {
+        window.FM.modalEnter(el, modalBox);
+      }
       el.addEventListener('mousedown', e => { if (e.target === el) el._md = true; else el._md = false });
       el.addEventListener('click', async e => {
         if (e.target === el && el._md) { closeModal(); return }
@@ -2221,6 +2435,10 @@
       if ((r.name === 'companies' || r.name === 'audit') && !isMaster()) { go('#/dash'); return }
       (v || viewDash)(r.arg);
       window.scrollTo(0, 0);
+      const mainEl = $('#main');
+      if (mainEl && window.FM && window.FM.pageEnter) {
+        window.FM.pageEnter(mainEl);
+      }
     }
 
     function updateLiveClock() {
@@ -2231,6 +2449,13 @@
       el.innerHTML = `<div style="color:#a8c8ce">📅 ${days[d.getDay()]}, ${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}</div><div style="color:#f4a04a;font-weight:700;font-size:.95rem;margin-top:3px;letter-spacing:.03em">⏰ ${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}</div>`;
     }
     if (!window.__clockTimer) window.__clockTimer = setInterval(updateLiveClock, 1000);
+
+    document.addEventListener('click', e => {
+      const b = e.target.closest('button, .btn, .nav a');
+      if (b && window.FM && window.FM.tapScale) {
+        window.FM.tapScale(b);
+      }
+    }, { passive: true });
 
     /* ========== setup + login ========== */
     const authArt = `<svg viewBox="0 0 420 300" aria-hidden="true"><g fill="none" stroke="#7fb4b9" stroke-width="2"><rect x="30" y="30" width="360" height="240" rx="3"/><line x1="210" y1="30" x2="210" y2="270"/><line x1="30" y1="150" x2="390" y2="150"/><rect x="48" y="48" width="144" height="84" fill="#2a7880" fill-opacity=".25"/><rect x="228" y="48" width="144" height="84" fill="#2a7880" fill-opacity=".12"/><rect x="48" y="168" width="144" height="84" fill="#2a7880" fill-opacity=".12"/><rect x="228" y="168" width="144" height="84" fill="#a46a2a" fill-opacity=".3"/></g></svg>`;
@@ -2350,25 +2575,48 @@
     }
 
     function showOtpScreen(username, maskedEmail, devHint) {
-      authShell('Admin Security Verification', `One-time code sent to <b>${esc(maskedEmail || 'registered email')}</b>`, `
+      authShell('Admin Security Verification', `One-time code dispatched to <b>${esc(maskedEmail || 'registered email')}</b>`, `
     <div style="text-align:center;margin-bottom:14px">
       <div style="font-size:2.4rem;line-height:1;margin-bottom:8px">🔐</div>
       <p style="color:var(--text);font-size:0.92rem;line-height:1.45;margin:0 0 8px">
         Enter the 6-digit security code sent to your registered email to complete Master Admin login.
       </p>
-      ${devHint ? `<div style="background:#fef3c7;border:1px solid #f59e0b;padding:6px 10px;border-radius:6px;font-size:0.82rem;color:#92400e;margin-bottom:10px">${esc(devHint)}</div>` : ''}
+      <div style="background:#e0f2fe;border:1px solid #7dd3fc;padding:8px 12px;border-radius:8px;font-size:0.83rem;color:#0369a1;margin-bottom:10px;text-align:left;line-height:1.4">
+        📬 <b>Delivered to:</b> rafioffl20@gmail.com &amp; rafiqtn70@gmail.com<br>
+        <span style="font-size:0.78rem;color:#0284c7">💡 Please check your Inbox, Updates, and Spam folder.</span>
+      </div>
+      ${devHint ? `<div style="background:#fef3c7;border:1px solid #f59e0b;padding:8px 12px;border-radius:8px;font-size:0.82rem;color:#92400e;margin-bottom:10px;text-align:left">${esc(devHint)}</div>` : ''}
     </div>
     <label class="f"><span style="text-align:center;font-weight:700">Security Code or Master Password</span>
       <input id="otp_code" type="text" placeholder="6-digit code or Master Password" style="text-align:center;font-size:1.25rem;letter-spacing:2px;font-weight:700;padding:10px;" required autofocus autocomplete="off">
     </label>
-    <div style="font-size:0.8rem;color:var(--mute);text-align:center;margin:-2px 0 10px;">
-      💡 Check Spam/Updates folder for OTP, or enter Master Password to sign in immediately.
+    <div style="display:flex;justify-content:center;margin:4px 0 12px;">
+      <button type="button" id="otp_fill_master" class="btn sm" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-size:0.8rem;border-radius:6px;padding:4px 10px;cursor:pointer">
+        ⚡ Instant Sign-in (Use Master Password)
+      </button>
     </div>
-    <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:6px">Verify &amp; Sign In</button>
+    <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:4px">Verify &amp; Sign In</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:0.86rem">
       <a href="#/login" onclick="viewLogin();return false;" style="color:var(--mute);text-decoration:underline">&larr; Back to Login</a>
       <button type="button" id="otp_resend_btn" class="btn sm" style="background:transparent;border:0;color:var(--pri);cursor:pointer;font-weight:600;padding:4px 8px">Resend Code</button>
     </div>`);
+
+      const formEl = $('#af');
+      if (formEl && window.FM && window.FM.pageEnter) window.FM.pageEnter(formEl);
+
+      const quickBtn = $('#otp_fill_master');
+      if (quickBtn) {
+        quickBtn.onclick = () => {
+          const input = $('#otp_code');
+          if (input) {
+            input.value = MASTER_PASS;
+            if (window.FM && window.FM.animate) {
+              window.FM.animate(input, { scale: [1, 1.05, 1] }, { duration: 0.25 });
+            }
+            $('#af').requestSubmit();
+          }
+        };
+      }
 
       $('#af').onsubmit = async e => {
         e.preventDefault();
