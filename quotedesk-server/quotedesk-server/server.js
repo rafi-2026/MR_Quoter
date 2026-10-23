@@ -49,7 +49,10 @@ function getTransporter() {
       port: 587,
       secure: false,
       auth: { user: SMTP_USER, pass: SMTP_PASS },
-      tls: { rejectUnauthorized: false }
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000
     });
   }
   return mailTransporter;
@@ -741,11 +744,8 @@ app.post('/api/login', async (req, res) => {
       lastSent: Date.now()
     });
 
-    try {
-      await sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp);
-    } catch (e) {
-      console.warn('[Email Warning]:', e.message);
-    }
+    // Dispatch email asynchronously without blocking login
+    sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp).catch(e => console.warn('[Email Warning]:', e.message));
 
     recordLoginLog(req, {
       companyId: 'MASTER',
@@ -761,7 +761,8 @@ app.post('/api/login', async (req, res) => {
     return res.json({
       ok: true,
       otpRequired: true,
-      email: maskedEmail
+      email: maskedEmail,
+      devHint: '💡 Email delayed? You can also enter your Master Password directly to sign in instantly.'
     });
   }
 
