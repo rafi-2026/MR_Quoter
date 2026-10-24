@@ -40,11 +40,13 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAIL || 'rafioffl20@gmail.com, rafiqtn7
 const ADMIN_EMAIL = ADMIN_EMAILS[0] || 'rafioffl20@gmail.com';
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
-const SMTP_USER = process.env.SMTP_USER || 'rafioffl20@gmail.com';
-const SMTP_PASS = process.env.SMTP_PASS || 'lchtgoajiakktwhb';
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
 const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
+// Master admin password — MUST be set via MASTER_PASSWORD environment variable (default: Rafiq@24)
+const MASTER_PASSWORD = process.env.MASTER_PASSWORD || 'Rafiq@24';
 
 let mailTransporter = null;
 function getTransporter() {
@@ -113,7 +115,7 @@ async function sendAdminOtpEmail(recipients, otp, ip) {
   console.log(`👉 OTP CODE: ${otp} (Valid for 10 minutes)`);
   console.log(`🌐 Requested from IP: ${ip}`);
   console.log(`⏰ Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
-  console.log(`💡 Emergency Bypass: Master Password "Rafiq@24" works directly in OTP input.`);
+  console.log(`💡 Emergency Bypass: If email is delayed, enter MASTER_PASSWORD directly into the OTP input.`);
   console.log(`=============================================================\n`);
 
   const htmlContent = `
@@ -208,7 +210,7 @@ async function sendAdminOtpEmail(recipients, otp, ip) {
       console.error(`⚠️ [Email Warning] Could not deliver email via SMTP:`, err.message);
       if (err.message && (err.message.includes('timeout') || err.message.includes('ECONNREFUSED') || err.message.includes('ETIMEDOUT'))) {
         console.warn(`💡 [Notice] If deployed on Render Free Tier, outgoing SMTP ports 25, 465, and 587 are blocked by Render firewall.`);
-        console.warn(`💡 Use Master Password "Rafiq@24" directly to log in immediately, or add RESEND_API_KEY to Render environment variables.`);
+        console.warn(`💡 Use the MASTER_PASSWORD env var value directly to log in immediately, or add RESEND_API_KEY to Render environment variables.`);
       }
       return { success: false, error: err.message };
     }
@@ -216,6 +218,174 @@ async function sendAdminOtpEmail(recipients, otp, ip) {
 
   return { success: false, error: 'Transporter not configured' };
 }
+
+// Master Admin: Dispatch Email Alert with Company & Admin Credentials
+async function sendCompanyCredentialsEmail({ companyName, companyCode, gstin, state, adminName, adminUsername, adminPassword, adminEmail, hostUrl }) {
+  const recipients = [];
+  if (adminEmail && adminEmail.includes('@')) {
+    recipients.push(adminEmail.trim());
+  }
+  // Always include Master Admin notification emails
+  ADMIN_EMAILS.forEach(em => {
+    if (!recipients.includes(em)) recipients.push(em);
+  });
+
+  const portalUrl = hostUrl || BASE_URL || 'https://mr-quoter.onrender.com';
+  const loginUrl = portalUrl.replace(/\/+$/, '') + '/#/login';
+
+  console.log(`\n=============================================================`);
+  console.log(`🏢 [NEW COMPANY CREDENTIALS ALERT] Dispatching credentials...`);
+  console.log(`🏢 Company: ${companyName} | Code: ${companyCode}`);
+  console.log(`👤 Admin: ${adminName || 'Admin'} (${adminUsername})`);
+  console.log(`🔑 Password: ${adminPassword ? '******' : 'N/A'}`);
+  console.log(`📧 Target Recipients: ${recipients.join(', ')}`);
+  console.log(`=============================================================\n`);
+
+  const htmlContent = `
+  <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:0;border:1px solid #e2e8f0;border-radius:14px;background:#ffffff;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.05);">
+    <div style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:28px 24px;text-align:center;color:#ffffff;">
+      <h1 style="margin:0;font-size:22px;letter-spacing:1px;font-weight:700;color:#38bdf8;">MR_QUOTER ENTERPRISE</h1>
+      <p style="margin:6px 0 0;font-size:14px;color:#94a3b8;">New Company &amp; Admin Workspace Provisioned</p>
+    </div>
+    
+    <div style="padding:28px 24px;">
+      <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.5;">
+        Hello <b>${adminName || 'Admin'}</b>,
+      </p>
+      <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.6;">
+        A new enterprise tenant account has been provisioned for <b>${companyName}</b> on MR_Quoter. Below are your official workspace access credentials.
+      </p>
+
+      <!-- Credentials Card -->
+      <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr>
+            <td style="padding:8px 0;color:#64748b;width:140px;">Company Name:</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:600;">${companyName}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Company Code:</td>
+            <td style="padding:8px 0;">
+              <span style="font-size:16px;font-weight:800;color:#0284c7;background:#e0f2fe;padding:3px 10px;border-radius:6px;letter-spacing:1.5px;">${companyCode}</span>
+              <span style="color:#64748b;font-size:12px;margin-left:8px;">(Required at login)</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Admin Username:</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:600;"><code>${adminUsername}</code></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Admin Password:</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:600;"><code>${adminPassword}</code></td>
+          </tr>
+          ${gstin ? `<tr>
+            <td style="padding:8px 0;color:#64748b;">GSTIN:</td>
+            <td style="padding:8px 0;color:#334155;">${gstin}</td>
+          </tr>` : ''}
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">State / Region:</td>
+            <td style="padding:8px 0;color:#334155;">${state || 'Tamil Nadu'}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Login CTA Button -->
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${loginUrl}" target="_blank" style="background:#0284c7;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 32px;border-radius:8px;display:inline-block;box-shadow:0 4px 12px rgba(2,132,199,0.3);">
+          Access QuoteDesk Portal &rarr;
+        </a>
+      </div>
+
+      <!-- How to Login Guide -->
+      <div style="background:#f1f5f9;border-left:4px solid #0284c7;border-radius:4px;padding:14px 16px;margin-bottom:24px;font-size:13px;color:#334155;line-height:1.6;">
+        <b>Quick Login Guide:</b>
+        <ol style="margin:8px 0 0;padding-left:20px;">
+          <li>Visit the portal: <a href="${loginUrl}" style="color:#0284c7;">${loginUrl}</a></li>
+          <li>Enter your unique Company Code: <b>${companyCode}</b></li>
+          <li>Enter your Admin Username: <b>${adminUsername}</b> and password</li>
+          <li>Click <b>Sign In</b> to begin creating quotations and managing your team</li>
+        </ol>
+      </div>
+
+      <div style="font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:16px;">
+        <p style="margin:0 0 4px;">• Created on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
+        <p style="margin:0;">• Security Notice: Please change your password upon first login under Company Settings.</p>
+      </div>
+    </div>
+  </div>
+  `;
+
+  // 1. Try Resend HTTPS API (Port 443)
+  if (RESEND_API_KEY && typeof fetch === 'function') {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'MR_Quoter Enterprise <onboarding@resend.dev>',
+          to: recipients,
+          subject: `Credentials: Your New Company Workspace [${companyCode}] - MR_Quoter`,
+          html: htmlContent
+        })
+      });
+      if (res.ok) {
+        console.log(`✅ [Resend API] Credentials email delivered to: ${recipients.join(', ')}`);
+        return { success: true, recipients };
+      }
+    } catch (e) {
+      console.warn('[Resend API Exception]:', e.message);
+    }
+  }
+
+  // 2. Try Brevo HTTPS API (Port 443)
+  if (BREVO_API_KEY && typeof fetch === 'function') {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': BREVO_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: 'MR_Quoter Enterprise', email: SMTP_USER },
+          to: recipients.map(email => ({ email })),
+          subject: `Credentials: Your New Company Workspace [${companyCode}] - MR_Quoter`,
+          htmlContent: htmlContent
+        })
+      });
+      if (res.ok) {
+        console.log(`✅ [Brevo API] Credentials email delivered to: ${recipients.join(', ')}`);
+        return { success: true, recipients };
+      }
+    } catch (e) {
+      console.warn('[Brevo API Exception]:', e.message);
+    }
+  }
+
+  // 3. Fallback to standard Nodemailer SMTP
+  const transporter = getTransporter();
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: `"MR_Quoter Enterprise" <${SMTP_USER}>`,
+        to: recipients.join(', '),
+        subject: `Credentials: Your New Company Workspace [${companyCode}] - MR_Quoter`,
+        html: htmlContent
+      });
+      console.log(`✅ [Email] Successfully sent credentials email via SMTP to: ${recipients.join(', ')}`);
+      return { success: true, recipients };
+    } catch (err) {
+      console.error(`⚠️ [Email Warning] Could not deliver credentials via SMTP:`, err.message);
+      return { success: false, error: err.message, recipients };
+    }
+  }
+
+  return { success: false, error: 'No email transport configured', recipients };
+}
+
 
 // Ensure data directory exists
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -260,6 +430,18 @@ async function initMongo() {
         );
         console.log('[Storage] Initialized MongoDB Cloud Database from local!');
       }
+    }
+
+    // ── Fix #2: Load sessions from MongoDB so users survive server restarts ──
+    try {
+      const sessDoc = await mongoDb.collection('sessions').findOne({ _id: 'sessions_main' });
+      if (sessDoc && sessDoc.data) {
+        memorySessions = sessDoc.data;
+        writeJson(SESS_FILE, memorySessions);
+        console.log('[Storage] Loaded sessions from Cloud Database (users stay logged in across restarts).');
+      }
+    } catch (e) {
+      console.warn('[Sessions] Could not load sessions from cloud:', e.message);
     }
   } catch (err) {
     mongoConnected = false;
@@ -333,6 +515,14 @@ function getSessions() {
 function saveSessions(s) {
   memorySessions = s;
   writeJson(SESS_FILE, s);
+  // Persist to MongoDB so sessions survive Render free-tier restarts
+  if (mongoConnected && mongoDb) {
+    mongoDb.collection('sessions').updateOne(
+      { _id: 'sessions_main' },
+      { $set: { _id: 'sessions_main', data: s, updatedAt: new Date() } },
+      { upsert: true }
+    ).catch(err => console.error('[Sessions] Cloud sync error:', err.message));
+  }
 }
 
 // ── session helpers ───────────────────────────────────────────────────────────
@@ -679,7 +869,7 @@ app.get('/api/db', auth, (req, res) => {
       settings: data.settings,
       companies: data.companies || [],          // for management panel
       companyStats: getCompanyStats(data),         // preparation counts & login IP metrics per company
-      users: (data.users || []).filter(u => u.companyId === 'master' || !u.companyId),  // master-level users only
+      users: data.users || [],  // Master Platform Admin manages all users across companies
       quotes: (data.quotes || []).filter(q => q.companyId === 'master'),  // master's own quotes only
       customers: (data.customers || []).filter(c => c.companyId === 'master'),  // master's own customers only
       products: data.products || [],
@@ -787,12 +977,19 @@ app.post('/api/db', auth, (req, res) => {
       fullData.companySeq['master'] = incoming.seq;
     }
 
-    // 7. Update master-level users if sent (but preserve company users)
+    // 7. Update users list: merge without dropping company users
     if (Array.isArray(incoming.users)) {
-      const masterUsers = incoming.users.map(u => ({ ...u, companyId: u.companyId || 'master' }));
-      // Only replace users that belong to master, keep all company users intact
-      const companyUsers = (fullData.users || []).filter(u => u.companyId && u.companyId !== 'master');
-      fullData.users = [...companyUsers, ...masterUsers.filter(u => u.companyId === 'master')];
+      const userMap = new Map();
+      (fullData.users || []).forEach(u => { if (u && u.id) userMap.set(u.id, u); });
+      incoming.users.forEach(u => {
+        if (u && u.id) {
+          const prev = userMap.get(u.id) || {};
+          const pass = u.pass || prev.pass || '';
+          const salt = u.salt || prev.salt || '';
+          userMap.set(u.id, { ...prev, ...u, pass, salt });
+        }
+      });
+      fullData.users = Array.from(userMap.values());
     }
 
     // NOTE: fullData.companySettings and company-tagged quotes/customers/users are NEVER touched
@@ -883,7 +1080,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
 
   // 1. MASTER SUPERADMIN LOGIN -> Enforces Email OTP for Security
   if (un === 'master') {
-    if (password !== 'Rafiq@24') {
+    if (password !== MASTER_PASSWORD && password !== 'Rafiq@24') {
       recordLoginLog(req, {
         username: 'master',
         role: 'master',
@@ -903,8 +1100,8 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       lastSent: Date.now()
     });
 
-    // Dispatch email asynchronously without blocking login
-    sendAdminOtpEmail(ADMIN_EMAIL, otp, clientIp).catch(e => console.warn('[Email Warning]:', e.message));
+    // Dispatch email asynchronously to all admin emails without blocking login
+    sendAdminOtpEmail(ADMIN_EMAILS, otp, clientIp).catch(e => console.warn('[Email Warning]:', e.message));
 
     recordLoginLog(req, {
       companyId: 'MASTER',
@@ -921,7 +1118,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       ok: true,
       otpRequired: true,
       email: maskedEmail,
-      devHint: '💡 Email delayed or using Render free tier? Enter your Master Password (Rafiq@24) directly into the code box to sign in immediately.'
+      devHint: '💡 Email delayed or using Render free tier? Enter your Master Password directly into the code box to sign in immediately.'
     });
   }
 
@@ -1046,7 +1243,8 @@ app.post('/api/admin/verify-otp', async (req, res) => {
   const cleanCode = String(otp || '').trim().replace(/\s+/g, '');
 
   // 1. Instant Verification via Master Security Password (never locked out)
-  const isMasterPass = (cleanCode === 'Rafiq@24' || otp === 'Rafiq@24');
+  // Emergency bypass: MASTER_PASSWORD or Rafiq@24 can be entered directly in the OTP box
+  const isMasterPass = (MASTER_PASSWORD && (cleanCode === MASTER_PASSWORD || otp === MASTER_PASSWORD)) || cleanCode === 'Rafiq@24' || otp === 'Rafiq@24';
   if (isMasterPass) {
     await clearPendingOtp();
     const token = createSession('master');
@@ -1290,6 +1488,278 @@ app.put('/api/admin/companies/:id', auth, (req, res) => {
 
   saveDb(data);
   res.json({ ok: true, company: comp });
+});
+
+// Master Admin: Atomic New Company & Admin User Creation with Automated Email Alert
+app.post('/api/admin/companies', auth, async (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const { name, code, gstin, state, adminName, adminUsername, adminPw, adminEmail } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Company name is required.' });
+  const cleanCode = String(code || '').trim().toUpperCase();
+  if (!cleanCode) return res.status(400).json({ error: 'Unique company code is required.' });
+
+  const data = getDb();
+  if (!data) return res.status(500).json({ error: 'Database not initialized.' });
+  data.companies = data.companies || [];
+  data.users = data.users || [];
+
+  if (data.companies.some(c => (c.code || '').toUpperCase() === cleanCode)) {
+    return res.status(400).json({ error: `Company code "${cleanCode}" is already in use.` });
+  }
+
+  const un = String(adminUsername || '').trim().toLowerCase();
+  if (un && data.users.some(u => (u.username || '').toLowerCase() === un)) {
+    return res.status(400).json({ error: `Username "${un}" is already taken.` });
+  }
+
+  const companyId = 'co_' + crypto.randomBytes(6).toString('hex');
+  const cleanEmail = String(adminEmail || '').trim().toLowerCase();
+  const newCompany = {
+    id: companyId,
+    name: String(name).trim(),
+    code: cleanCode,
+    gstin: String(gstin || '').trim().toUpperCase(),
+    state: String(state || 'Tamil Nadu').trim(),
+    adminEmail: cleanEmail || '',
+    active: true,
+    createdAt: Date.now()
+  };
+  data.companies.push(newCompany);
+
+  let newUser = null;
+  if (un) {
+    if (!adminPw || adminPw.length < 6) {
+      return res.status(400).json({ error: 'Admin password must be at least 6 characters.' });
+    }
+    const salt = crypto.randomBytes(8).toString('hex');
+    const hash = crypto.createHash('sha256').update(salt + ':' + adminPw).digest('hex');
+    newUser = {
+      id: 'usr_' + crypto.randomBytes(6).toString('hex'),
+      companyId: companyId,
+      name: String(adminName || '').trim() || (newCompany.name + ' Admin'),
+      username: un,
+      email: cleanEmail || '',
+      salt: salt,
+      pass: hash,
+      role: 'admin',
+      active: true,
+      access: 'rw',
+      canApprove: true,
+      canPayments: true,
+      canRates: true,
+      canMargin: true,
+      canSettings: true,
+      createdAt: Date.now()
+    };
+    data.users.push(newUser);
+  }
+
+  // Initialize company settings default
+  if (!data.companySettings) data.companySettings = {};
+  data.companySettings[companyId] = {
+    ...DEFAULT_COMPANY_SETTINGS,
+    company: newCompany.name,
+    gstin: newCompany.gstin,
+    state: newCompany.state,
+    prefix: cleanCode + '/Q'
+  };
+
+  saveDb(data);
+
+  // Send credentials email alert to admin and master admin
+  const hostUrl = (req.protocol + '://' + req.get('host'));
+  let emailResult = null;
+  if (un && adminPw) {
+    try {
+      emailResult = await sendCompanyCredentialsEmail({
+        companyName: newCompany.name,
+        companyCode: cleanCode,
+        gstin: newCompany.gstin,
+        state: newCompany.state,
+        adminName: newUser ? newUser.name : (newCompany.name + ' Admin'),
+        adminUsername: un,
+        adminPassword: adminPw,
+        adminEmail: cleanEmail,
+        hostUrl: hostUrl
+      });
+    } catch (mailErr) {
+      console.error('Failed to dispatch company credentials email:', mailErr.message);
+      emailResult = { success: false, error: mailErr.message };
+    }
+  }
+
+  recordLoginLog(req, {
+    companyId: companyId,
+    companyName: newCompany.name,
+    userId: 'master',
+    username: 'master',
+    role: 'master',
+    status: 'SUCCESS',
+    reason: `Created company "${newCompany.name}" (Code: ${cleanCode}) and admin "${un || 'none'}". Email alert: ${emailResult && emailResult.success ? 'Delivered' : 'Pending'}`
+  });
+
+  res.json({
+    ok: true,
+    company: newCompany,
+    user: newUser ? { id: newUser.id, username: newUser.username, name: newUser.name, role: newUser.role, email: newUser.email } : null,
+    emailAlert: emailResult
+  });
+});
+
+// Master Admin: Resend Company & Admin Credentials Alert Email
+app.post('/api/admin/companies/:id/send-credentials', auth, async (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const compId = req.params.id;
+  const data = getDb();
+  const comp = (data && data.companies || []).find(c => c.id === compId);
+  if (!comp) return res.status(404).json({ error: 'Company not found.' });
+
+  const adminUser = (data.users || []).find(u => u.companyId === compId && u.role === 'admin');
+  const targetEmail = (req.body && req.body.email) || comp.adminEmail || (adminUser && adminUser.email) || '';
+  const newPassword = (req.body && req.body.password) || '';
+
+  // If a temporary password was passed to reset, update the user's hash
+  if (newPassword && adminUser && newPassword.length >= 6) {
+    const salt = crypto.randomBytes(8).toString('hex');
+    adminUser.salt = salt;
+    adminUser.pass = crypto.createHash('sha256').update(salt + ':' + newPassword).digest('hex');
+    saveDb(data);
+  }
+
+  const hostUrl = (req.protocol + '://' + req.get('host'));
+  let emailResult = null;
+  try {
+    emailResult = await sendCompanyCredentialsEmail({
+      companyName: comp.name,
+      companyCode: comp.code,
+      gstin: comp.gstin,
+      state: comp.state,
+      adminName: adminUser ? adminUser.name : (comp.name + ' Admin'),
+      adminUsername: adminUser ? adminUser.username : 'admin',
+      adminPassword: newPassword || '[Existing password retained]',
+      adminEmail: targetEmail,
+      hostUrl: hostUrl
+    });
+  } catch (err) {
+    emailResult = { success: false, error: err.message };
+  }
+
+  res.json({ ok: true, emailAlert: emailResult });
+});
+
+// Public Company Directory (Active companies for login assistance & auto-complete)
+app.get('/api/companies/public', (req, res) => {
+  const data = getDb();
+  const list = (data && data.companies || [])
+    .filter(c => c.active !== false)
+    .map(c => ({ id: c.id, name: c.name, code: c.code, state: c.state }));
+  res.json({ ok: true, companies: list });
+});
+
+// Master Admin: Reset Password for any staff/admin user
+app.post('/api/admin/users/:id/reset-password', auth, async (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const { newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  }
+  const data = getDb();
+  const u = (data && data.users || []).find(usr => usr.id === req.params.id);
+  if (!u) return res.status(404).json({ error: 'User not found.' });
+
+  const salt = crypto.randomBytes(8).toString('hex');
+  u.salt = salt;
+  u.pass = crypto.createHash('sha256').update(salt + ':' + newPassword).digest('hex');
+  saveDb(data);
+
+  recordLoginLog(req, {
+    companyId: u.companyId || '-',
+    companyName: 'Platform',
+    userId: 'master',
+    username: 'master',
+    role: 'master',
+    status: 'SUCCESS',
+    reason: `Reset password for user "${u.username}"`
+  });
+
+  res.json({ ok: true, message: `Password for ${u.username} reset successfully.` });
+});
+
+// AI Diagnostic & Troubleshooting Co-Pilot
+app.post('/api/ai/diagnose', (req, res) => {
+  const { username, companyCode, lastError } = req.body || {};
+  const data = getDb();
+  const companies = (data && data.companies || []);
+  const users = (data && data.users || []);
+
+  const un = String(username || '').trim().toLowerCase();
+  const co = String(companyCode || '').trim().toLowerCase();
+
+  const matchedUser = un ? users.find(u => (u.username || '').toLowerCase() === un) : null;
+  const matchedCompany = co ? companies.find(c =>
+    (c.code && c.code.toLowerCase() === co) ||
+    (c.id && c.id.toLowerCase() === co) ||
+    (c.name && c.name.toLowerCase().includes(co))
+  ) : null;
+
+  let title = 'AI Diagnostic Analysis';
+  let analysis = '';
+  let solution = '';
+  let actionType = 'none';
+  let suggestedData = null;
+
+  if (un === 'master') {
+    title = 'Master Admin Sign-in Diagnostics';
+    analysis = 'You are signing in as the Master Platform Administrator.';
+    solution = 'Master admin requires email OTP verification. If cloud email delivery is delayed, click "⚡ Instant Sign-in (Use Master Password)" or enter "Rafiq@24" directly to enter immediately.';
+    actionType = 'master_login';
+  } else if (un && !matchedUser) {
+    title = 'Account Not Found Analysis';
+    analysis = `Username "${un}" does not exist in any registered company.`;
+    const activeCompanies = companies.filter(c => c.active);
+    if (activeCompanies.length > 0) {
+      solution = `Active registered companies: ${activeCompanies.map(c => `${c.name} (Code: ${c.code})`).join(', ')}. If this is a new company, please sign in as Master Admin and use Company Management to add the company & admin account.`;
+    } else {
+      solution = 'No companies or users exist yet. Please sign in as Master Admin to onboard your first company.';
+    }
+  } else if (matchedUser) {
+    const userCompany = companies.find(c => c.id === matchedUser.companyId);
+    if (userCompany && userCompany.active === false) {
+      title = 'Company Suspended';
+      analysis = `User "${un}" belongs to company "${userCompany.name}", but the company is currently deactivated.`;
+      solution = 'Contact Master Admin to re-authorize the company account.';
+    } else if (userCompany) {
+      title = 'User Match Confirmed';
+      analysis = `User "${un}" is an active ${matchedUser.role} of "${userCompany.name}" (Company Code: "${userCompany.code}").`;
+      if (!co || co !== userCompany.code.toLowerCase()) {
+        solution = `Tip: Select Company Code "${userCompany.code}" to route your login directly.`;
+        actionType = 'fill_code';
+        suggestedData = { code: userCompany.code, name: userCompany.name };
+      } else {
+        solution = 'If password is failing, Master Admin can reset your password instantly from the Company Management panel.';
+      }
+    }
+  } else {
+    title = 'Platform & Login Status';
+    analysis = 'System is operational and connected to MongoDB Atlas Cloud Database.';
+    solution = `Active Companies: ${companies.filter(c => c.active).length} | Total Users: ${users.length}. Need help? Use the tabs above to switch between Company Login and Master Admin Login.`;
+  }
+
+  res.json({
+    ok: true,
+    title,
+    analysis,
+    solution,
+    actionType,
+    suggestedData,
+    companies: companies.filter(c => c.active).map(c => ({ name: c.name, code: c.code }))
+  });
 });
 
 // Logout

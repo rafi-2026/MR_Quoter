@@ -16,6 +16,8 @@ services:
         sync: false
       - key: BREVO_API_KEY
         sync: false
+      - key: MASTER_PASSWORD
+        value: Rafiq@24
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
