@@ -2252,7 +2252,6 @@
     const STATUS = { draft: 'Draft', pending: 'Awaiting approval', approved: 'Approved', rejected: 'Rejected', sent: 'Sent', won: 'Won', lost: 'Lost' };
     const ROLES = { master: 'Master Admin', admin: 'Company Admin', md: 'Managing Director (MD)', manager: 'Manager', accounts: 'Accounts & Finance', sales: 'Sales Executive' };
     const ACCESS_LEVELS = { rw: 'Read & Write', ro: 'Only Read', wo: 'Only Write / Create' };
-    const MASTER_PASS = 'Rafiq@24';
     const GLYPHS = { slider: 'Sliding window', casement: 'Casement / hinged', fixed: 'Fixed glass', door: 'Door', facade: 'Facade / glazing', partition: 'Partition' };
     const UNIT_FT = { mm: 1 / 304.8, ft: 1, in: 1 / 12, m: 3.28084 };
     const getFy = iso => fyOf(iso || today());
@@ -2738,15 +2737,6 @@
               <div class="mute sm">Loading companies...</div>
             </div>
           </div>
-
-          <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:12px">
-            <b>💡 Instant Troubleshooting Shortcuts</b>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-              <button class="btn sm" onclick="document.querySelector('#l_un') && (document.querySelector('#l_un').value='rafi');document.querySelector('#l_co') && (document.querySelector('#l_co').value='CTPL');closeModal();toast('Loaded username & company code for Rafi.');">👤 Use Demo Admin "rafi" (CTPL)</button>
-              <button class="btn sm" onclick="setLoginTab('master');closeModal();toast('Switched to Master Admin Login tab.');">👑 Switch to Master Admin Tab</button>
-              <button class="btn sm" onclick="toast('Master Emergency Password: Rafiq@24', 'pri');">🔑 Show Master Password</button>
-            </div>
-          </div>
         </div>`,
         okText: 'Close'
       });
@@ -2921,20 +2911,6 @@
       <button type="button" class="auth-tab" id="tab_master" onclick="setLoginTab('master')">👑 Master Platform Admin</button>
     </div>
 
-    <!-- ⚡ Quick Fast Demo Access Bar -->
-    <div style="background:rgba(2,132,199,0.06);border:1px dashed #7dd3fc;border-radius:10px;padding:8px 10px;margin-bottom:14px;">
-      <div style="font-size:0.73rem;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-        <span>⚡ Quick 1-Click Fast Fill</span>
-        <span style="font-size:0.7rem;font-weight:500;color:#0284c7;">Click to test</span>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button type="button" class="btn sm" style="padding:3px 8px;font-size:0.78rem;background:#fff;border:1px solid #cbd5e1;font-weight:600;color:#0f172a" onclick="setLoginTab('master');$('#l_pw').value='Rafiq@24';toast('Filled Master Admin credentials');">👑 Master (Rafiq@24)</button>
-        <button type="button" class="btn sm" style="padding:3px 8px;font-size:0.78rem;background:#fff;border:1px solid #cbd5e1;font-weight:600;color:#0f172a" onclick="setLoginTab('company');$('#l_co').value='CTPL';$('#l_un').value='rafi';$('#l_pw').value='Rafiq@24';toast('Filled Crescent Tech (rafi)');">🏢 Crescent (CTPL)</button>
-        <button type="button" class="btn sm" style="padding:3px 8px;font-size:0.78rem;background:#fff;border:1px solid #cbd5e1;font-weight:600;color:#0f172a" onclick="setLoginTab('company');$('#l_co').value='APEX';$('#l_un').value='apex_admin';$('#l_pw').value='Apex@2026';toast('Filled Apex (apex_admin)');">✨ Apex (APEX)</button>
-        <button type="button" class="btn sm" style="padding:3px 8px;font-size:0.78rem;background:#fff;border:1px solid #cbd5e1;font-weight:600;color:#0f172a" onclick="setLoginTab('company');$('#l_co').value='ABC';$('#l_un').value='demo';$('#l_pw').value='demo';toast('Filled Demo Company (demo)');">📋 Demo (ABC)</button>
-      </div>
-    </div>
-
     <!-- Company Login Section -->
     <div id="company_fields">
       <label class="f">
@@ -2948,11 +2924,8 @@
 
     <!-- Master Notice Section -->
     <div id="master_fields" style="display:none">
-      <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 12px;border-radius:10px;font-size:0.83rem;color:#1e40af;margin-bottom:12px;line-height:1.45">
-        👑 <b>Master Platform Administrator:</b> Full access to onboard companies, manage staff logins, monitor quotes, and inspect live IP audits.<br>
-        <div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:0.78rem;color:#1d4ed8;">
-          <span>🔐 2FA Email OTP Verification Active</span> &middot; <span>⚡ Emergency Bypass: <b>Rafiq@24</b></span>
-        </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px 14px;border-radius:10px;font-size:0.83rem;color:#475569;margin-bottom:12px;line-height:1.45">
+        👑 <b>Master Platform Administrator:</b> Enter your master credentials. A one-time verification security code will be sent to your registered admin email to authenticate.
       </div>
     </div>
 
@@ -3064,32 +3037,25 @@
       };
     }
 
-    function showOtpScreen(username, maskedEmail, devHint) {
-      const MASTER_PASS = 'Rafiq@24';
+    function showOtpScreen(username, maskedEmail) {
       authShell('Admin Security Verification', `One-time code dispatched to <b>${esc(maskedEmail || 'registered email')}</b>`, `
     <div style="text-align:center;margin-bottom:14px">
       <div style="font-size:2.4rem;line-height:1;margin-bottom:8px">🔐</div>
       <p style="color:var(--text);font-size:0.92rem;line-height:1.45;margin:0 0 8px">
         Enter the 6-digit security code sent to your registered email to complete Master Admin login.
       </p>
-      <div style="background:#e0f2fe;border:1px solid #7dd3fc;padding:8px 12px;border-radius:8px;font-size:0.83rem;color:#0369a1;margin-bottom:10px;text-align:left;line-height:1.4">
-        📬 <b>Delivered to:</b> rafioffl20@gmail.com &amp; rafiqtn70@gmail.com<br>
-        <span style="font-size:0.78rem;color:#0284c7">💡 Please check your Inbox, Updates, and Spam folder.</span>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px 14px;border-radius:8px;font-size:0.84rem;color:#334155;margin-bottom:12px;text-align:left;line-height:1.45">
+        📬 <b>Delivered to:</b> ${esc(maskedEmail || 'registered email')}<br>
+        <span style="font-size:0.78rem;color:#64748b">Please check your Inbox, Updates, and Spam folder.</span>
       </div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;font-size:0.82rem;color:#64748b;font-weight:600">
-        <span>⏱️ Code valid for:</span> <span id="otp_timer" style="color:#0284c7;font-family:monospace;font-size:0.95rem">10:00</span>
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:12px;font-size:0.85rem;color:#64748b;font-weight:600">
+        <span>⏱️ Code valid for:</span> <span id="otp_timer" style="color:#0284c7;font-family:monospace;font-size:1rem;font-weight:700">10:00</span>
       </div>
-      ${devHint ? `<div style="background:#fef3c7;border:1px solid #f59e0b;padding:8px 12px;border-radius:8px;font-size:0.82rem;color:#92400e;margin-bottom:10px;text-align:left">${esc(devHint)}</div>` : ''}
     </div>
-    <label class="f"><span style="text-align:center;font-weight:700">Security Code or Master Password</span>
-      <input id="otp_code" type="text" placeholder="6-digit code or Master Password" style="text-align:center;font-size:1.35rem;letter-spacing:4px;font-weight:700;padding:12px;border-radius:10px" required autofocus autocomplete="off">
+    <label class="f"><span style="text-align:center;font-weight:700;font-size:0.95rem">Enter 6-Digit Security Code</span>
+      <input id="otp_code" type="text" maxlength="6" placeholder="000000" style="text-align:center;font-size:1.6rem;letter-spacing:8px;font-weight:700;padding:12px;border-radius:10px" required autofocus autocomplete="one-time-code">
     </label>
-    <div style="display:flex;justify-content:center;margin:8px 0 14px;">
-      <button type="button" id="otp_fill_master" class="btn pri sm" style="background:linear-gradient(135deg, #0284c7, #2563eb);color:#fff;border:none;font-size:0.88rem;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:700;box-shadow:0 4px 14px rgba(2,132,199,0.35);display:flex;align-items:center;gap:6px">
-        ⚡ Instant Sign-in (Use Master Password: Rafiq@24)
-      </button>
-    </div>
-    <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:4px">Verify &amp; Sign In</button>
+    <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:10px">Verify &amp; Sign In</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:0.86rem">
       <a href="#/login" onclick="viewLogin();return false;" style="color:var(--mute);text-decoration:underline">&larr; Back to Login</a>
       <button type="button" id="otp_resend_btn" class="btn sm" style="background:transparent;border:0;color:var(--pri);cursor:pointer;font-weight:600;padding:4px 8px">Resend Code</button>
@@ -3113,25 +3079,11 @@
       const formEl = $('#af');
       if (formEl && window.FM && window.FM.pageEnter) window.FM.pageEnter(formEl);
 
-      const quickBtn = $('#otp_fill_master');
-      if (quickBtn) {
-        quickBtn.onclick = () => {
-          const input = $('#otp_code');
-          if (input) {
-            input.value = 'Rafiq@24';
-            if (window.FM && window.FM.animate) {
-              window.FM.animate(input, { scale: [1, 1.05, 1] }, { duration: 0.25 });
-            }
-            $('#af').requestSubmit();
-          }
-        };
-      }
-
       $('#af').onsubmit = async e => {
         e.preventDefault();
         const code = $('#otp_code').value.trim();
         if (!code) {
-          $('#aerr').textContent = 'Please enter your 6-digit OTP or Master Password.';
+          $('#aerr').textContent = 'Please enter your 6-digit security code.';
           return;
         }
         const btn = $('#otp_verify_btn');

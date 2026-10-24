@@ -39,10 +39,10 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAIL || 'rafioffl20@gmail.com, rafiqtn7
   .filter(Boolean);
 const ADMIN_EMAIL = ADMIN_EMAILS[0] || 'rafioffl20@gmail.com';
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
+const SMTP_USER = process.env.SMTP_USER || 'rafioffl20@gmail.com';
+const SMTP_PASS = process.env.SMTP_PASS || 'lchtgoajiakktwhb';
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465 || true;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 // Master admin password — MUST be set via MASTER_PASSWORD environment variable (default: Rafiq@24)
@@ -55,7 +55,7 @@ function getTransporter() {
     mailTransporter = nodemailer.createTransport({
       host: SMTP_HOST,
       port: SMTP_PORT,
-      secure: SMTP_SECURE,
+      secure: SMTP_PORT === 465,
       auth: { user: SMTP_USER, pass: SMTP_PASS },
       tls: { rejectUnauthorized: false },
       connectionTimeout: 12000,
@@ -1117,8 +1117,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
     return res.json({
       ok: true,
       otpRequired: true,
-      email: maskedEmail,
-      devHint: '💡 Email delayed or using Render free tier? Enter your Master Password directly into the code box to sign in immediately.'
+      email: maskedEmail
     });
   }
 
@@ -1344,8 +1343,7 @@ app.post('/api/admin/resend-otp', async (req, res) => {
   const masked = ADMIN_EMAILS.map(em => em.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)))).join(' & ');
   res.json({
     ok: true,
-    message: 'New security code sent to ' + masked,
-    devHint: '💡 Email delayed? Enter your Master Password directly to sign in instantly.'
+    message: 'New security code sent to ' + masked
   });
 });
 
@@ -1717,7 +1715,7 @@ app.post('/api/ai/diagnose', (req, res) => {
   if (un === 'master') {
     title = 'Master Admin Sign-in Diagnostics';
     analysis = 'You are signing in as the Master Platform Administrator.';
-    solution = 'Master admin requires email OTP verification. If cloud email delivery is delayed, click "⚡ Instant Sign-in (Use Master Password)" or enter "Rafiq@24" directly to enter immediately.';
+    solution = 'Master admin requires your master password and a 6-digit email OTP verification code sent to your registered email address.';
     actionType = 'master_login';
   } else if (un && !matchedUser) {
     title = 'Account Not Found Analysis';
