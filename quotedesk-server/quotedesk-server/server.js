@@ -48,6 +48,91 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 // Master admin password — MUST be set via MASTER_PASSWORD environment variable (default: Rafiq@24)
 const MASTER_PASSWORD = process.env.MASTER_PASSWORD || 'Rafiq@24';
 
+// Master Admin Google Authenticator (RFC 6238 TOTP 2FA)
+const DEFAULT_TOTP_SECRET = 'JBSWY3DPEHPK3PXPMRQUOTER24RAFIQ7';
+let cachedTotpSecret = (process.env.MASTER_TOTP_SECRET || '').trim();
+
+function base32Decode(str) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let cleaned = String(str || '').toUpperCase().replace(/=+$/, '').replace(/[\s-]/g, '');
+  let bits = 0;
+  let value = 0;
+  const output = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    const idx = alphabet.indexOf(cleaned[i]);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      output.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(output);
+}
+
+function generateTotp(secret, timeMs = Date.now(), stepSeconds = 30) {
+  try {
+    const key = base32Decode(secret);
+    const counter = Math.floor(timeMs / 1000 / stepSeconds);
+    const buf = Buffer.alloc(8);
+    buf.writeBigUInt64BE(BigInt(counter));
+    const hmac = crypto.createHmac('sha1', key).update(buf).digest();
+    const offset = hmac[hmac.length - 1] & 0x0f;
+    const binary = ((hmac[offset] & 0x7f) << 24) |
+                   ((hmac[offset + 1] & 0xff) << 16) |
+                   ((hmac[offset + 2] & 0xff) << 8) |
+                   (hmac[offset + 3] & 0xff);
+    return String(binary % 1000000).padStart(6, '0');
+  } catch (e) {
+    return '';
+  }
+}
+
+function verifyTotp(code, secret, window = 1) {
+  if (!code || !secret) return false;
+  const cleanCode = String(code).trim().replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(cleanCode)) return false;
+  const now = Date.now();
+  const stepMs = 30 * 1000;
+  for (let i = -window; i <= window; i++) {
+    const expected = generateTotp(secret, now + i * stepMs);
+    if (cleanCode === expected) return true;
+  }
+  return false;
+}
+
+async function getMasterTotpSecret() {
+  if (process.env.MASTER_TOTP_SECRET && process.env.MASTER_TOTP_SECRET.trim()) {
+    return process.env.MASTER_TOTP_SECRET.trim().toUpperCase();
+  }
+  if (cachedTotpSecret) return cachedTotpSecret;
+
+  if (mongoConnected && mongoDb) {
+    try {
+      const doc = await mongoDb.collection('admin_security').findOne({ _id: 'master_totp_secret' });
+      if (doc && doc.secret) {
+        cachedTotpSecret = doc.secret.toUpperCase();
+        return cachedTotpSecret;
+      }
+    } catch (e) {
+      console.warn('[Security] MongoDB TOTP secret fetch warning:', e.message);
+    }
+  }
+
+  cachedTotpSecret = DEFAULT_TOTP_SECRET;
+  if (mongoConnected && mongoDb) {
+    try {
+      await mongoDb.collection('admin_security').updateOne(
+        { _id: 'master_totp_secret' },
+        { $set: { secret: DEFAULT_TOTP_SECRET, updatedAt: new Date() } },
+        { upsert: true }
+      );
+    } catch (e) { }
+  }
+  return cachedTotpSecret;
+}
+
 let mailTransporter = null;
 function getTransporter() {
   if (mailTransporter) return mailTransporter;
@@ -1090,7 +1175,10 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       return res.status(401).json({ error: 'Wrong username or password' });
     }
 
-    // Password valid -> Generate secure 6-digit email OTP
+    // Password valid -> Prepare TOTP & Backup Email OTP
+    const totpSecret = await getMasterTotpSecret();
+    const totpUri = `otpauth://totp/MR_Quoter:master?secret=${totpSecret}&issuer=MR_Quoter`;
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     await setPendingOtp({
       otp: String(otp).trim(),
@@ -1110,13 +1198,16 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       username: 'master',
       role: 'master',
       status: 'PENDING_OTP',
-      reason: `Email OTP dispatched to ${ADMIN_EMAILS.join(', ')}`
+      reason: `2FA requested via Google Authenticator & Email OTP`
     });
 
     const maskedEmail = ADMIN_EMAILS.map(em => em.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)))).join(' & ');
     return res.json({
       ok: true,
       otpRequired: true,
+      authType: 'totp',
+      totpSecret: totpSecret,
+      totpUri: totpUri,
       email: maskedEmail
     });
   }
@@ -1235,16 +1326,27 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
   res.json({ ok: true, userId: user.id, companyId: user.companyId || (targetCompany && targetCompany.id) });
 });
 
-// Master Admin OTP Verification
+// Master Admin OTP & Google Authenticator (TOTP) Verification
 app.post('/api/admin/verify-otp', async (req, res) => {
   const { otp } = req.body || {};
   const clientIp = getClientIp(req);
   const cleanCode = String(otp || '').trim().replace(/\s+/g, '');
 
-  // 1. Instant Verification via Master Security Password (never locked out)
-  // Emergency bypass: MASTER_PASSWORD or Rafiq@24 can be entered directly in the OTP box
-  const isMasterPass = (MASTER_PASSWORD && (cleanCode === MASTER_PASSWORD || otp === MASTER_PASSWORD)) || cleanCode === 'Rafiq@24' || otp === 'Rafiq@24';
-  if (isMasterPass) {
+  if (!cleanCode) {
+    return res.status(400).json({ error: 'Please enter the 6-digit verification code.' });
+  }
+
+  // 1. Verify Google Authenticator TOTP (RFC 6238)
+  const totpSecret = await getMasterTotpSecret();
+  const isTotpMatch = verifyTotp(cleanCode, totpSecret);
+
+  // 2. Verify Email OTP (if available)
+  const pending = await getPendingOtp();
+  const isEmailMatch = pending &&
+    (Date.now() <= (pending.expires || 0)) &&
+    (cleanCode === String(pending.otp).trim().replace(/\s+/g, ''));
+
+  if (isTotpMatch || isEmailMatch) {
     await clearPendingOtp();
     const token = createSession('master');
     res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
@@ -1256,65 +1358,38 @@ app.post('/api/admin/verify-otp', async (req, res) => {
       username: 'master',
       role: 'master',
       status: 'SUCCESS',
-      reason: 'Verified via Master Security Password'
+      reason: isTotpMatch ? 'Verified via Google Authenticator' : 'Verified via Email OTP'
     });
 
     return res.json({ ok: true, userId: 'master' });
   }
 
-  // 2. Email OTP Verification
-  const pending = await getPendingOtp();
-
-  if (!pending) {
-    return res.status(400).json({ error: 'No active OTP session found or code expired. Please sign in again or enter your master password.' });
-  }
-
-  if (Date.now() > pending.expires) {
-    await clearPendingOtp();
-    return res.status(400).json({ error: 'Security OTP expired. Please request a new code or enter your master password.' });
-  }
-
-  if (pending.attempts >= 8) {
-    await clearPendingOtp();
-    recordLoginLog(req, {
-      username: 'master',
-      role: 'master',
-      status: 'BLOCKED',
-      reason: 'Maximum OTP attempts exceeded'
-    });
-    return res.status(403).json({ error: 'Too many incorrect attempts. Please sign in again or enter your master password.' });
-  }
-
-  const isOtpMatch = cleanCode === String(pending.otp).trim().replace(/\s+/g, '');
-
-  if (!isOtpMatch) {
+  // Incorrect code handling & attempt tracking
+  if (pending) {
     pending.attempts = (pending.attempts || 0) + 1;
+    if (pending.attempts >= 8) {
+      await clearPendingOtp();
+      recordLoginLog(req, {
+        username: 'master',
+        role: 'master',
+        status: 'BLOCKED',
+        reason: 'Maximum 2FA verification attempts exceeded'
+      });
+      return res.status(403).json({ error: 'Too many incorrect attempts. Please sign in again.' });
+    }
     await setPendingOtp(pending);
-    recordLoginLog(req, {
-      username: 'master',
-      role: 'master',
-      status: 'FAILED',
-      reason: `Wrong OTP entered "${cleanCode}" (Attempt ${pending.attempts}/8)`
-    });
-    return res.status(400).json({ error: `Invalid security code. (${8 - pending.attempts} attempts remaining)` });
   }
-
-  // OTP verified successfully
-  await clearPendingOtp();
-  const token = createSession('master');
-  res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
 
   recordLoginLog(req, {
-    companyId: 'MASTER',
-    companyName: 'Master Platform Admin',
-    userId: 'master',
     username: 'master',
     role: 'master',
-    status: 'SUCCESS',
-    reason: 'Verified via Email OTP'
+    status: 'FAILED',
+    reason: `Invalid 2FA code entered "${cleanCode}"`
   });
 
-  return res.json({ ok: true, userId: 'master' });
+  return res.status(400).json({
+    error: 'Invalid 6-digit code. Please enter the current code from your Google Authenticator app (or email).'
+  });
 });
 
 // Resend Admin OTP

@@ -2965,7 +2965,7 @@
           try {
             const res = await apiPost('/api/login', { username: un, password: pw, companyCode: co });
             if (res.otpRequired) {
-              return showOtpScreen(un, res.email, res.devHint);
+              return showOtpScreen(un, res.email, res);
             }
             if (un === 'master') {
               $('#aerr').textContent = 'Security OTP required. Please try again.';
@@ -3037,44 +3037,82 @@
       };
     }
 
-    function showOtpScreen(username, maskedEmail) {
-      authShell('Admin Security Verification', `One-time code dispatched to <b>${esc(maskedEmail || 'registered email')}</b>`, `
+    function showOtpScreen(username, maskedEmail, loginData) {
+      const totpUri = loginData && loginData.totpUri;
+      const totpSecret = loginData && loginData.totpSecret;
+
+      authShell('Admin Security Verification', 'Google Authenticator 2-Factor Authentication (2FA)', `
     <div style="text-align:center;margin-bottom:14px">
       <div style="font-size:2.4rem;line-height:1;margin-bottom:8px">🔐</div>
-      <p style="color:var(--text);font-size:0.92rem;line-height:1.45;margin:0 0 8px">
-        Enter the 6-digit security code sent to your registered email to complete Master Admin login.
+      <p style="color:var(--text);font-size:0.95rem;font-weight:700;margin:0 0 6px">
+        Google Authenticator Verification
       </p>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px 14px;border-radius:8px;font-size:0.84rem;color:#334155;margin-bottom:12px;text-align:left;line-height:1.45">
-        📬 <b>Delivered to:</b> ${esc(maskedEmail || 'registered email')}<br>
-        <span style="font-size:0.78rem;color:#64748b">Please check your Inbox, Updates, and Spam folder.</span>
+      <p style="color:#64748b;font-size:0.86rem;line-height:1.45;margin:0 0 12px">
+        Open <b>Google Authenticator</b> on your phone and enter the 6-digit code.
+      </p>
+
+      <!-- Google Authenticator Setup Card -->
+      <div id="totp_setup_card" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;margin-bottom:14px;text-align:center">
+        <button type="button" id="totp_toggle_btn" class="btn sm" style="width:100%;background:#ffffff;border:1px solid #94a3b8;color:#0f172a;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">
+          <span>📲</span> <span>First time? Show QR Code &amp; Setup Key</span>
+        </button>
+
+        <div id="totp_qr_details" style="display:none;margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1">
+          <p style="margin:0 0 8px;font-size:0.84rem;color:#334155;line-height:1.4">
+            1. Open <b>Google Authenticator</b> on your phone.<br>
+            2. Tap <b>+</b> &rarr; <b>Scan a QR code</b>.
+          </p>
+          <div style="display:flex;justify-content:center;margin:8px 0">
+            <canvas id="totp_qr_canvas" style="background:#ffffff;padding:8px;border-radius:8px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.06)"></canvas>
+          </div>
+          <div style="font-size:0.78rem;color:#64748b;margin-top:6px;word-break:break-all">
+            Or enter key manually in app: <br>
+            <code id="totp_key_code" style="font-family:monospace;font-size:0.92rem;font-weight:700;color:#0284c7;background:#f1f5f9;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;user-select:all">${esc(totpSecret || '')}</code>
+          </div>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:12px;font-size:0.85rem;color:#64748b;font-weight:600">
-        <span>⏱️ Code valid for:</span> <span id="otp_timer" style="color:#0284c7;font-family:monospace;font-size:1rem;font-weight:700">10:00</span>
-      </div>
+
+      ${maskedEmail ? `
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;padding:6px 10px;border-radius:6px;font-size:0.78rem;color:#0369a1;margin-bottom:12px;text-align:left;line-height:1.4">
+        ✉️ <i>Backup email code dispatched to: <b>${esc(maskedEmail)}</b></i>
+      </div>` : ''}
     </div>
-    <label class="f"><span style="text-align:center;font-weight:700;font-size:0.95rem">Enter 6-Digit Security Code</span>
-      <input id="otp_code" type="text" maxlength="6" placeholder="000000" style="text-align:center;font-size:1.6rem;letter-spacing:8px;font-weight:700;padding:12px;border-radius:10px" required autofocus autocomplete="one-time-code">
+
+    <label class="f"><span style="text-align:center;font-weight:700;font-size:0.95rem">Enter 6-Digit Authenticator Code</span>
+      <input id="otp_code" type="text" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="000000" style="text-align:center;font-size:1.6rem;letter-spacing:8px;font-weight:700;padding:12px;border-radius:10px" required autofocus autocomplete="one-time-code">
     </label>
     <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:10px">Verify &amp; Sign In</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:0.86rem">
       <a href="#/login" onclick="viewLogin();return false;" style="color:var(--mute);text-decoration:underline">&larr; Back to Login</a>
-      <button type="button" id="otp_resend_btn" class="btn sm" style="background:transparent;border:0;color:var(--pri);cursor:pointer;font-weight:600;padding:4px 8px">Resend Code</button>
+      ${maskedEmail ? `<button type="button" id="otp_resend_btn" class="btn sm" style="background:transparent;border:0;color:var(--pri);cursor:pointer;font-weight:600;padding:4px 8px">Resend Email</button>` : ''}
     </div>`);
 
-      let secondsLeft = 600;
-      const timerInterval = setInterval(() => {
-        secondsLeft--;
-        const el = $('#otp_timer');
-        if (!el) { clearInterval(timerInterval); return; }
-        if (secondsLeft <= 0) {
-          el.textContent = 'Expired';
-          clearInterval(timerInterval);
-        } else {
-          const m = Math.floor(secondsLeft / 60);
-          const s = secondsLeft % 60;
-          el.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
-        }
-      }, 1000);
+      const toggleBtn = $('#totp_toggle_btn');
+      const qrDetails = $('#totp_qr_details');
+      let qrRendered = false;
+
+      if (toggleBtn && qrDetails) {
+        toggleBtn.onclick = () => {
+          const isOpen = qrDetails.style.display !== 'none';
+          qrDetails.style.display = isOpen ? 'none' : 'block';
+          toggleBtn.innerHTML = isOpen ?
+            '<span>📲</span> <span>First time? Show QR Code &amp; Setup Key</span>' :
+            '<span>▲</span> <span>Hide QR Code &amp; Setup Key</span>';
+
+          if (!isOpen && !qrRendered && totpUri) {
+            const canvas = $('#totp_qr_canvas');
+            if (canvas && typeof QRCode !== 'undefined') {
+              try {
+                QRCode.toCanvas(canvas, totpUri, { width: 170, margin: 1 }, () => {
+                  qrRendered = true;
+                });
+              } catch (e) {
+                console.warn('QR render error:', e);
+              }
+            }
+          }
+        };
+      }
 
       const formEl = $('#af');
       if (formEl && window.FM && window.FM.pageEnter) window.FM.pageEnter(formEl);
@@ -3114,15 +3152,17 @@
         }
       };
 
-      $('#otp_resend_btn').onclick = async () => {
-        try {
-          const res = await apiPost('/api/admin/resend-otp', {});
-          toast(res.message || 'New OTP sent to your email.');
-          if (res.devHint) toast(res.devHint, 'pri');
-        } catch (ex) {
-          toast(ex.message || 'Failed to resend code.', 'bad');
-        }
-      };
+      const resendBtn = $('#otp_resend_btn');
+      if (resendBtn) {
+        resendBtn.onclick = async () => {
+          try {
+            const res = await apiPost('/api/admin/resend-otp', {});
+            toast(res.message || 'New OTP sent to your email.');
+          } catch (ex) {
+            toast(ex.message || 'Failed to resend code.', 'bad');
+          }
+        };
+      }
     }
     function pwModal(u, own) {
       modal({
