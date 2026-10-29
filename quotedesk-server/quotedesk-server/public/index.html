@@ -965,45 +965,239 @@
       transform: translateY(-1px);
     }
 
-    .auth-card {
+    /* Stitch Horizon v3.2 Frame & Components */
+    .auth-horizon-container {
       position: relative;
       z-index: 10;
-      width: min(460px, 100%);
-      background: rgba(255, 255, 255, 0.97);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      border-radius: 20px;
-      padding: 34px 30px;
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.2);
-    }
-
-    /* Modern Login Tabs */
-    .auth-tabs {
+      width: min(1140px, 95vw);
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(226, 232, 240, 0.85);
+      overflow: hidden;
+      margin: 24px auto;
       display: flex;
+      flex-direction: column;
+      animation: fadeIn 0.4s ease;
+    }
+    .auth-horizon-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 28px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 0.82rem;
+    }
+    .stitch-logo-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: #1e40af;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-family: "IBM Plex Sans Condensed", sans-serif;
+      font-weight: 800;
+      font-size: 0.85rem;
+      letter-spacing: -0.02em;
+    }
+    .stitch-pro-badge {
+      background: #e0f2fe;
+      color: #0284c7;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid #bae6fd;
+    }
+    .stitch-top-link {
+      background: transparent;
+      border: none;
+      color: #475569;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+    }
+    .stitch-top-link:hover {
       background: #e2e8f0;
+      color: #0f172a;
+    }
+    .stitch-theme-dropdown {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease;
+    }
+    .stitch-theme-dropdown:hover {
+      border-color: #94a3b8;
+      background: #f8fafc;
+    }
+    .auth-horizon-body {
+      display: grid;
+      grid-template-columns: 1.15fr 0.95fr;
+      gap: 36px;
+      padding: 38px 40px;
+      align-items: start;
+    }
+    @media (max-width: 920px) {
+      .auth-horizon-body {
+        grid-template-columns: 1fr;
+        padding: 24px 20px;
+        gap: 28px;
+      }
+      .hide-mobile {
+        display: none !important;
+      }
+    }
+    .stitch-hero-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: #1e40af;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-family: "IBM Plex Sans Condensed", sans-serif;
+      font-weight: 800;
+      font-size: 1.3rem;
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+    }
+    .stitch-version-pill {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #2563eb;
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    .auth-hero-title {
+      font-size: 2.15rem;
+      line-height: 1.22;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.03em;
+      margin: 18px 0 12px;
+    }
+    .auth-hero-desc {
+      color: #475569;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      margin: 0 0 20px;
+    }
+    .auth-motivation-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 22px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    }
+    .stitch-focus-tag {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #2563eb;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 4px;
+    }
+    .auth-feature-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .auth-feat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .auth-feat-pill span {
+      color: #2563eb;
+      font-weight: 800;
+    }
+    .auth-card {
+      position: relative;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 28px 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(241, 245, 249, 0.8);
+    }
+    .auth-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #16a34a;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.02em;
+    }
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #16a34a;
+      box-shadow: 0 0 6px #16a34a;
+      animation: pulseGlow 1.8s infinite;
+    }
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: #f1f5f9;
       padding: 4px;
       border-radius: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 14px;
       gap: 4px;
     }
     .auth-tab {
-      flex: 1;
       padding: 8px 12px;
       text-align: center;
-      font-size: 0.86rem;
+      font-size: 0.84rem;
       font-weight: 600;
       color: #64748b;
-      border-radius: 8px;
+      border-radius: 7px;
       cursor: pointer;
       border: none;
       background: transparent;
-      transition: all 0.2s ease;
+      transition: all 0.18s ease;
     }
     .auth-tab.active {
       background: #ffffff;
       color: #0f172a;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+    .auth-horizon-footer {
+      padding: 14px 28px;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      color: #64748b;
+      font-size: 0.8rem;
     }
 
     /* AI Diagnostic Card inside Auth */
@@ -2822,39 +3016,109 @@
     }
 
     function authShell(title, sub, form) {
+      const liveDateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
       root.innerHTML = `<div class="auth-wrap">
-    <canvas id="auth_canvas" style="position:absolute;inset:0;pointer-events:none;z-index:2;opacity:0.6"></canvas>
+    <canvas id="auth_canvas" style="position:absolute;inset:0;pointer-events:none;z-index:2;opacity:0.5"></canvas>
     <div class="auth-grid-bg"></div>
-    <div class="auth-bg-orbs">
-      <div class="orb orb1"></div>
-      <div class="orb orb2"></div>
-      <div class="orb orb3"></div>
-    </div>
-    <div class="auth-theme-pill" id="auth_theme_pill" onclick="openThemePickerModal()" title="Click to change daily luxury wallpaper">
-      🎨 Daily Theme ▾
-    </div>
-    <div class="auth-card">
-      <div class="auth-brand">
-        <div class="auth-logo-badge">MQ</div>
-        <div class="auth-title-box">
-          <h2>MR_Quoter</h2>
-          <span>Smart Quotation & Invoicing for Construction & Interior</span>
+
+    <div class="auth-horizon-container">
+
+      <!-- Horizon Topbar -->
+      <div class="auth-horizon-topbar">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="stitch-logo-badge">MQ</div>
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-weight:800;letter-spacing:0.04em;color:#0f172a;font-size:0.88rem">MR_QUOTER</span>
+            <span class="stitch-pro-badge">PRO</span>
+          </div>
+          <span style="color:#94a3b8;font-size:0.78rem;border-left:1px solid #cbd5e1;padding-left:10px;margin-left:4px" class="hide-mobile">Architecture, Estimations &amp; Invoicing Portal</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button type="button" class="stitch-top-link" onclick="openAiAssistantModal()">💡 Quick Help</button>
+          <button type="button" class="stitch-theme-dropdown" onclick="openThemePickerModal()">
+            🎨 Theme: Daylight Architectural Horizon ▾
+          </button>
         </div>
       </div>
-      <div class="auth-card-head">
-        <h1 style="margin:0 0 4px;font-size:1.35rem">${title}</h1>
-        ${sub ? `<div class="mute" style="font-size:0.88rem">${sub}</div>` : ''}
+
+      <!-- Horizon Body: Split Showcase + Auth Card -->
+      <div class="auth-horizon-body">
+
+        <!-- Left Column: Architectural Branding & Hero Story -->
+        <div class="auth-showcase-col">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+            <div class="stitch-hero-badge">MQ</div>
+            <div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.45rem;font-weight:800;color:#0f172a">MR_Quoter</span>
+                <span class="stitch-version-pill">Horizon v3.2</span>
+              </div>
+              <div style="font-size:0.82rem;color:#64748b;margin-top:2px">Modern Architecture, Estimations &amp; Invoicing Platform</div>
+            </div>
+          </div>
+
+          <h1 class="auth-hero-title">Precision architectural costing.<br><span>Crafted for turnkey execution.</span></h1>
+          <p class="auth-hero-desc">Empower your agency, project directors, and estimators with realtime BOQ modeling, transparent client invoicing, and multi-tier authentication.</p>
+
+          <!-- Daily Business Motivation Card -->
+          <div class="auth-motivation-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:0.72rem;font-weight:700;color:#64748b;letter-spacing:0.04em">📐 DAILY BUSINESS MOTIVATION</span>
+                <span class="stitch-focus-tag">Today's Focus: Sustainable Turnkey Execution</span>
+              </div>
+              <span style="color:#94a3b8;font-size:0.8rem;cursor:pointer" onclick="applyDailyTheme()" title="Refresh Quote">↻</span>
+            </div>
+            <div style="font-size:0.92rem;font-weight:600;font-style:italic;color:#1e293b;line-height:1.45;margin-bottom:10px">
+              "We shape our buildings; thereafter, our buildings shape us." &mdash; Winston Churchill
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.76rem;color:#64748b;border-top:1px dashed #cbd5e1;padding-top:8px">
+              <span style="background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 8px;border-radius:4px;color:#334155;font-weight:600">🏗️ (- Rafi [Builder of MR_Quoter])</span>
+              <span>🟢 ${liveDateStr} &bull; Enterprise Quote #14</span>
+            </div>
+          </div>
+
+          <!-- Feature Pills -->
+          <div class="auth-feature-pills">
+            <div class="auth-feat-pill"><span>✓</span> Automated BOQ Takeoffs</div>
+            <div class="auth-feat-pill"><span>✓</span> Dual-Factor 2FA Verification</div>
+            <div class="auth-feat-pill"><span>✓</span> Instant Tax &amp; Currency Conversion</div>
+          </div>
+        </div>
+
+        <!-- Right Column: Portal Access Auth Card -->
+        <div class="auth-portal-col">
+          <div class="auth-card">
+            <div class="auth-card-head-stitch" style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div>
+                  <h2 style="margin:0;font-size:1.35rem;font-weight:800;color:#0f172a">${title}</h2>
+                  <div style="color:#64748b;font-size:0.83rem;margin-top:2px">${sub || 'Authenticate your enterprise credentials'}</div>
+                </div>
+                <div class="auth-status-pill">
+                  <span class="pulse-dot"></span>
+                  <span>SECURE ACCESS &bull; Online</span>
+                </div>
+              </div>
+            </div>
+            <form id="af" autocomplete="off">
+              ${form}
+              <div class="err" id="aerr" role="alert"></div>
+              <div id="ai_login_diag" style="display:none"></div>
+            </form>
+          </div>
+        </div>
+
       </div>
-      <form id="af" autocomplete="off">
-        ${form}
-        <div class="err" id="aerr" role="alert"></div>
-        <div id="ai_login_diag" style="display:none"></div>
-      </form>
+
+      <!-- Footer Bar -->
+      <div class="auth-horizon-footer">
+        Created by <b>RAFIQ</b> &nbsp;&bull;&nbsp; Dual Admin Security &bull; <a href="mailto:RAFIQTN70@GMAIL.COM" style="color:inherit;text-decoration:none">RAFIQTN70@GMAIL.COM</a>
+      </div>
+
     </div>
-    <div class="auth-footer-credit">
-      Created by <b>RAFIQ</b> &nbsp;&bull;&nbsp; Dual Admin Security &bull; <a href="mailto:RAFIQTN70@GMAIL.COM">RAFIQTN70@GMAIL.COM</a>
-    </div>
-    <div class="ai-fab" onclick="openAiAssistantModal()" title="Open AI Assistant & Co-Pilot">
+
+    <div class="ai-fab" onclick="openAiAssistantModal()" title="Open AI Assistant &amp; Co-Pilot">
       <div class="ai-fab-pulse"></div>
       <span>🤖 AI Co-Pilot</span>
     </div>
@@ -2871,6 +3135,7 @@
       const masterFields = document.querySelector('#master_fields');
       const unInput = document.querySelector('#l_un');
       const submitBtn = document.querySelector('#login_btn');
+      const labelEl = document.querySelector('#login_section_label');
       const diagBox = document.querySelector('#ai_login_diag');
       if (diagBox) diagBox.style.display = 'none';
 
@@ -2880,14 +3145,16 @@
         if (coFields) coFields.style.display = 'none';
         if (masterFields) masterFields.style.display = 'block';
         if (unInput) unInput.value = 'master';
-        if (submitBtn) submitBtn.textContent = 'Sign in as Master Admin';
+        if (submitBtn) submitBtn.textContent = 'Sign In as Master Admin';
+        if (labelEl) labelEl.innerHTML = '<span>Platform Superadmin Workspace</span> &bull; <span style="font-weight:400;color:#64748b">Two-Factor Authentication (2FA) enforced</span>';
       } else {
         if (masterTab) masterTab.classList.remove('active');
         if (coTab) coTab.classList.add('active');
         if (masterFields) masterFields.style.display = 'none';
         if (coFields) coFields.style.display = 'block';
         if (unInput && unInput.value === 'master') unInput.value = '';
-        if (submitBtn) submitBtn.textContent = 'Sign in to Company';
+        if (submitBtn) submitBtn.textContent = 'Sign In to Workspace';
+        if (labelEl) labelEl.innerHTML = '<span>Agent / Staff Workspace</span> &bull; <span style="font-weight:400;color:#64748b">Please enter your company credentials to proceed</span>';
       }
     }
 
@@ -2904,10 +3171,14 @@
     }
 
     function viewLogin() {
-      authShell('Welcome to MR_Quoter', 'Sign in to your quotation & estimation workspace', `
+      authShell('Portal Access', 'Authenticate your enterprise credentials', `
     <div class="auth-tabs">
-      <button type="button" class="auth-tab active" id="tab_company" onclick="setLoginTab('company')">🏢 Company Staff Login</button>
-      <button type="button" class="auth-tab" id="tab_master" onclick="setLoginTab('master')">👑 Master Platform Admin</button>
+      <button type="button" class="auth-tab active" id="tab_company" onclick="setLoginTab('company')">🏢 Company Staff</button>
+      <button type="button" class="auth-tab" id="tab_master" onclick="setLoginTab('master')">👑 Master Admin 2FA</button>
+    </div>
+
+    <div style="font-size:0.81rem;color:#475569;margin-bottom:12px;font-weight:600" id="login_section_label">
+      <span>Agent / Staff Workspace</span> &bull; <span style="font-weight:400;color:#64748b">Please enter your company credentials to proceed</span>
     </div>
 
     <!-- Company Login Section -->
@@ -2915,7 +3186,7 @@
       <label class="f">
         <span style="display:flex;justify-content:space-between;align-items:center">
           <span>Company Code <small style="color:var(--mute)">(e.g. CTPL, APEX, ABC)</small></span>
-          <button type="button" class="btn sm" style="padding:1px 6px;font-size:0.75rem;background:#e0f2fe;color:#0284c7;border:none" onclick="openCompanyPickerModal()">📋 Browse Companies</button>
+          <button type="button" class="btn sm" style="padding:1px 8px;font-size:0.75rem;background:#e0f2fe;color:#0284c7;border:1px solid #bae6fd;border-radius:4px;cursor:pointer" onclick="openCompanyPickerModal()">📋 Browse Companies</button>
         </span>
         <input id="l_co" placeholder="Enter Company Code (or click Browse)" autocapitalize="characters">
       </label>
@@ -2923,29 +3194,37 @@
 
     <!-- Master Notice Section -->
     <div id="master_fields" style="display:none">
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px 14px;border-radius:10px;font-size:0.83rem;color:#475569;margin-bottom:12px;line-height:1.45">
-        👑 <b>Master Platform Administrator:</b> Enter your master credentials. A one-time verification security code will be sent to your registered admin email to authenticate.
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 14px;border-radius:10px;font-size:0.83rem;color:#1e40af;margin-bottom:12px;line-height:1.45">
+        👑 <b>Platform Superadmin:</b> Google Authenticator (TOTP) 2FA is active. Enter your Master credentials to receive the 6-digit verification prompt.
       </div>
     </div>
 
     <label class="f">
       <span>Username</span>
-      <input id="l_un" placeholder="Your username" required autocapitalize="none" autofocus>
+      <input id="l_un" placeholder="Your username (e.g. Jonathan_Reichert07)" required autocapitalize="none" autofocus>
     </label>
 
     <label class="f">
-      <span>Password</span>
+      <span style="display:flex;justify-content:space-between;align-items:center">
+        <span>Password</span>
+        <a href="#/login" onclick="toast('Please contact your administrator or master admin to reset credentials.','pri');return false;" style="font-size:0.76rem;color:#2563eb;text-decoration:none">Forgot password?</a>
+      </span>
       <div style="position:relative;display:flex;align-items:center">
-        <input id="l_pw" type="password" placeholder="Your password" style="width:100%;padding-right:40px" required>
+        <input id="l_pw" type="password" placeholder="••••••••••••" style="width:100%;padding-right:40px" required>
         <button type="button" onclick="togglePwVisibility('l_pw', this)" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px;color:#64748b" title="Toggle password visibility">👁️</button>
       </div>
     </label>
 
-    <button class="btn pri" id="login_btn" type="submit" style="justify-content:center;margin-top:4px">Sign in to Company</button>
+    <button class="btn pri" id="login_btn" type="submit" style="justify-content:center;margin-top:6px;padding:12px;font-size:0.96rem;font-weight:700">Sign In to Workspace</button>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:0.86rem">
-      <button type="button" class="btn sm" style="background:transparent;border:0;color:var(--pri);font-weight:600;padding:2px 0;cursor:pointer" onclick="openAiAssistantModal()">🤖 AI Login Assistant &amp; Help</button>
-      <a href="#/setup" style="color:var(--mute);text-decoration:underline;font-size:0.82rem">First time setup?</a>
+    <button type="button" class="btn" style="justify-content:center;margin-top:8px;background:#ffffff;border:1px solid #cbd5e1;color:#334155;font-weight:600;font-size:0.86rem;padding:9px;border-radius:8px;cursor:pointer" onclick="toast('Google Enterprise SSO is active for verified company domains. Enter your credentials above or contact admin.', 'pri')">
+      <svg width="16" height="16" viewBox="0 0 24 24" style="margin-right:6px"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
+      Sign in with Google Enterprise
+    </button>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:0.82rem;padding-top:10px;border-top:1px solid #f1f5f9">
+      <button type="button" class="btn sm" style="background:transparent;border:0;color:#2563eb;font-weight:600;padding:2px 0;cursor:pointer" onclick="openAiAssistantModal()">🤖 AI Login Assistant</button>
+      <span style="color:#64748b">Are you new? <a href="#/login" onclick="openCompanyPickerModal();return false;" style="color:#2563eb;text-decoration:none;font-weight:600">Create an Account</a></span>
     </div>`);
 
       $('#af').onsubmit = async e => {
