@@ -2546,7 +2546,6 @@
         return viewLogin();
       }
       if (!me) {
-        if (!db || !db.users || !db.users.length) return viewSetup();
         return viewLogin();
       }
       db.companies = db.companies || [];
