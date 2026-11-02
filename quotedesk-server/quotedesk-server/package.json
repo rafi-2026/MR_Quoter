@@ -5,7 +5,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "lint": "eslint pricing-engine.js server.js tests/unit/pricing.test.js",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "cookie-parser": "^1.4.6",
@@ -15,5 +19,11 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "eslint": "^10.14.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }

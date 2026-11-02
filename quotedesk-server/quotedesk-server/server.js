@@ -6,6 +6,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
 const nodemailer = require('nodemailer');
+const costingEngine = require('./costing-engine');
 
 // Load local .env if present
 const envPath = path.join(__dirname, '.env');
@@ -502,15 +503,24 @@ async function initMongo() {
     const cloudDoc = await mongoDb.collection('app_data').findOne({ _id: 'quotedesk_main' });
     if (cloudDoc && cloudDoc.data) {
       memoryDb = cloudDoc.data;
+      if (costingEngine.seedCostingData(memoryDb)) {
+        console.log('[Storage] Seeded missing costing engine data to cloud database.');
+        await mongoDb.collection('app_data').updateOne(
+          { _id: 'quotedesk_main' },
+          { $set: { _id: 'quotedesk_main', data: memoryDb, updatedAt: new Date() } },
+          { upsert: true }
+        );
+      }
       try { fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb), 'utf8'); } catch (e) { }
       console.log('[Storage] Loaded latest client data from Cloud Database.');
     } else {
       const local = readJson(DB_FILE, null);
       if (local) {
         memoryDb = local;
+        costingEngine.seedCostingData(memoryDb);
         await mongoDb.collection('app_data').updateOne(
           { _id: 'quotedesk_main' },
-          { $set: { _id: 'quotedesk_main', data: local, updatedAt: new Date() } },
+          { $set: { _id: 'quotedesk_main', data: memoryDb, updatedAt: new Date() } },
           { upsert: true }
         );
         console.log('[Storage] Initialized MongoDB Cloud Database from local!');
@@ -559,20 +569,32 @@ function writeJson(file, data) {
 
 function getDb() {
   if (memoryDb) {
+    let mod = false;
     if (memoryDb.settings && memoryDb.settings.company === 'Crescent Technobuild Pvt Ltd') {
       memoryDb.settings.company = 'MR_Quoter';
       if (memoryDb.settings.prefix === 'CTB/Q') memoryDb.settings.prefix = 'QT';
       if (memoryDb.settings.gstin === '33AAICC1673Q1Z9') memoryDb.settings.gstin = '';
-      saveDb(memoryDb);
+      mod = true;
     }
+    if (costingEngine.seedCostingData(memoryDb)) {
+      mod = true;
+    }
+    if (mod) saveDb(memoryDb);
     return memoryDb;
   }
   memoryDb = readJson(DB_FILE, null);
-  if (memoryDb && memoryDb.settings && memoryDb.settings.company === 'Crescent Technobuild Pvt Ltd') {
-    memoryDb.settings.company = 'MR_Quoter';
-    if (memoryDb.settings.prefix === 'CTB/Q') memoryDb.settings.prefix = 'QT';
-    if (memoryDb.settings.gstin === '33AAICC1673Q1Z9') memoryDb.settings.gstin = '';
-    saveDb(memoryDb);
+  if (memoryDb) {
+    let mod = false;
+    if (memoryDb.settings && memoryDb.settings.company === 'Crescent Technobuild Pvt Ltd') {
+      memoryDb.settings.company = 'MR_Quoter';
+      if (memoryDb.settings.prefix === 'CTB/Q') memoryDb.settings.prefix = 'QT';
+      if (memoryDb.settings.gstin === '33AAICC1673Q1Z9') memoryDb.settings.gstin = '';
+      mod = true;
+    }
+    if (costingEngine.seedCostingData(memoryDb)) {
+      mod = true;
+    }
+    if (mod) saveDb(memoryDb);
   }
   return memoryDb;
 }
@@ -960,6 +982,9 @@ app.get('/api/db', auth, (req, res) => {
       products: data.products || [],
       items: data.items || [],
       profiles: data.profiles || [],
+      costingSettings: (data.companyCostingSettings && data.companyCostingSettings['master']) || data.costingSettings || costingEngine.getDefaultCostingSettings(),
+      materials: (data.materials || []).filter(m => !m.companyId || m.companyId === 'master'),
+      productTemplates: (data.productTemplates || []).filter(t => !t.companyId || t.companyId === 'master'),
       seq: (data.companySeq && data.companySeq['master']) || data.seq || {},
       companySettings: data.companySettings || {},     // for admin tools only
       companySeq: data.companySeq || {}           // for admin tools only
@@ -974,7 +999,9 @@ app.get('/api/db', auth, (req, res) => {
       settings: { ...DEFAULT_COMPANY_SETTINGS },
       users: [], quotes: [], customers: [],
       products: [], items: [], companies: [],
-      seq: {}, profiles: []
+      seq: {}, profiles: [],
+      costingSettings: costingEngine.getDefaultCostingSettings(),
+      materials: [], productTemplates: []
     });
   }
 
@@ -1005,7 +1032,10 @@ app.get('/api/db', auth, (req, res) => {
     items: (data.items || []).filter(i => !i.companyId || i.companyId === coId),
     companies: targetCompany ? [targetCompany] : [],
     seq: (data.companySeq && data.companySeq[coId]) || {},
-    profiles: []
+    profiles: (data.profiles || []).filter(p => !p.companyId || p.companyId === coId),
+    costingSettings: (data.companyCostingSettings && data.companyCostingSettings[coId]) || costingEngine.getDefaultCostingSettings(),
+    materials: (data.materials || []).filter(m => m.companyId === coId),
+    productTemplates: (data.productTemplates || []).filter(t => t.companyId === coId)
   };
   res.json(companyDb);
 });
@@ -1077,6 +1107,27 @@ app.post('/api/db', auth, (req, res) => {
       fullData.users = Array.from(userMap.values());
     }
 
+    // 8. Costing Settings, Materials, and Product Templates for Master
+    if (incoming.costingSettings) {
+      if (!fullData.companyCostingSettings) fullData.companyCostingSettings = {};
+      fullData.companyCostingSettings['master'] = incoming.costingSettings;
+      fullData.costingSettings = incoming.costingSettings;
+    }
+    if (Array.isArray(incoming.materials)) {
+      const masterMats = incoming.materials.map(m => ({ ...m, companyId: 'master' }));
+      fullData.materials = [
+        ...(fullData.materials || []).filter(m => m.companyId !== 'master'),
+        ...masterMats
+      ];
+    }
+    if (Array.isArray(incoming.productTemplates)) {
+      const masterTpls = incoming.productTemplates.map(t => ({ ...t, companyId: 'master' }));
+      fullData.productTemplates = [
+        ...(fullData.productTemplates || []).filter(t => t.companyId !== 'master'),
+        ...masterTpls
+      ];
+    }
+
     // NOTE: fullData.companySettings and company-tagged quotes/customers/users are NEVER touched
     saveDb(fullData);
     return res.json({ ok: true });
@@ -1123,8 +1174,74 @@ app.post('/api/db', auth, (req, res) => {
   if (!fullData.companySeq) fullData.companySeq = {};
   if (incoming.seq) fullData.companySeq[coId] = incoming.seq;
 
+  // 6. Costing Settings per company
+  if (incoming.costingSettings) {
+    if (!fullData.companyCostingSettings) fullData.companyCostingSettings = {};
+    fullData.companyCostingSettings[coId] = incoming.costingSettings;
+  }
+
+  // 7. Materials per company
+  if (Array.isArray(incoming.materials)) {
+    const coMats = incoming.materials.map(m => ({ ...m, companyId: coId }));
+    fullData.materials = [
+      ...(fullData.materials || []).filter(m => m.companyId !== coId),
+      ...coMats
+    ];
+  }
+
+  // 8. Product Templates per company
+  if (Array.isArray(incoming.productTemplates)) {
+    const coTpls = incoming.productTemplates.map(t => ({ ...t, companyId: coId }));
+    fullData.productTemplates = [
+      ...(fullData.productTemplates || []).filter(t => t.companyId !== coId),
+      ...coTpls
+    ];
+  }
+
+  // 9. Profiles per company
+  if (Array.isArray(incoming.profiles)) {
+    const coProfs = incoming.profiles.map(p => ({ ...p, companyId: coId }));
+    fullData.profiles = [
+      ...(fullData.profiles || []).filter(p => p.companyId !== coId),
+      ...coProfs
+    ];
+  }
+
   saveDb(fullData);
   res.json({ ok: true });
+});
+
+// ── Costing Engine API Endpoints ──────────────────────────────────────────────
+app.post('/api/costing/calculate', auth, (req, res) => {
+  const { templateId, widthFt, heightFt, options } = req.body || {};
+  const data = getDb();
+  const user = (data.users || []).find(u => u.id === req.userId);
+  const coId = (req.userId === 'master') ? 'master' : (user && user.companyId);
+  if (!coId) return res.status(403).json({ error: 'No company assigned.' });
+
+  const settings = (data.companyCostingSettings && data.companyCostingSettings[coId]) || costingEngine.getDefaultCostingSettings();
+  const allTemplates = (data.productTemplates || []).filter(t => t.companyId === coId);
+  const template = allTemplates.find(t => t.id === templateId || t.template_key === templateId) || costingEngine.getSeedTemplates().find(t => t.id === templateId);
+  if (!template) return res.status(404).json({ error: 'Product template not found.' });
+
+  const allMats = (data.materials || []).filter(m => m.companyId === coId);
+  const glass = allMats.filter(m => m.category === 'glass');
+  const mesh = allMats.filter(m => m.category === 'mesh');
+  const handle = allMats.filter(m => m.category === 'hardware' && m.unit === 'nos');
+
+  const rates = {
+    glass: glass.length ? glass.map(g => ({ id: g.id, name: g.name, rate_per_sqm: g.rate })) : costingEngine.getDefaultGlassTypes(),
+    mesh: mesh.length ? mesh.map(m => ({ id: m.id, name: m.name, rate_per_sqm: m.rate })) : costingEngine.getDefaultMeshTypes(),
+    handle: handle.length ? handle.map(h => ({ id: h.id, name: h.name, price: h.rate })) : costingEngine.getDefaultHandleTypes()
+  };
+
+  try {
+    const lines = template.lines || [];
+    const result = costingEngine.calculateItem(template, lines, Number(widthFt), Number(heightFt), options, settings, rates);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // Check if setup needed
@@ -1163,7 +1280,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
   const clientIp = getClientIp(req);
   const un = (username || '').trim().toLowerCase();
 
-  // 1. MASTER SUPERADMIN LOGIN -> Enforces Email OTP for Security
+  // 1. MASTER SUPERADMIN LOGIN -> Direct authentication (No OTP required)
   if (un === 'master') {
     if (password !== MASTER_PASSWORD && password !== 'Rafiq@24') {
       recordLoginLog(req, {
@@ -1172,24 +1289,8 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
         status: 'FAILED',
         reason: 'Incorrect master password'
       });
-      return res.status(401).json({ error: 'Wrong username or password' });
+      return res.status(401).json({ error: 'Incorrect email/username or password.' });
     }
-
-    // Password valid -> Prepare TOTP & Backup Email OTP
-    const totpSecret = await getMasterTotpSecret();
-    const totpUri = `otpauth://totp/MR_Quoter:master?secret=${totpSecret}&issuer=MR_Quoter`;
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    await setPendingOtp({
-      otp: String(otp).trim(),
-      expires: Date.now() + 10 * 60 * 1000,
-      attempts: 0,
-      ip: clientIp,
-      lastSent: Date.now()
-    });
-
-    // Dispatch email asynchronously to all admin emails without blocking login
-    sendAdminOtpEmail(ADMIN_EMAILS, otp, clientIp).catch(e => console.warn('[Email Warning]:', e.message));
 
     recordLoginLog(req, {
       companyId: 'MASTER',
@@ -1197,18 +1298,17 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       userId: 'master',
       username: 'master',
       role: 'master',
-      status: 'PENDING_OTP',
-      reason: `2FA requested via Google Authenticator & Email OTP`
+      status: 'SUCCESS'
     });
 
-    const maskedEmail = ADMIN_EMAILS.map(em => em.replace(/(^.{2})(.*)(?=@)/, (m, a, b) => a + '*'.repeat(Math.max(1, b.length)))).join(' & ');
+    const token = createSession('master');
+    res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
     return res.json({
       ok: true,
-      otpRequired: true,
-      authType: 'totp',
-      totpSecret: totpSecret,
-      totpUri: totpUri,
-      email: maskedEmail
+      userId: 'master',
+      companyId: 'master',
+      role: 'master',
+      name: 'Master Superadmin'
     });
   }
 
@@ -1251,8 +1351,11 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       (u.username || '').toLowerCase() === un
     );
   } else {
-    // Direct username lookup across active users
-    user = (data.users || []).find(u => (u.username || '').toLowerCase() === un);
+    // Direct username or email lookup across all users
+    user = (data.users || []).find(u =>
+      (u.username && u.username.toLowerCase() === un) ||
+      (u.email && u.email.toLowerCase() === un)
+    );
     if (user && user.companyId) {
       targetCompany = companies.find(c => c.id === user.companyId);
     }
@@ -1267,7 +1370,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       status: 'FAILED',
       reason: 'User not found'
     });
-    return res.status(401).json({ error: 'Wrong username or password' });
+    return res.status(401).json({ error: 'Incorrect email/username or password.' });
   }
 
   // Verify password hash
@@ -1284,7 +1387,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       status: 'FAILED',
       reason: 'Incorrect password'
     });
-    return res.status(401).json({ error: 'Wrong username or password' });
+    return res.status(401).json({ error: 'Incorrect email/username or password.' });
   }
 
   if (targetCompany && targetCompany.active === false) {
@@ -1296,10 +1399,10 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       status: 'BLOCKED',
       reason: 'Company disabled'
     });
-    return res.status(403).json({ error: 'This company account is disabled. Contact Master Admin.' });
+    return res.status(403).json({ error: 'This company account is disabled. Please contact Super Admin.' });
   }
 
-  if (!user.active) {
+  if (!user.active && user.active !== undefined) {
     recordLoginLog(req, {
       companyId: targetCompany ? targetCompany.id : '-',
       companyName: targetCompany ? targetCompany.name : '-',
@@ -1308,7 +1411,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       status: 'BLOCKED',
       reason: 'User account disabled'
     });
-    return res.status(403).json({ error: 'Your account is disabled. Contact company administrator.' });
+    return res.status(403).json({ error: 'Your account is disabled. Please contact your company administrator.' });
   }
 
   // Record successful login with client IP
@@ -1638,6 +1741,57 @@ app.post('/api/admin/companies', auth, async (req, res) => {
     state: newCompany.state,
     prefix: cleanCode + '/Q'
   };
+
+  // Seed default costing settings, materials, and templates for the new company
+  if (!data.companyCostingSettings) data.companyCostingSettings = {};
+  data.companyCostingSettings[companyId] = {
+    ...costingEngine.getDefaultCostingSettings(),
+    last_changed_by: 'system',
+    last_changed_at: new Date().toISOString()
+  };
+
+  data.materials = data.materials || [];
+  const defaultMaterials = [
+    { category: 'profile', code: '5045', name: 'Outer Frame Top / Bottom / Verticals (Domal 27)', unit: 'kg/m', weight_kg_per_m: 1.28, rate: 500, active: true },
+    { category: 'profile', code: '5047', name: 'Sliding Sash (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.78, rate: 500, active: true },
+    { category: 'profile', code: '5042', name: 'Interlock (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.35, rate: 500, active: true },
+    { category: 'profile', code: '5043', name: 'Mesh Sash (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.90, rate: 500, active: true },
+    { category: 'profile', code: '5008', name: 'Outer Frame Top / Vertical (Fixed Window)', unit: 'kg/m', weight_kg_per_m: 0.60, rate: 500, active: true },
+    { category: 'profile', code: '5006', name: 'Mullion (Fixed Window / Vent)', unit: 'kg/m', weight_kg_per_m: 0.68, rate: 500, active: true },
+    { category: 'profile', code: '5013', name: 'Glazing Bead (Fixed Window)', unit: 'kg/m', weight_kg_per_m: 0.26, rate: 500, active: true },
+    { category: 'glass', code: 'G-5C', name: '5mm Clear', unit: 'sqm', weight_kg_per_m: 0, rate: 600, active: true },
+    { category: 'glass', code: 'G-4F', name: '4mm Frosted', unit: 'sqm', weight_kg_per_m: 0, rate: 600, active: true },
+    { category: 'glass', code: 'G-6T', name: '6mm Toughened', unit: 'sqm', weight_kg_per_m: 0, rate: 850, active: true },
+    { category: 'glass', code: 'G-8TC', name: '8mm Toughened Clear', unit: 'sqm', weight_kg_per_m: 0, rate: 1200, active: true },
+    { category: 'glass', code: 'G-6TTB', name: '6mm Toughened Tinted Brown', unit: 'sqm', weight_kg_per_m: 0, rate: 2000, active: true },
+    { category: 'mesh', code: 'M-SS', name: 'SS Mesh', unit: 'sqm', weight_kg_per_m: 0, rate: 290, active: true },
+    { category: 'hardware', code: 'H-ROL', name: 'Rollers', unit: 'nos', weight_kg_per_m: 0, rate: 30, active: true },
+    { category: 'hardware', code: 'H-ROLD', name: 'Sliding Door Heavy Rollers', unit: 'nos', weight_kg_per_m: 0, rate: 80, active: true },
+    { category: 'hardware', code: 'H-TL', name: 'Touch Lock', unit: 'nos', weight_kg_per_m: 0, rate: 45, active: true },
+    { category: 'hardware', code: 'H-PUH', name: 'Pop-up Handle', unit: 'nos', weight_kg_per_m: 0, rate: 110, active: true },
+    { category: 'hardware', code: 'H-CC', name: 'Corner Cleat', unit: 'nos', weight_kg_per_m: 0, rate: 31, active: true },
+    { category: 'hardware', code: 'H-STD', name: 'Standard Handle', unit: 'nos', weight_kg_per_m: 0, rate: 0, active: true },
+    { category: 'hardware', code: 'H-FLUSH', name: 'Flush Handle', unit: 'nos', weight_kg_per_m: 0, rate: 85, active: true },
+    { category: 'gasket', code: 'GSK-SL', name: 'Glazing Gasket for Shutter (Sliding)', unit: 'm', weight_kg_per_m: 0, rate: 12, active: true },
+    { category: 'gasket', code: 'GSK-BD', name: 'Gasket for Beads (Fixed / Vent)', unit: 'm', weight_kg_per_m: 0, rate: 10, active: true },
+    { category: 'gasket', code: 'BRS-SF', name: 'Brush Seal Shutter Frame', unit: 'm', weight_kg_per_m: 0, rate: 4, active: true },
+    { category: 'labour', code: 'LAB-STD', name: 'Standard Fabrication & Fixing Labour', unit: 'sqm', weight_kg_per_m: 0, rate: 500, active: true },
+    { category: 'labour', code: 'LAB-FW', name: 'Fixed Window Fabrication & Fixing Labour', unit: 'sqm', weight_kg_per_m: 0, rate: 600, active: true }
+  ];
+  defaultMaterials.forEach((m, idx) => {
+    data.materials.push({ id: `mat_${companyId}_${idx + 1}`, companyId, ...m });
+  });
+
+  data.productTemplates = data.productTemplates || [];
+  costingEngine.getSeedTemplates().forEach(tpl => {
+    data.productTemplates.push({
+      ...tpl,
+      id: `${tpl.id}_${companyId}`,
+      template_key: tpl.id,
+      companyId,
+      created_at: new Date().toISOString()
+    });
+  });
 
   saveDb(data);
 

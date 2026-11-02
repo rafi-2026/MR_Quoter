@@ -868,6 +868,139 @@
       transition: background 0.8s ease;
     }
 
+    /* Classic Simple Login Card */
+    .auth-classic-box {
+      width: 100%;
+      max-width: 440px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
+      padding: 36px 32px;
+      position: relative;
+      z-index: 10;
+    }
+    .auth-classic-header {
+      text-align: center;
+      margin-bottom: 26px;
+    }
+    .auth-classic-badge {
+      width: 54px;
+      height: 54px;
+      background: linear-gradient(135deg, #1e3a8a, #2563eb);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 1.35rem;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 16px -4px rgba(37, 99, 235, 0.4);
+      margin-bottom: 14px;
+    }
+    .auth-classic-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 6px;
+      letter-spacing: -0.02em;
+    }
+    .auth-classic-sub {
+      font-size: 0.88rem;
+      color: #64748b;
+      margin: 0;
+    }
+    .auth-field-group {
+      margin-bottom: 18px;
+      text-align: left;
+    }
+    .auth-field-label {
+      display: block;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 7px;
+    }
+    .auth-input-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .auth-input-field {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 9px;
+      background: #f8fafc;
+      color: #0f172a;
+      transition: all 0.2s ease;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .auth-input-field:focus {
+      background: #ffffff;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+    .auth-pw-toggle {
+      position: absolute;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 1.15rem;
+      color: #64748b;
+      cursor: pointer;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+    .auth-pw-toggle:hover {
+      color: #0f172a;
+    }
+    .auth-submit-btn {
+      width: 100%;
+      padding: 13px;
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 0.98rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 9px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+    .auth-submit-btn:hover:not(:disabled) {
+      background: #1d4ed8;
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+      transform: translateY(-1px);
+    }
+    .auth-submit-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .auth-err-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 9px;
+      color: #b91c1c;
+      padding: 11px 14px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: none;
+      line-height: 1.4;
+      text-align: left;
+    }
+
     /* Animated architectural blueprint drafting grid */
     .auth-grid-bg {
       position: absolute;
@@ -2621,6 +2754,157 @@
       };
     }
     function logq(q, x) { q.log.push({ t: Date.now(), u: me ? me.name : '', x }) }
+
+    /* ========== Excel Costing Engine (Phase 1) ========== */
+    const CostingEngine = {
+      roundFeetFromMm(mm) {
+        const feet = Number(mm) / 304.8;
+        const whole = Math.floor(feet);
+        const frac = feet - whole;
+        if (frac < 0.3) return whole;
+        if (frac <= 0.7) return whole + 0.5;
+        return whole + 1;
+      },
+      evalExpr(expr, vars) {
+        if (!expr || String(expr).trim() === '') return 0;
+        let s = String(expr).trim();
+        const names = Object.keys(vars).sort((a, b) => b.length - a.length);
+        let safe = s;
+        for (let i = 0; i < names.length; i++) {
+          const n = names[i];
+          const escaped = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp('\\b' + escaped + '\\b', 'g');
+          safe = safe.replace(re, '(' + Number(vars[n]) + ')');
+        }
+        if (!/^[\d\s.\+\-\*\/\(\)]+$/.test(safe)) {
+          throw new Error('Unsafe expression: ' + expr);
+        }
+        return (new Function('return (' + safe + ')'))();
+      },
+      calculateItem(template, templateLines, widthFt, heightFt, options, settings, rates) {
+        const FT_TO_M = Number(settings.ft_to_m) || 0.3048;
+        const W = widthFt * FT_TO_M;
+        const H = heightFt * FT_TO_M;
+        const A = W * H;
+
+        const alRate = Number(settings.aluminium_rate_per_kg) || 500;
+        const labourRate = Number(settings.labour_rate_per_sqm) || 500;
+
+        let glassOption = null;
+        if (options && options.glass_id) {
+          const gl = (rates && rates.glass) || [];
+          for (let gi = 0; gi < gl.length; gi++) {
+            if (gl[gi].id === options.glass_id || gl[gi].name === options.glass_id) {
+              glassOption = gl[gi]; break;
+            }
+          }
+        }
+        const glassRate = glassOption ? Number(glassOption.rate_per_sqm || glassOption.rate) : 600;
+
+        let meshOption = null;
+        let hasMesh = false;
+        if (options && options.mesh && options.mesh !== 'NA') {
+          const ms = (rates && rates.mesh) || [];
+          for (let mi = 0; mi < ms.length; mi++) {
+            if (ms[mi].name === options.mesh || ms[mi].id === options.mesh) { meshOption = ms[mi]; break; }
+          }
+          if (!meshOption) meshOption = { rate_per_sqm: 290 };
+          hasMesh = true;
+        }
+        const meshRate = meshOption ? Number(meshOption.rate_per_sqm || meshOption.rate) : 0;
+
+        const priorLengths = {};
+        const vars = () => Object.assign({ W, H, A }, priorLengths);
+
+        const bomLines = [];
+        let subtotal = 0;
+        const lines = templateLines || (template && template.lines) || [];
+
+        for (let i = 0; i < lines.length; i++) {
+          const rawLine = lines[i];
+          const line = Object.assign({}, rawLine);
+
+          let include = true;
+          if (line.condition) {
+            const cond = line.condition.trim().toLowerCase();
+            if (cond.indexOf('mesh') !== -1 && cond.indexOf("'na'") !== -1) {
+              include = hasMesh ? (cond.indexOf('!=') !== -1) : (cond.indexOf('==') !== -1);
+            }
+          }
+          if (!include) continue;
+
+          let unitPrice = Number(line.unit_price) || 0;
+          if (line.kind === 'labour' && unitPrice === 0) unitPrice = labourRate;
+          if (line.kind === 'glass') unitPrice = glassRate;
+          if (line.kind === 'mesh') unitPrice = meshRate;
+
+          const len = CostingEngine.evalExpr(line.length_expr, vars());
+          const nos = CostingEngine.evalExpr(line.nos_expr, vars());
+          const totalMetres = len * nos;
+          priorLengths['L' + line.sl_no] = totalMetres;
+
+          let amount = 0;
+          if (line.kind === 'profile') {
+            const wt = Number(line.weight_kg_per_m) || 0;
+            const rate = (unitPrice > 0) ? unitPrice : alRate;
+            amount = totalMetres * wt * rate;
+          } else if (line.kind === 'labour' || line.kind === 'glass' || line.kind === 'mesh') {
+            amount = len * nos * unitPrice;
+          } else {
+            const lEff = (len > 0) ? len : 1;
+            amount = lEff * nos * unitPrice;
+          }
+
+          line.evaluatedLen = len;
+          line.evaluatedNos = nos;
+          line.totalMetres = totalMetres;
+          line.amount = amount;
+          bomLines.push(line);
+          subtotal += amount;
+        }
+
+        const wastagePct = Number(settings.wastage_pct) || 5;
+        const marginPct = Number(settings.margin_pct) || 35;
+        const gstPct = Number(settings.gst_pct) || 18;
+        const sqftPerSqm = Number(settings.sqft_per_sqm) || 10.764;
+
+        const wastage = subtotal * wastagePct / 100;
+        const totalCost = subtotal + wastage;
+        const margin = Math.round(totalCost * marginPct / 100);
+        const priceExTax = Math.round(totalCost + margin);
+        const ratePerSqm = A > 0 ? Math.round(priceExTax / A) : 0;
+        const ratePerSqft = Math.round(ratePerSqm / sqftPerSqm);
+        const priceInclGst = Math.round(priceExTax * (1 + gstPct / 100));
+
+        return {
+          widthFt, heightFt, options,
+          W, H, A,
+          lines: bomLines,
+          subtotal, wastage, totalCost, margin,
+          priceExTax, ratePerSqm, ratePerSqft, priceInclGst,
+          wastagePct, marginPct, gstPct
+        };
+      },
+      quoteTotals(items, transportCharges, gstPct) {
+        let totalQty = 0, totalArea = 0, totalPrice = 0;
+        (items || []).forEach(item => {
+          totalQty += Number(item.qty) || 0;
+          totalArea += Number(item.area_sqft || item.area) || 0;
+          totalPrice += Number(item.total_price || item.amt) || 0;
+        });
+        const avgRate = totalArea > 0 ? Math.round(totalPrice / totalArea) : 0;
+        const transport = Number(transportCharges) || 0;
+        const totalExGst = totalPrice + transport;
+        const gst = Number(gstPct) || 18;
+        const gstAmount = totalExGst * gst / 100;
+        const totalInclGst = totalExGst + gstAmount;
+        return { totalQty, totalArea, totalPrice, avgRate, transport, totalExGst, gstAmount, totalInclGst, gst };
+      },
+      getDefaultCostingSettings() {
+        return { aluminium_rate_per_kg: 500, wastage_pct: 5, margin_pct: 35, gst_pct: 18, labour_rate_per_sqm: 500, sqft_per_sqm: 10.764, ft_to_m: 0.3048, last_changed_by: 'System', last_changed_at: '' };
+      }
+    };
+    window.CostingEngine = CostingEngine;
     function lineCalc(l, q) {
       if (l.type === 'section') return { amt: 0, gross: 0, disc: 0, cost: 0 };
       const qty = num(l.qty);
@@ -3015,433 +3299,158 @@
       } catch (e) { }
     }
 
-    function authShell(title, sub, form) {
-      const liveDateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      root.innerHTML = `<div class="auth-wrap">
-    <canvas id="auth_canvas" style="position:absolute;inset:0;pointer-events:none;z-index:2;opacity:0.5"></canvas>
-    <div class="auth-grid-bg"></div>
-
-    <div class="auth-horizon-container">
-
-      <!-- Horizon Topbar -->
-      <div class="auth-horizon-topbar">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="stitch-logo-badge">MQ</div>
-          <div style="display:flex;align-items:baseline;gap:6px">
-            <span style="font-weight:800;letter-spacing:0.04em;color:#0f172a;font-size:0.88rem">MR_QUOTER</span>
-            <span class="stitch-pro-badge">PRO</span>
-          </div>
-          <span style="color:#94a3b8;font-size:0.78rem;border-left:1px solid #cbd5e1;padding-left:10px;margin-left:4px" class="hide-mobile">Architecture, Estimations &amp; Invoicing Portal</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px">
-          <button type="button" class="stitch-top-link" onclick="openAiAssistantModal()">💡 Quick Help</button>
-          <button type="button" class="stitch-theme-dropdown" onclick="openThemePickerModal()">
-            🎨 Theme: Daylight Architectural Horizon ▾
-          </button>
-        </div>
-      </div>
-
-      <!-- Horizon Body: Split Showcase + Auth Card -->
-      <div class="auth-horizon-body">
-
-        <!-- Left Column: Architectural Branding & Hero Story -->
-        <div class="auth-showcase-col">
-          <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
-            <div class="stitch-hero-badge">MQ</div>
-            <div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:1.45rem;font-weight:800;color:#0f172a">MR_Quoter</span>
-                <span class="stitch-version-pill">Horizon v3.2</span>
-              </div>
-              <div style="font-size:0.82rem;color:#64748b;margin-top:2px">Modern Architecture, Estimations &amp; Invoicing Platform</div>
-            </div>
-          </div>
-
-          <h1 class="auth-hero-title">Precision architectural costing.<br><span>Crafted for turnkey execution.</span></h1>
-          <p class="auth-hero-desc">Empower your agency, project directors, and estimators with realtime BOQ modeling, transparent client invoicing, and multi-tier authentication.</p>
-
-          <!-- Daily Business Motivation Card -->
-          <div class="auth-motivation-card">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="font-size:0.72rem;font-weight:700;color:#64748b;letter-spacing:0.04em">📐 DAILY BUSINESS MOTIVATION</span>
-                <span class="stitch-focus-tag">Today's Focus: Sustainable Turnkey Execution</span>
-              </div>
-              <span style="color:#94a3b8;font-size:0.8rem;cursor:pointer" onclick="applyDailyTheme()" title="Refresh Quote">↻</span>
-            </div>
-            <div style="font-size:0.92rem;font-weight:600;font-style:italic;color:#1e293b;line-height:1.45;margin-bottom:10px">
-              "We shape our buildings; thereafter, our buildings shape us." &mdash; Winston Churchill
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.76rem;color:#64748b;border-top:1px dashed #cbd5e1;padding-top:8px">
-              <span style="background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 8px;border-radius:4px;color:#334155;font-weight:600">🏗️ (- Rafi [Builder of MR_Quoter])</span>
-              <span>🟢 ${liveDateStr} &bull; Enterprise Quote #14</span>
-            </div>
-          </div>
-
-          <!-- Feature Pills -->
-          <div class="auth-feature-pills">
-            <div class="auth-feat-pill"><span>✓</span> Automated BOQ Takeoffs</div>
-            <div class="auth-feat-pill"><span>✓</span> Dual-Factor 2FA Verification</div>
-            <div class="auth-feat-pill"><span>✓</span> Instant Tax &amp; Currency Conversion</div>
-          </div>
-        </div>
-
-        <!-- Right Column: Portal Access Auth Card -->
-        <div class="auth-portal-col">
-          <div class="auth-card">
-            <div class="auth-card-head-stitch" style="margin-bottom:16px">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-                <div>
-                  <h2 style="margin:0;font-size:1.35rem;font-weight:800;color:#0f172a">${title}</h2>
-                  <div style="color:#64748b;font-size:0.83rem;margin-top:2px">${sub || 'Authenticate your enterprise credentials'}</div>
-                </div>
-                <div class="auth-status-pill">
-                  <span class="pulse-dot"></span>
-                  <span>SECURE ACCESS &bull; Online</span>
-                </div>
-              </div>
-            </div>
-            <form id="af" autocomplete="off">
-              ${form}
-              <div class="err" id="aerr" role="alert"></div>
-              <div id="ai_login_diag" style="display:none"></div>
-            </form>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Footer Bar -->
-      <div class="auth-horizon-footer">
-        Created by <b>RAFIQ</b> &nbsp;&bull;&nbsp; Dual Admin Security &bull; <a href="mailto:RAFIQTN70@GMAIL.COM" style="color:inherit;text-decoration:none">RAFIQTN70@GMAIL.COM</a>
-      </div>
-
-    </div>
-
-    <div class="ai-fab" onclick="openAiAssistantModal()" title="Open AI Assistant &amp; Co-Pilot">
-      <div class="ai-fab-pulse"></div>
-      <span>🤖 AI Co-Pilot</span>
-    </div>
-  </div>`;
-      applyDailyTheme();
-    }
-
-    let currentLoginTab = 'company';
-    function setLoginTab(tab) {
-      currentLoginTab = tab;
-      const coTab = document.querySelector('#tab_company');
-      const masterTab = document.querySelector('#tab_master');
-      const coFields = document.querySelector('#company_fields');
-      const masterFields = document.querySelector('#master_fields');
-      const unInput = document.querySelector('#l_un');
-      const submitBtn = document.querySelector('#login_btn');
-      const labelEl = document.querySelector('#login_section_label');
-      const diagBox = document.querySelector('#ai_login_diag');
-      if (diagBox) diagBox.style.display = 'none';
-
-      if (tab === 'master') {
-        if (coTab) coTab.classList.remove('active');
-        if (masterTab) masterTab.classList.add('active');
-        if (coFields) coFields.style.display = 'none';
-        if (masterFields) masterFields.style.display = 'block';
-        if (unInput) unInput.value = 'master';
-        if (submitBtn) submitBtn.textContent = 'Sign In as Master Admin';
-        if (labelEl) labelEl.innerHTML = '<span>Platform Superadmin Workspace</span> &bull; <span style="font-weight:400;color:#64748b">Two-Factor Authentication (2FA) enforced</span>';
-      } else {
-        if (masterTab) masterTab.classList.remove('active');
-        if (coTab) coTab.classList.add('active');
-        if (masterFields) masterFields.style.display = 'none';
-        if (coFields) coFields.style.display = 'block';
-        if (unInput && unInput.value === 'master') unInput.value = '';
-        if (submitBtn) submitBtn.textContent = 'Sign In to Workspace';
-        if (labelEl) labelEl.innerHTML = '<span>Agent / Staff Workspace</span> &bull; <span style="font-weight:400;color:#64748b">Please enter your company credentials to proceed</span>';
-      }
-    }
-
     function togglePwVisibility(inputId, btn) {
       const inp = document.querySelector('#' + inputId);
       if (!inp) return;
       if (inp.type === 'password') {
         inp.type = 'text';
         btn.textContent = '🙈';
+        btn.setAttribute('aria-label', 'Hide password');
       } else {
         inp.type = 'password';
         btn.textContent = '👁️';
+        btn.setAttribute('aria-label', 'Show password');
       }
     }
 
     function viewLogin() {
-      authShell('Portal Access', 'Authenticate your enterprise credentials', `
-    <div class="auth-tabs">
-      <button type="button" class="auth-tab active" id="tab_company" onclick="setLoginTab('company')">🏢 Company Staff</button>
-      <button type="button" class="auth-tab" id="tab_master" onclick="setLoginTab('master')">👑 Master Admin 2FA</button>
-    </div>
+      root.innerHTML = `
+        <div class="auth-wrap">
+          <div class="auth-grid-bg"></div>
+          <div class="auth-classic-box">
+            <div class="auth-classic-header">
+              <div class="auth-classic-badge">MQ</div>
+              <h1 class="auth-classic-title">MR_Quoter</h1>
+              <p class="auth-classic-sub">Interior &amp; Windows Quotation Portal</p>
+            </div>
 
-    <div style="font-size:0.81rem;color:#475569;margin-bottom:12px;font-weight:600" id="login_section_label">
-      <span>Agent / Staff Workspace</span> &bull; <span style="font-weight:400;color:#64748b">Please enter your company credentials to proceed</span>
-    </div>
+            <form id="af" autocomplete="on">
+              <div class="auth-field-group">
+                <label class="auth-field-label" for="l_un">Email or Username</label>
+                <div class="auth-input-container">
+                  <input id="l_un" class="auth-input-field" name="username" type="text" placeholder="e.g. master or your email" required autofocus autocomplete="username" autocapitalize="none">
+                </div>
+              </div>
 
-    <!-- Company Login Section -->
-    <div id="company_fields">
-      <label class="f">
-        <span style="display:flex;justify-content:space-between;align-items:center">
-          <span>Company Code <small style="color:var(--mute)">(e.g. CTPL, APEX, ABC)</small></span>
-          <button type="button" class="btn sm" style="padding:1px 8px;font-size:0.75rem;background:#e0f2fe;color:#0284c7;border:1px solid #bae6fd;border-radius:4px;cursor:pointer" onclick="openCompanyPickerModal()">📋 Browse Companies</button>
-        </span>
-        <input id="l_co" placeholder="Enter Company Code (or click Browse)" autocapitalize="characters">
-      </label>
-    </div>
+              <div class="auth-field-group">
+                <label class="auth-field-label" for="l_pw">Password</label>
+                <div class="auth-input-container">
+                  <input id="l_pw" class="auth-input-field" name="password" type="password" placeholder="••••••••••••" required autocomplete="current-password" style="padding-right:44px">
+                  <button type="button" class="auth-pw-toggle" onclick="togglePwVisibility('l_pw', this)" title="Show / Hide Password" aria-label="Toggle password visibility">👁️</button>
+                </div>
+              </div>
 
-    <!-- Master Notice Section -->
-    <div id="master_fields" style="display:none">
-      <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 14px;border-radius:10px;font-size:0.83rem;color:#1e40af;margin-bottom:12px;line-height:1.45">
-        👑 <b>Platform Superadmin:</b> Google Authenticator (TOTP) 2FA is active. Enter your Master credentials to receive the 6-digit verification prompt.
-      </div>
-    </div>
+              <div class="auth-err-banner" id="aerr" role="alert"></div>
 
-    <label class="f">
-      <span>Username</span>
-      <input id="l_un" placeholder="Your username (e.g. Jonathan_Reichert07)" required autocapitalize="none" autofocus>
-    </label>
+              <button class="auth-submit-btn" id="login_btn" type="submit">
+                <span>Sign In</span>
+              </button>
+            </form>
 
-    <label class="f">
-      <span style="display:flex;justify-content:space-between;align-items:center">
-        <span>Password</span>
-        <a href="#/login" onclick="toast('Please contact your administrator or master admin to reset credentials.','pri');return false;" style="font-size:0.76rem;color:#2563eb;text-decoration:none">Forgot password?</a>
-      </span>
-      <div style="position:relative;display:flex;align-items:center">
-        <input id="l_pw" type="password" placeholder="••••••••••••" style="width:100%;padding-right:40px" required>
-        <button type="button" onclick="togglePwVisibility('l_pw', this)" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;font-size:1.1rem;padding:4px;color:#64748b" title="Toggle password visibility">👁️</button>
-      </div>
-    </label>
-
-    <button class="btn pri" id="login_btn" type="submit" style="justify-content:center;margin-top:6px;padding:12px;font-size:0.96rem;font-weight:700">Sign In to Workspace</button>
-
-    <button type="button" class="btn" style="justify-content:center;margin-top:8px;background:#ffffff;border:1px solid #cbd5e1;color:#334155;font-weight:600;font-size:0.86rem;padding:9px;border-radius:8px;cursor:pointer" onclick="toast('Google Enterprise SSO is active for verified company domains. Enter your credentials above or contact admin.', 'pri')">
-      <svg width="16" height="16" viewBox="0 0 24 24" style="margin-right:6px"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
-      Sign in with Google Enterprise
-    </button>
-
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:0.82rem;padding-top:10px;border-top:1px solid #f1f5f9">
-      <button type="button" class="btn sm" style="background:transparent;border:0;color:#2563eb;font-weight:600;padding:2px 0;cursor:pointer" onclick="openAiAssistantModal()">🤖 AI Login Assistant</button>
-      <span style="color:#64748b">Are you new? <a href="#/login" onclick="openCompanyPickerModal();return false;" style="color:#2563eb;text-decoration:none;font-weight:600">Create an Account</a></span>
-    </div>`);
+            <div style="text-align:center;margin-top:24px;font-size:0.78rem;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:16px">
+              MR_Quoter &bull; Precision Architectural Costing &amp; Invoicing
+            </div>
+          </div>
+        </div>
+      `;
 
       $('#af').onsubmit = async e => {
         e.preventDefault();
-        const isMasterTab = currentLoginTab === 'master';
-        const co = isMasterTab ? '' : ($('#l_co') ? $('#l_co').value.trim() : '');
-        const un = isMasterTab ? 'master' : $('#l_un').value.trim().toLowerCase();
+        const un = $('#l_un').value.trim().toLowerCase();
         const pw = $('#l_pw').value;
         const btn = $('#login_btn');
-        const diagBox = $('#ai_login_diag');
-        if (diagBox) diagBox.style.display = 'none';
+        const errBox = $('#aerr');
+        errBox.style.display = 'none';
+        errBox.textContent = '';
 
-        if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
+        if (!un || !pw) {
+          errBox.textContent = 'Please enter both email/username and password.';
+          errBox.style.display = 'block';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Signing in...';
 
         if (CLOUD) {
           try {
-            const res = await apiPost('/api/login', { username: un, password: pw, companyCode: co });
-            if (res.otpRequired) {
-              return showOtpScreen(un, res.email, res);
-            }
-            if (un === 'master') {
-              $('#aerr').textContent = 'Security OTP required. Please try again.';
-              if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
-              return;
-            }
+            const res = await apiPost('/api/login', { username: un, password: pw });
             db = await loadDbCloud();
             if (db) {
               db.settings = db.settings || {};
               db.settings.bank = db.settings.bank || {};
-              ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []);
+              ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles', 'materials', 'productTemplates'].forEach(k => db[k] = db[k] || []);
               db.seq = db.seq || {};
             }
             const mData = await apiGet('/api/me');
-            me = db && db.users.find(u => u.id === mData.userId && u.active) || null;
+            if (mData.userId === 'master') {
+              me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
+              setMasterSess(true);
+            } else {
+              me = db && db.users ? db.users.find(u => u.id === mData.userId && (u.active || u.active === undefined)) || null : null;
+              setMasterSess(false);
+            }
+
             if (!me) {
-              $('#aerr').textContent = 'User account not found or deactivated.';
-              if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+              errBox.textContent = 'User account not found or deactivated.';
+              errBox.style.display = 'block';
+              btn.disabled = false;
+              btn.textContent = 'Sign In';
               return;
             }
-            toast(`Welcome back, ${me.name}! Logged in successfully.`);
+
+            toast(`Welcome back, ${me.name}!`);
+            go('#/dash');
             renderApp();
           } catch (ex) {
-            const errMsg = ex.message || 'Sign in failed.';
-            $('#aerr').textContent = errMsg;
-            if (btn) { btn.disabled = false; btn.textContent = isMasterTab ? 'Sign in as Master Admin' : 'Sign in to Company'; }
-
-            // Automatic AI Diagnostic Analysis on error
-            try {
-              const diag = await apiPost('/api/ai/diagnose', { username: un, companyCode: co, lastError: errMsg });
-              if (diagBox && diag.ok && (diag.analysis || diag.solution)) {
-                diagBox.style.display = 'block';
-                diagBox.className = 'ai-diag-card error-mode';
-                diagBox.innerHTML = `
-                  <div class="ai-diag-header">🤖 AI Diagnostic Analysis</div>
-                  <div style="margin-bottom:6px">${esc(diag.analysis)}</div>
-                  <div style="font-weight:600">${esc(diag.solution)}</div>
-                  ${diag.actionType === 'fill_code' && diag.suggestedData ? `
-                    <button type="button" class="btn sm pri" style="margin-top:8px" onclick="document.querySelector('#l_co').value='${diag.suggestedData.code}';$('#af').requestSubmit();">⚡ Auto-fill Code "${diag.suggestedData.code}" &amp; Sign In</button>
-                  ` : ''}
-                  ${diag.actionType === 'master_login' ? `
-                    <button type="button" class="btn sm" style="margin-top:8px;background:#ffffff;color:#0f172a;border:1px solid #cbd5e1" onclick="setLoginTab('master')">👑 Switch to Master Admin Tab</button>
-                  ` : ''}
-                `;
-              }
-            } catch (dErr) { }
+            const errMsg = ex.message || 'Incorrect email/username or password.';
+            errBox.textContent = errMsg;
+            errBox.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
           }
           return;
         }
 
         // Offline / local fallback
         if (un === 'master') {
-          $('#aerr').textContent = 'Master Admin login requires active cloud server connection for email OTP verification.';
-          if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
-          return;
-        }
-        const u = db.users.find(x => x.username === un);
-        if (!u || !(await checkPw(u, pw))) {
-          $('#aerr').textContent = 'Username or password is wrong.';
-          if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
-          return;
-        }
-        if (!u.active) {
-          $('#aerr').textContent = 'This account is switched off. Ask an admin.';
-          if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
-          return;
-        }
-        me = u; setSess(u.id); renderApp();
-      };
-    }
-
-    function showOtpScreen(username, maskedEmail, loginData) {
-      const totpUri = loginData && loginData.totpUri;
-      const totpSecret = loginData && loginData.totpSecret;
-
-      authShell('Admin Security Verification', 'Google Authenticator 2-Factor Authentication (2FA)', `
-    <div style="text-align:center;margin-bottom:14px">
-      <div style="font-size:2.4rem;line-height:1;margin-bottom:8px">🔐</div>
-      <p style="color:var(--text);font-size:0.95rem;font-weight:700;margin:0 0 6px">
-        Google Authenticator Verification
-      </p>
-      <p style="color:#64748b;font-size:0.86rem;line-height:1.45;margin:0 0 12px">
-        Open <b>Google Authenticator</b> on your phone and enter the 6-digit code.
-      </p>
-
-      <!-- Google Authenticator Setup Card -->
-      <div id="totp_setup_card" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;margin-bottom:14px;text-align:center">
-        <button type="button" id="totp_toggle_btn" class="btn sm" style="width:100%;background:#ffffff;border:1px solid #94a3b8;color:#0f172a;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">
-          <span>📲</span> <span>First time? Show QR Code &amp; Setup Key</span>
-        </button>
-
-        <div id="totp_qr_details" style="display:none;margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1">
-          <p style="margin:0 0 8px;font-size:0.84rem;color:#334155;line-height:1.4">
-            1. Open <b>Google Authenticator</b> on your phone.<br>
-            2. Tap <b>+</b> &rarr; <b>Scan a QR code</b>.
-          </p>
-          <div style="display:flex;justify-content:center;margin:8px 0">
-            <canvas id="totp_qr_canvas" style="background:#ffffff;padding:8px;border-radius:8px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.06)"></canvas>
-          </div>
-          <div style="font-size:0.78rem;color:#64748b;margin-top:6px;word-break:break-all">
-            Or enter key manually in app: <br>
-            <code id="totp_key_code" style="font-family:monospace;font-size:0.92rem;font-weight:700;color:#0284c7;background:#f1f5f9;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;user-select:all">${esc(totpSecret || '')}</code>
-          </div>
-        </div>
-      </div>
-
-      ${maskedEmail ? `
-      <div style="background:#f0f9ff;border:1px solid #bae6fd;padding:6px 10px;border-radius:6px;font-size:0.78rem;color:#0369a1;margin-bottom:12px;text-align:left;line-height:1.4">
-        ✉️ <i>Backup email code dispatched to: <b>${esc(maskedEmail)}</b></i>
-      </div>` : ''}
-    </div>
-
-    <label class="f"><span style="text-align:center;font-weight:700;font-size:0.95rem">Enter 6-Digit Authenticator Code</span>
-      <input id="otp_code" type="text" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="000000" style="text-align:center;font-size:1.6rem;letter-spacing:8px;font-weight:700;padding:12px;border-radius:10px" required autofocus autocomplete="one-time-code">
-    </label>
-    <button class="btn pri" id="otp_verify_btn" type="submit" style="justify-content:center;margin-top:10px">Verify &amp; Sign In</button>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:0.86rem">
-      <a href="#/login" onclick="viewLogin();return false;" style="color:var(--mute);text-decoration:underline">&larr; Back to Login</a>
-      ${maskedEmail ? `<button type="button" id="otp_resend_btn" class="btn sm" style="background:transparent;border:0;color:var(--pri);cursor:pointer;font-weight:600;padding:4px 8px">Resend Email</button>` : ''}
-    </div>`);
-
-      const toggleBtn = $('#totp_toggle_btn');
-      const qrDetails = $('#totp_qr_details');
-      let qrRendered = false;
-
-      if (toggleBtn && qrDetails) {
-        toggleBtn.onclick = () => {
-          const isOpen = qrDetails.style.display !== 'none';
-          qrDetails.style.display = isOpen ? 'none' : 'block';
-          toggleBtn.innerHTML = isOpen ?
-            '<span>📲</span> <span>First time? Show QR Code &amp; Setup Key</span>' :
-            '<span>▲</span> <span>Hide QR Code &amp; Setup Key</span>';
-
-          if (!isOpen && !qrRendered && totpUri) {
-            const canvas = $('#totp_qr_canvas');
-            if (canvas && typeof QRCode !== 'undefined') {
-              try {
-                QRCode.toCanvas(canvas, totpUri, { width: 170, margin: 1 }, () => {
-                  qrRendered = true;
-                });
-              } catch (e) {
-                console.warn('QR render error:', e);
-              }
-            }
-          }
-        };
-      }
-
-      const formEl = $('#af');
-      if (formEl && window.FM && window.FM.pageEnter) window.FM.pageEnter(formEl);
-
-      $('#af').onsubmit = async e => {
-        e.preventDefault();
-        const code = $('#otp_code').value.trim();
-        if (!code) {
-          $('#aerr').textContent = 'Please enter your 6-digit security code.';
-          return;
-        }
-        const btn = $('#otp_verify_btn');
-        btn.disabled = true;
-        btn.textContent = 'Verifying security code...';
-        try {
-          const v = await apiPost('/api/admin/verify-otp', { otp: code });
-          if (v.ok) {
-            let d = await loadDbCloud();
-            if (d) {
-              db = d; db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};
-              ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []);
-              db.seq = db.seq || {};
-            } else {
-              db = seedData();
-              await apiPost('/api/db', db);
-            }
+          if (pw === 'Rafiq@24') {
             me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
             setMasterSess(true);
             go('#/dash');
             renderApp();
-            toast('Welcome, Master Admin! Verified successfully.');
+            return;
+          } else {
+            errBox.textContent = 'Incorrect password.';
+            errBox.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
+            return;
           }
-        } catch (ex) {
-          $('#aerr').textContent = ex.message || 'OTP verification failed.';
-          btn.disabled = false;
-          btn.textContent = 'Verify & Sign In';
         }
-      };
 
-      const resendBtn = $('#otp_resend_btn');
-      if (resendBtn) {
-        resendBtn.onclick = async () => {
-          try {
-            const res = await apiPost('/api/admin/resend-otp', {});
-            toast(res.message || 'New OTP sent to your email.');
-          } catch (ex) {
-            toast(ex.message || 'Failed to resend code.', 'bad');
-          }
-        };
-      }
+        const u = (db.users || []).find(x => (x.username && x.username.toLowerCase() === un) || (x.email && x.email.toLowerCase() === un));
+        if (!u || !(await checkPw(u, pw))) {
+          errBox.textContent = 'Incorrect email/username or password.';
+          errBox.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+          return;
+        }
+        if (!u.active && u.active !== undefined) {
+          errBox.textContent = 'Your account is disabled. Please contact your administrator.';
+          errBox.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+          return;
+        }
+        me = u;
+        setSess(u.id);
+        go('#/dash');
+        renderApp();
+      };
     }
+
     function pwModal(u, own) {
       modal({
         title: own ? 'Change password' : 'Reset password for ' + u.name, body: `${own ? '<label class="f"><span>Current password</span><input type="password" name="cur"></label><br>' : ''}<label class="f"><span>New password (at least 6 characters)</span><input type="password" name="pw"></label>`,
@@ -3989,29 +3998,481 @@
     }
 
     /* ========== rate library ========== */
-    let rateTab = 'products';
+    let rateTab = 'templates';
+    let selectedTemplateId = null;
+
+    function getMaterialUsage(mat) {
+      const tpls = db.productTemplates || [];
+      let count = 0;
+      tpls.forEach(t => {
+        const lines = t.lines || [];
+        const used = lines.some(l => {
+          if (mat.category === 'profile') return String(l.profile_no || '').trim() === String(mat.code || '').trim();
+          if (mat.category === 'glass') return l.kind === 'glass';
+          if (mat.category === 'mesh') return l.kind === 'mesh';
+          if (mat.category === 'hardware') return l.kind === 'hardware' && (l.description === mat.name || String(l.profile_no || '') === String(mat.code || ''));
+          if (mat.category === 'gasket') return (l.kind === 'gasket' || l.kind === 'brush_seal') && (l.description === mat.name || String(l.profile_no || '') === String(mat.code || ''));
+          return false;
+        });
+        if (used) count++;
+      });
+      return count;
+    }
+
     function viewRates() {
       const m = $('#main'), ed = canEditRates() && canWrite();
-      m.innerHTML = `<div class="ph"><div><h1>Rate library</h1><div class="mute">${ed ? 'Rates and profiles set here are copied into new quotes. Changing them later does not alter existing quotes.' : 'Read only. Manager, MD or authorised roles can change rates and profiles.'}</div></div></div>
-  <div class="note" style="margin-bottom:14px">The products, items, profiles and rates here are sample entries. Replace them with your own rates before sending quotations.</div>
-  <div class="chips" style="margin-bottom:14px">${[['products', 'Windows, doors and facades'], ['items', 'BOQ items'], ['profiles', 'Profiles (Aluminium & uPVC)'], ['options', 'Glass and finish options']].map(([k, t]) => `<button class="chip ${rateTab === k ? 'on' : ''}" data-act="rtab" data-t="${k}">${t}</button>`).join('')}</div><div id="rbody"></div>`;
+      const rateTabsList = [
+        ['templates', '⚡ Product Templates (BOM Costing)'],
+        ['profiles', 'Profiles (kg/m)'],
+        ['glass', 'Glass library'],
+        ['mesh_handle', 'Mesh & Handles'],
+        ['hardware', 'Hardware'],
+        ['gaskets', 'Gaskets & Seals'],
+        ['products', 'Custom Products'],
+        ['items', 'BOQ items'],
+        ['options', 'Legacy options']
+      ];
+      m.innerHTML = `<div class="ph"><div><h1>Rate library</h1><div class="mute">${ed ? 'Rates, materials and BOM templates set here are used by the auto costing engine for accurate quotation pricing.' : 'Read only. Manager or authorised roles can change rates and templates.'}</div></div></div>
+  <div class="note" style="margin-bottom:14px">Materials, rates and product templates are specific to your company. All BOM line amounts calculate automatically with Excel-matching precision.</div>
+  <div class="chips" style="margin-bottom:14px">${rateTabsList.map(([k, t]) => `<button class="chip ${rateTab === k ? 'on' : ''}" data-act="rtab" data-t="${k}">${t}</button>`).join('')}</div><div id="rbody"></div>`;
       drawRates();
     }
-    ACT.rtab = b => { rateTab = b.dataset.t; viewRates() };
+    ACT.rtab = b => { rateTab = b.dataset.t; selectedTemplateId = null; viewRates() };
+
     function drawRates() {
       const ed = canEditRates() && canWrite(), b = $('#rbody');
-      if (rateTab === 'products') {
+      db.materials = db.materials || [];
+      db.productTemplates = db.productTemplates || [];
+
+      if (rateTab === 'templates') {
+        const tpls = db.productTemplates || [];
+        if (selectedTemplateId) {
+          const tpl = tpls.find(t => t.id === selectedTemplateId) || tpls[0];
+          if (!tpl) { selectedTemplateId = null; drawRates(); return; }
+          const cs = db.costingSettings || CostingEngine.getDefaultCostingSettings();
+          const mats = db.materials || [];
+          const glassMats = mats.filter(m => m.category === 'glass');
+          const meshMats = mats.filter(m => m.category === 'mesh');
+          const rates = {
+            glass: glassMats,
+            mesh: meshMats,
+            handle: mats.filter(m => m.category === 'hardware')
+          };
+          const defGlassId = tpl.default_glass ? (glassMats.find(g => g.name === tpl.default_glass)?.id || glassMats[0]?.id) : glassMats[0]?.id;
+          const previewRes = CostingEngine.calculateItem(tpl, tpl.lines, 10, 6, { glass_id: defGlassId, mesh: tpl.allows_mesh ? 'SS Mesh' : 'NA' }, cs, rates);
+
+          b.innerHTML = `<div class="card" style="margin-bottom:16px">
+            <div class="card-h">
+              <div style="display:flex;align-items:center;gap:10px">
+                <button class="btn sm" data-act="tplBack">← Back to Templates</button>
+                <div>
+                  <h3 style="margin:0">${esc(tpl.name)}</h3>
+                  <div class="mute sm">Series: <b>${esc(tpl.series || 'Domal 27')}</b> &bull; Category: ${esc(tpl.category || 'window')} &bull; Mesh: ${tpl.allows_mesh ? 'Allowed' : 'Not applicable'}</div>
+                </div>
+              </div>
+              <div class="acts">
+                ${ed ? `<button class="btn sm" data-act="tplDuplicate" data-id="${tpl.id}">Duplicate</button>` : ''}
+              </div>
+            </div>
+
+            <!-- Live Preview Top Bar -->
+            <div style="background:var(--bg);padding:14px;border-radius:6px;border:1px solid var(--line);margin-bottom:16px">
+              <div style="font-weight:600;margin-bottom:10px;color:var(--pri)">⚡ Live Costing Preview &amp; Auto Recalculator</div>
+              <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+                <label class="f" style="margin:0"><span>Width (ft)</span><input id="prev_w" type="number" step="any" value="10" style="width:90px" oninput="ACT.tplLiveRecalc()"></label>
+                <label class="f" style="margin:0"><span>Height (ft)</span><input id="prev_h" type="number" step="any" value="6" style="width:90px" oninput="ACT.tplLiveRecalc()"></label>
+                <label class="f" style="margin:0"><span>Glass Type</span>
+                  <select id="prev_glass" onchange="ACT.tplLiveRecalc()">
+                    ${glassMats.map(g => `<option value="${g.id}" ${g.id === defGlassId ? 'selected' : ''}>${esc(g.name)} (₹${g.rate}/sqm)</option>`).join('')}
+                  </select>
+                </label>
+                <label class="f" style="margin:0"><span>Mesh Provision</span>
+                  <select id="prev_mesh" onchange="ACT.tplLiveRecalc()">
+                    ${tpl.allows_mesh ? '<option value="SS Mesh" selected>SS Mesh (₹290/sqm)</option>' : ''}
+                    <option value="NA" ${!tpl.allows_mesh ? 'selected' : ''}>NA (No Mesh)</option>
+                  </select>
+                </label>
+              </div>
+
+              <!-- Live Calculated Badges -->
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px">
+                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                  <div class="mute sm">Billing Area</div>
+                  <div id="prev_res_area" style="font-weight:600">60.0 sqft (${previewRes.A.toFixed(2)} sqm)</div>
+                </div>
+                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                  <div class="mute sm">Subtotal BOM</div>
+                  <div id="prev_res_subtotal" style="font-weight:600">₹${previewRes.subtotal.toFixed(2)}</div>
+                </div>
+                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                  <div class="mute sm">Wastage (5%)</div>
+                  <div id="prev_res_wastage" style="font-weight:600">₹${previewRes.wastage.toFixed(2)}</div>
+                </div>
+                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                  <div class="mute sm">Total Cost</div>
+                  <div id="prev_res_totalcost" style="font-weight:600">₹${previewRes.totalCost.toFixed(2)}</div>
+                </div>
+                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                  <div class="mute sm">Margin (35%)</div>
+                  <div id="prev_res_margin" style="font-weight:600">₹${previewRes.margin}</div>
+                </div>
+                <div style="background:var(--card);padding:10px;border-radius:4px;border:2px solid var(--pri)">
+                  <div class="mute sm" style="color:var(--pri);font-weight:600">Price Ex-Tax</div>
+                  <div id="prev_res_price" style="font-size:18px;font-weight:700;color:var(--pri)">₹${previewRes.priceExTax.toLocaleString('en-IN')}</div>
+                </div>
+                <div style="background:var(--card);padding:10px;border-radius:4px;border:2px solid var(--pri)">
+                  <div class="mute sm" style="color:var(--pri);font-weight:600">Rate / Sq Ft</div>
+                  <div id="prev_res_sqft" style="font-size:18px;font-weight:700;color:var(--pri)">₹${previewRes.ratePerSqft} / sqft</div>
+                </div>
+                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                  <div class="mute sm">Price Incl GST (18%)</div>
+                  <div id="prev_res_gst" style="font-weight:600">₹${previewRes.priceInclGst.toLocaleString('en-IN')}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- BOM Lines Table -->
+            <div class="card-h">
+              <h4>Bill of Materials (BOM Structure)</h4>
+              <div class="mute sm">Formulas evaluate W, H, A (metres/sqm) and prior profile total metres (L1, L2...).</div>
+            </div>
+            <div class="scx">
+              <table class="tbl sm">
+                <thead>
+                  <tr>
+                    <th>Sl</th><th>Profile No</th><th>Description</th><th>Kind</th>
+                    <th>Length Formula</th><th>Nos Formula</th><th class="r">kg/m</th><th class="r">Unit Price</th>
+                    <th class="r">Calc Length</th><th class="r">Calc Nos</th><th class="r">Line Amount (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(tpl.lines || []).map((l, idx) => {
+                    const pl = previewRes.lines.find(x => x.sl_no === l.sl_no) || { evaluatedLen: 0, evaluatedNos: 0, amount: 0 };
+                    return `<tr>
+                      <td>${l.sl_no || (idx + 1)}</td>
+                      <td><b>${esc(l.profile_no || '-')}</b></td>
+                      <td>${esc(l.description || '')}</td>
+                      <td><span class="bd pending">${esc(l.kind || 'profile')}</span></td>
+                      <td><code>${esc(l.length_expr || '')}</code></td>
+                      <td><code>${esc(l.nos_expr || '')}</code></td>
+                      <td class="r">${l.weight_kg_per_m ? inr(l.weight_kg_per_m, 2) : '-'}</td>
+                      <td class="r">${l.unit_price ? rs(l.unit_price) : (l.kind === 'profile' ? rs(cs.aluminium_rate_per_kg || 500) : '-')}</td>
+                      <td class="r" id="line_len_${l.sl_no}">${pl.evaluatedLen ? pl.evaluatedLen.toFixed(3) + ' m' : '-'}</td>
+                      <td class="r" id="line_nos_${l.sl_no}">${pl.evaluatedNos || '-'}</td>
+                      <td class="r" id="line_amt_${l.sl_no}" style="font-weight:600">${rs(pl.amount)}</td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+        } else {
+          // Templates List
+          b.innerHTML = `<div class="card">
+            <div class="card-h">
+              <h3>Product Costing Templates (Excel BOM Engine)</h3>
+              <div class="mute sm">Pre-configured product templates verified against Excel sheets 2TM, SD, F, and V.</div>
+            </div>
+            <div class="scx">
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th>Template Name</th>
+                    <th>Series</th>
+                    <th>Category</th>
+                    <th>Mesh Provision</th>
+                    <th>Default Glass</th>
+                    <th>BOM Lines</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tpls.map(t => `<tr>
+                    <td><b>${esc(t.name)}</b></td>
+                    <td>${esc(t.series || 'Domal 27')}</td>
+                    <td><span class="bd approved">${esc(t.category || 'window')}</span></td>
+                    <td>${t.allows_mesh ? '✓ SS Mesh' : '<span class="mute">No</span>'}</td>
+                    <td>${esc(t.default_glass || '6mm Toughened')}</td>
+                    <td>${(t.lines || []).length} lines</td>
+                    <td class="r nowrap">
+                      <button class="btn sm pri" data-act="tplOpen" data-id="${t.id}">View / Edit BOM &amp; Live Preview</button>
+                      ${ed ? `<button class="btn sm" data-act="tplDuplicate" data-id="${t.id}">Duplicate</button>` : ''}
+                    </td>
+                  </tr>`).join('') || `<tr><td colspan="7"><div class="empty">No templates found. Click Run seed or reload to initialize.</div></td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+        }
+      } else if (rateTab === 'profiles') {
+        const profs = db.materials.filter(m => m.category === 'profile');
+        b.innerHTML = `<div class="card">
+          <div class="card-h">
+            <h3>Aluminium Profiles Master Database</h3>
+            ${ed ? '<button class="btn pri sm" data-act="matEdit" data-cat="profile">+ Add Profile</button>' : ''}
+          </div>
+          <div class="mute sm" style="margin-bottom:8px">Profile sections used in BOM formulas. Rate per kg defaults to costing settings if left blank.</div>
+          <div class="scx">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Profile Code</th>
+                  <th>Profile Description</th>
+                  <th class="r">Weight (kg/m)</th>
+                  <th class="r">Rate / kg</th>
+                  <th class="r">Used in Templates</th>
+                  ${ed ? '<th></th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${profs.map(p => `<tr>
+                  <td><b>${esc(p.code || '-')}</b></td>
+                  <td>${esc(p.name)}</td>
+                  <td class="r">${inr(p.weightPerM, 2)} kg/m</td>
+                  <td class="r">${p.rate ? rs(p.rate) : `<span class="mute sm">${rs(db.costingSettings?.aluminium_rate_per_kg || 500)} (base)</span>`}</td>
+                  <td class="r"><span class="bd pending">${getMaterialUsage(p)} templates</span></td>
+                  ${ed ? `<td class="r nowrap"><button class="btn sm" data-act="matEdit" data-id="${p.id}" data-cat="profile">Edit</button> <button class="btn sm bad" data-act="matDel" data-id="${p.id}">Delete</button></td>` : ''}
+                </tr>`).join('') || `<tr><td colspan="6"><div class="empty">No profiles found.</div></td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      } else if (rateTab === 'glass') {
+        const glass = db.materials.filter(m => m.category === 'glass');
+        b.innerHTML = `<div class="card">
+          <div class="card-h">
+            <h3>Glass Library (${'₹'} / sqm)</h3>
+            ${ed ? '<button class="btn pri sm" data-act="matEdit" data-cat="glass">+ Add Glass</button>' : ''}
+          </div>
+          <div class="mute sm" style="margin-bottom:8px">Rates per square metre. Used automatically when selecting glass type on a quotation line.</div>
+          <div class="scx">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Item Code</th>
+                  <th>Glass Type &amp; Specification</th>
+                  <th class="r">Rate (${'₹'} / sqm)</th>
+                  <th class="r">Used in Templates</th>
+                  ${ed ? '<th></th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${glass.map(g => `<tr>
+                  <td><code>${esc(g.code || '-')}</code></td>
+                  <td><b>${esc(g.name)}</b></td>
+                  <td class="r font-bold">${rs(g.rate)} / sqm</td>
+                  <td class="r"><span class="bd pending">${getMaterialUsage(g)} templates</span></td>
+                  ${ed ? `<td class="r nowrap"><button class="btn sm" data-act="matEdit" data-id="${g.id}" data-cat="glass">Edit</button> <button class="btn sm bad" data-act="matDel" data-id="${g.id}">Delete</button></td>` : ''}
+                </tr>`).join('') || `<tr><td colspan="5"><div class="empty">No glass types found.</div></td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      } else if (rateTab === 'mesh_handle') {
+        const mh = db.materials.filter(m => m.category === 'mesh' || (m.category === 'hardware' && (m.name.toLowerCase().includes('handle') || m.code.includes('H-'))));
+        b.innerHTML = `<div class="card">
+          <div class="card-h">
+            <h3>Mesh &amp; Handle Types</h3>
+            <div class="acts">
+              ${ed ? '<button class="btn pri sm" data-act="matEdit" data-cat="mesh">+ Add Mesh</button> <button class="btn sm" data-act="matEdit" data-cat="hardware">+ Add Handle</button>' : ''}
+            </div>
+          </div>
+          <div class="mute sm" style="margin-bottom:8px">Mesh rate is per square metre (applied on A/2 in Excel). Handle price is per piece.</div>
+          <div class="scx">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Unit</th>
+                  <th class="r">Rate (${'₹'})</th>
+                  <th class="r">Used in Templates</th>
+                  ${ed ? '<th></th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${mh.map(m => `<tr>
+                  <td><span class="bd ${m.category === 'mesh' ? 'approved' : 'pending'}">${esc(m.category)}</span></td>
+                  <td><code>${esc(m.code || '-')}</code></td>
+                  <td><b>${esc(m.name)}</b></td>
+                  <td>${esc(m.unit || 'nos')}</td>
+                  <td class="r font-bold">${rs(m.rate)}</td>
+                  <td class="r"><span class="bd pending">${getMaterialUsage(m)} templates</span></td>
+                  ${ed ? `<td class="r nowrap"><button class="btn sm" data-act="matEdit" data-id="${m.id}" data-cat="${m.category}">Edit</button> <button class="btn sm bad" data-act="matDel" data-id="${m.id}">Delete</button></td>` : ''}
+                </tr>`).join('') || `<tr><td colspan="7"><div class="empty">No items found.</div></td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      } else if (rateTab === 'hardware') {
+        const hw = db.materials.filter(m => m.category === 'hardware');
+        b.innerHTML = `<div class="card">
+          <div class="card-h">
+            <h3>Hardware &amp; Accessories</h3>
+            ${ed ? '<button class="btn pri sm" data-act="matEdit" data-cat="hardware">+ Add Hardware</button>' : ''}
+          </div>
+          <div class="mute sm" style="margin-bottom:8px">Rollers, touch locks, pop-up handles, corner cleats used in BOM line costing.</div>
+          <div class="scx">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Hardware Item</th>
+                  <th>Unit</th>
+                  <th class="r">Unit Price (${'₹'})</th>
+                  <th class="r">Used in Templates</th>
+                  ${ed ? '<th></th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${hw.map(h => `<tr>
+                  <td><code>${esc(h.code || '-')}</code></td>
+                  <td><b>${esc(h.name)}</b></td>
+                  <td>${esc(h.unit || 'nos')}</td>
+                  <td class="r font-bold">${rs(h.rate)}</td>
+                  <td class="r"><span class="bd pending">${getMaterialUsage(h)} templates</span></td>
+                  ${ed ? `<td class="r nowrap"><button class="btn sm" data-act="matEdit" data-id="${h.id}" data-cat="hardware">Edit</button> <button class="btn sm bad" data-act="matDel" data-id="${h.id}">Delete</button></td>` : ''}
+                </tr>`).join('') || `<tr><td colspan="6"><div class="empty">No hardware items found.</div></td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      } else if (rateTab === 'gaskets') {
+        const gsk = db.materials.filter(m => m.category === 'gasket');
+        b.innerHTML = `<div class="card">
+          <div class="card-h">
+            <h3>Gaskets &amp; Brush Seals (${'₹'} / metre)</h3>
+            ${ed ? '<button class="btn pri sm" data-act="matEdit" data-cat="gasket">+ Add Gasket / Seal</button>' : ''}
+          </div>
+          <div class="mute sm" style="margin-bottom:8px">Rates per metre for perimeter glazing gaskets and brush seals.</div>
+          <div class="scx">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Gasket / Seal Type</th>
+                  <th>Unit</th>
+                  <th class="r">Rate (${'₹'} / m)</th>
+                  <th class="r">Used in Templates</th>
+                  ${ed ? '<th></th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${gsk.map(g => `<tr>
+                  <td><code>${esc(g.code || '-')}</code></td>
+                  <td><b>${esc(g.name)}</b></td>
+                  <td>${esc(g.unit || 'm')}</td>
+                  <td class="r font-bold">${rs(g.rate)} / m</td>
+                  <td class="r"><span class="bd pending">${getMaterialUsage(g)} templates</span></td>
+                  ${ed ? `<td class="r nowrap"><button class="btn sm" data-act="matEdit" data-id="${g.id}" data-cat="gasket">Edit</button> <button class="btn sm bad" data-act="matDel" data-id="${g.id}">Delete</button></td>` : ''}
+                </tr>`).join('') || `<tr><td colspan="6"><div class="empty">No gaskets found.</div></td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      } else if (rateTab === 'products') {
         b.innerHTML = `<div class="card"><div class="card-h"><h3>Size-based products (rate per sq ft)</h3>${ed ? '<button class="btn pri sm" data-act="prodEdit">Add product</button>' : ''}</div><div class="scx"><table class="tbl"><thead><tr><th>Product</th><th>Type</th><th class="r">Rate / sq ft</th><th class="r">Min area</th>${ed ? '<th class="r">Cost / sq ft</th><th></th>' : ''}</tr></thead><tbody>${db.products.map(p => `<tr><td><b>${esc(p.name)}</b><div class="mute sm">${esc(p.desc)}</div></td><td>${esc(GLYPHS[p.glyph] || '')}</td><td class="r">${rs(p.rate)}</td><td class="r">${p.minArea ? inr(p.minArea) + ' sq ft' : '-'}</td>${ed ? `<td class="r">${p.cost ? rs(p.cost) : '-'}</td><td class="r nowrap"><button class="btn sm" data-act="prodEdit" data-id="${p.id}">Edit</button> <button class="btn sm bad" data-act="prodDel" data-id="${p.id}">Delete</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="6"><div class="empty">No products yet.</div></td></tr>`}</tbody></table></div></div>`;
       } else if (rateTab === 'items') {
         b.innerHTML = `<div class="card"><div class="card-h"><h3>BOQ items (construction, interiors, other works)</h3>${ed ? '<button class="btn pri sm" data-act="itemEdit">Add item</button>' : ''}</div><div class="scx"><table class="tbl"><thead><tr><th>Category</th><th>Description</th><th>Unit</th><th class="r">Rate</th>${ed ? '<th class="r">Cost</th><th></th>' : ''}</tr></thead><tbody>${db.items.map(p => `<tr><td>${esc(p.category)}</td><td>${esc(p.desc)}</td><td>${esc(p.unit)}</td><td class="r">${rs(p.rate)}</td>${ed ? `<td class="r">${p.cost ? rs(p.cost) : '-'}</td><td class="r nowrap"><button class="btn sm" data-act="itemEdit" data-id="${p.id}">Edit</button> <button class="btn sm bad" data-act="itemDel" data-id="${p.id}">Delete</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="6"><div class="empty">No items yet.</div></td></tr>`}</tbody></table></div></div>`;
-      } else if (rateTab === 'profiles') {
-        const profs = db.profiles || [];
-        b.innerHTML = `<div class="card"><div class="card-h"><h3>Aluminium &amp; uPVC Profile Master Database</h3>${ed ? '<button class="btn pri sm" data-act="profEdit">Add Profile</button>' : ''}</div><div class="mute sm" style="margin-bottom:8px">Upload profile specifications with images. These are used in the Profile Cost Calculator on each quote line item.</div><div class="scx"><table class="tbl"><thead><tr><th>Image</th><th>Profile Name</th><th>Material</th><th>Series</th><th>Dimensions</th><th class="r">Weight (kg/m)</th><th class="r">Rate / kg</th>${ed ? '<th></th>' : ''}</tr></thead><tbody>${profs.map(p => `<tr><td>${p.img ? `<img src="${p.img}" alt="" style="width:60px;height:44px;object-fit:contain;border:1px solid var(--line);border-radius:3px">` : "<span class='mute sm'>No image</span>"}</td><td><b>${esc(p.name)}</b><div class="mute sm">${esc(p.desc)}</div></td><td><span class="bd ${p.material === 'UPVC' ? 'pending' : 'approved'}">${esc(p.material)}</span></td><td>${esc(p.series)}</td><td class="mute sm">${p.widthMm ? `${p.widthMm}×${p.depthMm}mm${p.thicknessMm ? ' t=' + p.thicknessMm : ''}` : '-'}</td><td class="r">${inr(p.weightPerM, 2)} kg/m</td><td class="r">${rs(p.ratePerKg)}</td>${ed ? `<td class="r nowrap"><button class="btn sm" data-act="profEdit" data-id="${p.id}">Edit</button> <button class="btn sm bad" data-act="profDel" data-id="${p.id}">Delete</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="8"><div class="empty">No profiles added yet. Click Add Profile to start building your database.</div></td></tr>`}</tbody></table></div></div>`;
       } else {
-        const tbl = (key, title) => `<div class="card"><div class="card-h"><h3>${title}</h3>${ed ? `<button class="btn sm" data-act="optAdd" data-k="${key}">Add option</button>` : ''}</div><div class="mute sm" style="margin-bottom:8px">Extra charge per sq ft added to the base rate.</div>${db.settings[key].map((o, i) => `<div class="row2"><input value="${esc(o.name)}" data-opt="${key}" data-i="${i}" data-f="name" ${ed ? '' : 'disabled'}><input type="number" step="any" value="${o.add}" data-opt="${key}" data-i="${i}" data-f="add" ${ed ? '' : 'disabled'}>${ed ? `<button class="btn sm bad" data-act="optDel" data-k="${key}" data-i="${i}">Remove</button>` : '<span></span>'}</div>`).join('')}</div>`;
+        const tbl = (key, title) => `<div class="card"><div class="card-h"><h3>${title}</h3>${ed ? `<button class="btn sm" data-act="optAdd" data-k="${key}">Add option</button>` : ''}</div><div class="mute sm" style="margin-bottom:8px">Extra charge per sq ft added to the base rate.</div>${(db.settings[key] || []).map((o, i) => `<div class="row2"><input value="${esc(o.name)}" data-opt="${key}" data-i="${i}" data-f="name" ${ed ? '' : 'disabled'}><input type="number" step="any" value="${o.add}" data-opt="${key}" data-i="${i}" data-f="add" ${ed ? '' : 'disabled'}>${ed ? `<button class="btn sm bad" data-act="optDel" data-k="${key}" data-i="${i}">Remove</button>` : '<span></span>'}</div>`).join('')}</div>`;
         b.innerHTML = `<div class="grid g2">${tbl('glass', 'Glass options')}${tbl('finish', 'Finish options')}</div>`;
       }
     }
+
+    // Material & Template Action Handlers
+    ACT.tplOpen = b => { selectedTemplateId = b.dataset.id; drawRates(); };
+    ACT.tplBack = () => { selectedTemplateId = null; drawRates(); };
+    ACT.tplDuplicate = b => {
+      const tpl = (db.productTemplates || []).find(t => t.id === b.dataset.id);
+      if (!tpl) return;
+      const copy = JSON.parse(JSON.stringify(tpl));
+      copy.id = uid();
+      copy.name = tpl.name + ' (Copy)';
+      db.productTemplates.push(copy);
+      persist(true); toast('Template duplicated.'); drawRates();
+    };
+    ACT.tplLiveRecalc = () => {
+      const w = num($('#prev_w') ? $('#prev_w').value : 10) || 10;
+      const h = num($('#prev_h') ? $('#prev_h').value : 6) || 6;
+      const glassId = $('#prev_glass') ? $('#prev_glass').value : '';
+      const mesh = $('#prev_mesh') ? $('#prev_mesh').value : 'SS Mesh';
+      const tpl = (db.productTemplates || []).find(t => t.id === selectedTemplateId);
+      if (!tpl) return;
+      const cs = db.costingSettings || CostingEngine.getDefaultCostingSettings();
+      const mats = db.materials || [];
+      const rates = {
+        glass: mats.filter(m => m.category === 'glass'),
+        mesh: mats.filter(m => m.category === 'mesh'),
+        handle: mats.filter(m => m.category === 'hardware')
+      };
+      const res = CostingEngine.calculateItem(tpl, tpl.lines, w, h, { glass_id: glassId, mesh: mesh }, cs, rates);
+      if ($('#prev_res_area')) $('#prev_res_area').textContent = `${(w * h).toFixed(1)} sqft (${res.A.toFixed(2)} sqm)`;
+      if ($('#prev_res_subtotal')) $('#prev_res_subtotal').textContent = '₹' + res.subtotal.toFixed(2);
+      if ($('#prev_res_wastage')) $('#prev_res_wastage').textContent = '₹' + res.wastage.toFixed(2);
+      if ($('#prev_res_totalcost')) $('#prev_res_totalcost').textContent = '₹' + res.totalCost.toFixed(2);
+      if ($('#prev_res_margin')) $('#prev_res_margin').textContent = '₹' + res.margin;
+      if ($('#prev_res_price')) $('#prev_res_price').textContent = '₹' + res.priceExTax.toLocaleString('en-IN');
+      if ($('#prev_res_sqm')) $('#prev_res_sqm').textContent = '₹' + res.ratePerSqm.toLocaleString('en-IN') + ' / sqm';
+      if ($('#prev_res_sqft')) $('#prev_res_sqft').textContent = '₹' + res.ratePerSqft + ' / sqft';
+      if ($('#prev_res_gst')) $('#prev_res_gst').textContent = '₹' + res.priceInclGst.toLocaleString('en-IN');
+
+      res.lines.forEach(l => {
+        const amtEl = $(`#line_amt_${l.sl_no}`);
+        if (amtEl) amtEl.textContent = rs(l.amount);
+        const lenEl = $(`#line_len_${l.sl_no}`);
+        if (lenEl) lenEl.textContent = l.evaluatedLen.toFixed(3) + ' m';
+        const nosEl = $(`#line_nos_${l.sl_no}`);
+        if (nosEl) nosEl.textContent = l.evaluatedNos;
+      });
+    };
+    ACT.matEdit = b => {
+      const id = b.dataset.id;
+      const category = b.dataset.cat || 'profile';
+      const mats = db.materials = db.materials || [];
+      const m = id ? mats.find(x => x.id === id) : { category, code: '', name: '', unit: category === 'profile' ? 'kg/m' : category === 'glass' || category === 'mesh' ? 'sqm' : category === 'gasket' ? 'm' : 'nos', weight_kg_per_m: 0, rate: 0, active: true };
+      modal({
+        title: id ? 'Edit Material / Item' : 'Add Material / Item',
+        wide: true,
+        body: `<div class="grid g2">
+          <label class="f"><span>Item Code / Profile No</span><input name="code" value="${esc(m.code || '')}" placeholder="e.g. 5045"></label>
+          <label class="f"><span>Name / Description</span><input name="name" value="${esc(m.name || '')}" placeholder="e.g. Outer Frame Top" required></label>
+          <label class="f"><span>Category</span>
+            <select name="category">
+              <option value="profile" ${m.category === 'profile' ? 'selected' : ''}>Aluminium Profile</option>
+              <option value="glass" ${m.category === 'glass' ? 'selected' : ''}>Glass</option>
+              <option value="mesh" ${m.category === 'mesh' ? 'selected' : ''}>Mesh</option>
+              <option value="hardware" ${m.category === 'hardware' ? 'selected' : ''}>Hardware</option>
+              <option value="gasket" ${m.category === 'gasket' ? 'selected' : ''}>Gasket / Seal</option>
+              <option value="labour" ${m.category === 'labour' ? 'selected' : ''}>Labour</option>
+            </select>
+          </label>
+          <label class="f"><span>Unit</span><input name="unit" value="${esc(m.unit || '')}" placeholder="kg/m, sqm, nos, m"></label>
+          ${m.category === 'profile' ? `<label class="f"><span>Weight (kg/m)</span><input name="weight_kg_per_m" type="number" step="any" value="${m.weight_kg_per_m || 0}"></label>` : ''}
+          <label class="f"><span>Rate / Unit Price (${'₹'})</span><input name="rate" type="number" step="any" value="${m.rate || 0}"></label>
+        </div>`,
+        onOk: el => {
+          const d = formData(el);
+          if (!d.name.trim()) { toast('Name is required.', 'bad'); return false; }
+          d.weight_kg_per_m = num(d.weight_kg_per_m);
+          d.rate = num(d.rate);
+          d.active = true;
+          if (id) Object.assign(m, d);
+          else mats.push({ id: uid(), ...d });
+          persist(true); drawRates(); toast('Material saved.');
+        }
+      });
+    };
+    ACT.matDel = b => {
+      const mats = db.materials = db.materials || [];
+      const m = mats.find(x => x.id === b.dataset.id);
+      if (!m) return;
+      confirmBox(`Delete ${esc(m.name)} from material library?`, () => {
+        db.materials = db.materials.filter(x => x.id !== m.id);
+        persist(true); drawRates(); toast('Material deleted.');
+      }, 'Delete', 'bad');
+    };
     document.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.opt) { const o = db.settings[t.dataset.opt][+t.dataset.i]; o[t.dataset.f] = t.dataset.f === 'add' ? num(t.value) : t.value; persist(true) } });
     ACT.optAdd = b => { db.settings[b.dataset.k].push({ name: 'New option', add: 0 }); persist(true); drawRates() };
     ACT.optDel = b => { db.settings[b.dataset.k].splice(+b.dataset.i, 1); persist(true); drawRates() };
@@ -4906,9 +5367,33 @@
 
     /* ========== settings ========== */
     function viewSettings() {
-      const s = db.settings, m = $('#main');
+      const s = db.settings, m = $('#main'), cs = db.costingSettings || CostingEngine.getDefaultCostingSettings();
       m.innerHTML = `<div class="ph"><div><h1>Settings</h1><div class="mute sm">Configure your company identity, address, contact details, ISO certifications, and cloud storage.</div></div><div class="acts"><button class="btn pri" data-act="saveSettings">Save settings</button></div></div>
   <div class="two"><div>
+
+  <!-- 0. Excel Costing Engine & Markup Settings (Spec Section 5) -->
+  <div class="card" id="set_costing" style="border: 2px solid var(--pri); margin-bottom: 16px; background: var(--card)">
+    <div class="card-h">
+      <div>
+        <h3 style="color:var(--pri); margin-bottom: 2px">⚡ Costing Settings (Excel-Style Auto Costing Engine)</h3>
+        <div class="mute sm">Aluminium rate, wastage %, markup margin %, and labour rates used by BOM templates for dynamic line costing.</div>
+      </div>
+      <button type="button" class="btn sm ghost" data-act="testCostingBench">Run Benchmark Tests</button>
+    </div>
+    <div class="grid g3">
+      <label class="f"><span>Aluminium Base Rate (${'₹'} / kg)</span><input name="alRate" type="number" step="any" value="${cs.aluminium_rate_per_kg || 500}" required></label>
+      <label class="f"><span>Wastage % (Profiles &amp; Seals)</span><input name="wastagePct" type="number" step="any" value="${cs.wastage_pct || 5}" required></label>
+      <label class="f"><span>Margin Markup % (on Total Cost)</span><input name="marginPct" type="number" step="any" value="${cs.margin_pct || 35}" required></label>
+      <label class="f"><span>Default GST %</span><input name="gstPct" type="number" step="any" value="${cs.gst_pct || 18}" required></label>
+      <label class="f"><span>Fabrication &amp; Fixing Labour (${'₹'} / sqm)</span><input name="labourRate" type="number" step="any" value="${cs.labour_rate_per_sqm || 500}" required></label>
+      <label class="f"><span>Sq Ft per Sq M</span><input name="sqftPerSqm" type="number" step="any" value="${cs.sqft_per_sqm || 10.764}" required></label>
+    </div>
+    <div style="margin-top:12px;padding:8px 12px;background:var(--bg);border-radius:4px;display:flex;justify-content:space-between;align-items:center;font-size:12px">
+      <span class="mute">Last changed by: <b>${esc(cs.last_changed_by || 'Initial System Setup')}</b> ${cs.last_changed_at ? ' on ' + new Date(cs.last_changed_at).toLocaleString() : ''}</span>
+      <span style="color:var(--pri);font-weight:600">✓ Excel Math Precision Active</span>
+    </div>
+    <div id="costing_bench_results" style="margin-top:12px;display:none"></div>
+  </div>
 
   <!-- 1. Company Profile & Logo -->
   <div class="card" id="set1">
@@ -5172,7 +5657,79 @@
         s.headerColor = e6.headerColor || '#1b2a2f';
         s.docColor = e6.docColor || s.headerColor;
       } catch(e_){}
+      // Costing settings (Excel Engine)
+      try {
+        const cst = g('#set_costing');
+        if (cst) {
+          db.costingSettings = db.costingSettings || CostingEngine.getDefaultCostingSettings();
+          Object.assign(db.costingSettings, {
+            aluminium_rate_per_kg: num(cst.alRate) || 500,
+            wastage_pct: num(cst.wastagePct) || 5,
+            margin_pct: num(cst.marginPct) || 35,
+            gst_pct: num(cst.gstPct) || 18,
+            labour_rate_per_sqm: num(cst.labourRate) || 500,
+            sqft_per_sqm: num(cst.sqftPerSqm) || 10.764,
+            ft_to_m: 0.3048,
+            last_changed_by: (me && me.name) ? me.name : 'User',
+            last_changed_at: new Date().toISOString()
+          });
+        }
+      } catch (e_) { }
       persist(true); toast('Settings saved successfully.'); applyThemeColors();
+    };
+    ACT.testCostingBench = () => {
+      const el = $('#costing_bench_results');
+      if (!el) return;
+      const cs = db.costingSettings || CostingEngine.getDefaultCostingSettings();
+      const mats = db.materials || [];
+      const glass = mats.filter(m => m.category === 'glass');
+      const mesh = mats.filter(m => m.category === 'mesh');
+      const handle = mats.filter(m => m.category === 'hardware');
+      const rates = {
+        glass: glass.length ? glass.map(g => ({ id: g.id, name: g.name, rate_per_sqm: g.rate })) : [
+          { id: 'g1', name: '5mm Clear', rate_per_sqm: 600 },
+          { id: 'g2', name: '4mm Frosted', rate_per_sqm: 600 },
+          { id: 'g3', name: '6mm Toughened', rate_per_sqm: 850 },
+          { id: 'g4', name: '8mm Toughened Clear', rate_per_sqm: 1200 },
+          { id: 'g5', name: '6mm Toughened Tinted Brown', rate_per_sqm: 2000 }
+        ],
+        mesh: mesh.length ? mesh.map(m => ({ id: m.id, name: m.name, rate_per_sqm: m.rate })) : [{ id: 'm1', name: 'SS Mesh', rate_per_sqm: 290 }],
+        handle: handle.length ? handle.map(h => ({ id: h.id, name: h.name, price: h.rate })) : [{ id: 'h1', name: 'Standard Handle', price: 0 }]
+      };
+      const tpls = db.productTemplates || [];
+      const tests = [
+        { tplId: 'tpl_sliding_window', W: 10, H: 6, glass: '6mm Toughened', mesh: 'SS Mesh', expPrice: 35803, expRate: 597, name: '#1 2.5T Window 10×6' },
+        { tplId: 'tpl_sliding_window', W: 9,  H: 6, glass: '6mm Toughened', mesh: 'SS Mesh', expPrice: 33110, expRate: 613, name: '#2 2.5T Window 9×6' },
+        { tplId: 'tpl_sliding_door',   W: 8,  H: 8, glass: '8mm Toughened Clear', mesh: 'SS Mesh', expPrice: 39898, expRate: 623, name: '#3 2.5T Door 8×8' },
+        { tplId: 'tpl_fixed_window',   W: 10, H: 8, glass: '6mm Toughened', mesh: 'NA', expPrice: 26406, expRate: 330, name: '#4 Fixed Window 10×8' },
+        { tplId: 'tpl_ventilator',     W: 3.5,H: 2, glass: '4mm Frosted', mesh: 'NA', expPrice: 3826, expRate: 547, name: '#5 Ventilator 3.5×2' }
+      ];
+      let rows = '';
+      tests.forEach(tc => {
+        const tpl = tpls.find(t => t.id === tc.tplId || t.template_key === tc.tplId);
+        if (!tpl) { rows += `<tr><td>${tc.name}</td><td colspan="6" class="mute">Template not found</td></tr>`; return; }
+        const gObj = rates.glass.find(g => g.name === tc.glass) || rates.glass[0];
+        const res = CostingEngine.calculateItem(tpl, tpl.lines, tc.W, tc.H, { glass_id: gObj.id, mesh: tc.mesh }, cs, rates);
+        const pOk = Math.abs(res.priceExTax - tc.expPrice) <= 2;
+        const rOk = res.ratePerSqft === tc.expRate;
+        rows += `<tr>
+          <td><b>${tc.name}</b></td>
+          <td>${tc.W}×${tc.H} ft</td>
+          <td>₹${tc.expPrice.toLocaleString('en-IN')}</td>
+          <td style="color:${pOk ? 'var(--ok)' : 'var(--bad)'};font-weight:600">₹${res.priceExTax.toLocaleString('en-IN')}</td>
+          <td>₹${tc.expRate} / sqft</td>
+          <td style="color:${rOk ? 'var(--ok)' : 'var(--bad)'};font-weight:600">₹${res.ratePerSqft} / sqft</td>
+          <td><span class="bd ${pOk && rOk ? 'approved' : 'rejected'}">${pOk && rOk ? 'PASS' : 'FAIL'}</span></td>
+        </tr>`;
+      });
+      el.style.display = 'block';
+      el.innerHTML = `<div class="card" style="padding:12px;background:var(--bg);margin-top:10px">
+        <div style="font-weight:600;margin-bottom:6px">Section 9 Benchmark Results (Settings: Al ₹${cs.aluminium_rate_per_kg}/kg, Wastage ${cs.wastage_pct}%, Margin ${cs.margin_pct}%)</div>
+        <table class="tbl sm">
+          <thead><tr><th>Test Case</th><th>Size</th><th>Expected Price</th><th>Calculated Price</th><th>Expected Rate</th><th>Calculated Rate</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
     };
     ACT.setPresetTheme = b => {
       const acc = b.dataset.acc, hdr = b.dataset.hdr, doc = b.dataset.doc;
@@ -6079,7 +6636,7 @@
         if (getMasterSess()) {
           try {
             let d = await loadDbCloud();
-            if (d) { db = d; db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {}; }
+            if (d) { db = d; db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles', 'materials', 'productTemplates'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {}; }
             else db = seedData();
           } catch (ex) { db = seedData(); }
           me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
@@ -6091,7 +6648,7 @@
         try {
           const init = await fetch('/api/init').then(r => r.json());
           // Build a minimal db skeleton for the login screen
-          db = { settings: { company: init.company || '', accentColor: init.accentColor || '', headerColor: init.headerColor || '', bank: {} }, customers: [], products: [], items: [], quotes: [], users: init.hasUsers ? [{ id: '__placeholder__' }] : [], companies: [], profiles: [], seq: {} };
+          db = { settings: { company: init.company || '', accentColor: init.accentColor || '', headerColor: init.headerColor || '', bank: {} }, customers: [], products: [], items: [], quotes: [], users: init.hasUsers ? [{ id: '__placeholder__' }] : [], companies: [], profiles: [], seq: {}, materials: [], productTemplates: [], costingSettings: CostingEngine.getDefaultCostingSettings() };
         } catch (e) {
           // Server not reachable - try local storage
           console.warn('[QuoteDesk] Server not reachable, checking local cache:', e);
@@ -6099,7 +6656,7 @@
           if (localDb) {
             db = localDb;
             db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};
-            ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {};
+            ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles', 'materials', 'productTemplates'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {};
           } else {
             db = null;
           }
@@ -6114,7 +6671,7 @@
               if (fullDb) {
                 db = fullDb;
                 db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};
-                ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {};
+                ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles', 'materials', 'productTemplates'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {};
               }
             } catch (ex) { console.warn('[QuoteDesk] Could not load full DB:', ex); }
             if (m.userId === 'master') {
@@ -6135,7 +6692,7 @@
         db = loadDbLocal();
         if (db) {
           db.settings = db.settings || {}; db.settings.bank = db.settings.bank || {};
-          ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {};
+          ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles', 'materials', 'productTemplates'].forEach(k => db[k] = db[k] || []); db.seq = db.seq || {};
           const sid = getSess();
           if (sid) me = db.users.find(u => u.id === sid && u.active) || null;
         }

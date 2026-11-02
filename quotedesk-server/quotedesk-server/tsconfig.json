@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "moduleResolution": "node16",
+    "module": "node16",
+    "esModuleInterop": true
+  },
+  "include": [
+    "server.js",
+    "pricing-engine.js",
+    "tests/**/*.js"
+  ]
+}
