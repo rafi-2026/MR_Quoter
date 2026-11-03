@@ -1,6 +1,8 @@
 // Pricing & Validation Engine for MR_Quoter (Interior & Windows Quotations)
 'use strict';
 
+const costingEngine = require('./costing-engine');
+
 const UNIT_FT = { mm: 1 / 304.8, ft: 1, in: 1 / 12, m: 3.28084 };
 
 const num = v => {
@@ -12,15 +14,74 @@ const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function lineCalc(l, q = {}) {
   if (!l || l.type === 'section') return { amt: 0, gross: 0, disc: 0, cost: 0, totalArea: 0 };
-  const qty = num(l.qty);
-  const dimUnit = q.dimUnit || l.dimUnit || 'mm';
+  const qty = num(l.qty) || 0;
+  const dimUnit = q.dimUnit || l.dimUnit || 'ft';
 
   if (l.type === 'size') {
-    const k = UNIT_FT[dimUnit] || UNIT_FT.mm;
-    const w = num(l.w);
-    const h = num(l.h);
-    // Area in square feet
-    const area = r2(w * k * h * k);
+    const k = UNIT_FT[dimUnit] || 1;
+    const wRaw = num(l.w);
+    const hRaw = num(l.h);
+    const wFt = dimUnit === 'ft' ? wRaw : r2(wRaw * k);
+    const hFt = dimUnit === 'ft' ? hRaw : r2(hRaw * k);
+
+    // Auto-costing template engine integration (Phase 2)
+    if (l.template_id || l.templateKey) {
+      const allTemplates = q._templates || (costingEngine && costingEngine.getSeedTemplates ? costingEngine.getSeedTemplates() : []);
+      const template = allTemplates.find(t => t.id === l.template_id || t.template_key === l.template_id || t.id === l.templateKey) || allTemplates[0];
+      const settings = q._costingSettings || (costingEngine && costingEngine.getDefaultCostingSettings ? costingEngine.getDefaultCostingSettings() : {});
+      const rates = q._rates || {
+        glass: costingEngine.getDefaultGlassTypes(),
+        mesh: costingEngine.getDefaultMeshTypes(),
+        handle: costingEngine.getDefaultHandleTypes()
+      };
+
+      const glassId = l.glass_id || l.glassName || (template && template.default_glass) || '6mm Toughened';
+      const meshOpt = l.mesh !== undefined ? l.mesh : (template && template.allows_mesh !== false ? 'SS Mesh' : 'NA');
+      const handleOpt = l.handle || (template && template.default_handle) || 'Standard Handle';
+
+      let calc = null;
+      if (wFt > 0 && hFt > 0 && template) {
+        calc = costingEngine.calculateItem(template, template.lines || [], wFt, hFt, {
+          glass_id: glassId,
+          mesh: meshOpt,
+          handle: handleOpt,
+          operable_h_ft: l.operable_h_ft || l.operable_h
+        }, settings, rates, allTemplates);
+      }
+
+      const calcRate = calc ? calc.ratePerSqft : num(l.rate);
+      const isOverride = !!(l.rate_override !== undefined && l.rate_override !== null && String(l.rate_override).trim() !== '' && num(l.rate_override) > 0);
+      const effectiveRate = isOverride ? num(l.rate_override) : calcRate;
+
+      const area = r2(wFt * hFt);
+      const billed = Math.max(area, num(l.minArea));
+      const totalArea = r2(billed * qty);
+      const unit = r2(billed * effectiveRate);
+      const gross = r2(unit * qty);
+      const disc = r2(gross * num(l.disc) / 100);
+      const amt = r2(gross - disc);
+      const singleCost = calc ? calc.totalCost : (billed * num(l.cost));
+      const cost = r2(singleCost * qty);
+
+      return {
+        area,
+        billed,
+        rate: effectiveRate,
+        calcRate,
+        isOverride,
+        rate_override_reason: l.rate_override_reason || '',
+        unit,
+        gross,
+        disc,
+        amt,
+        cost,
+        totalArea,
+        cost_breakdown: calc
+      };
+    }
+
+    // Standard size calculation (fallback/legacy)
+    const area = r2(wRaw * k * hRaw * k);
     const minArea = num(l.minArea);
     const billed = Math.max(area, minArea);
     const rate = num(l.rate) + num(l.glassAdd) + num(l.finishAdd);
@@ -69,8 +130,10 @@ function calcTotals(q, settings = {}) {
   lineDisc = r2(lineDisc);
   cost = r2(cost);
 
+  const totalQty = lines.reduce((acc, l) => acc + (l.type !== 'section' ? num(l.qty) : 0), 0);
   const dAmt = r2(q.discType === 'pct' ? sub * num(q.discVal) / 100 : Math.min(num(q.discVal), sub));
-  const extras = r2((q.extras || []).reduce((a, e) => a + num(e.amount), 0));
+  const transport = num(q.transport_charges || q.transport || 0);
+  const extras = r2((q.extras || []).reduce((a, e) => a + num(e.amount), 0) + transport);
   const taxable = Math.max(r2(sub - dAmt + extras), 0);
   const gstRate = q.gst !== false ? num(q.gstRate || settings.gstRate || 18) : 0;
 
@@ -98,6 +161,7 @@ function calcTotals(q, settings = {}) {
     pct: r2((costedRev - cost) / costedRev * 100),
     rev: r2(costedRev)
   } : null;
+  const avgRate = sizeArea > 0 ? Math.round(sub / sizeArea) : 0;
 
   return {
     gross,
@@ -105,6 +169,7 @@ function calcTotals(q, settings = {}) {
     sub,
     dAmt,
     extras,
+    transport,
     taxable,
     rate: gstRate,
     inter,
@@ -117,6 +182,8 @@ function calcTotals(q, settings = {}) {
     grand,
     effDisc,
     margin,
+    totalQty,
+    avgRate,
     sizeArea: r2(sizeArea)
   };
 }

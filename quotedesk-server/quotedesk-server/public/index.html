@@ -2765,27 +2765,119 @@
         if (frac <= 0.7) return whole + 0.5;
         return whole + 1;
       },
+      normalizeExpr(expr) {
+        if (!expr || String(expr).trim() === '') return '0';
+        let s = String(expr).trim();
+        s = s.replace(/×/g, '*').replace(/÷/g, '/');
+        s = s.replace(/(\d+)\s*([A-Za-z])/g, '$1 * $2');
+        return s;
+      },
       evalExpr(expr, vars) {
         if (!expr || String(expr).trim() === '') return 0;
-        let s = String(expr).trim();
-        const names = Object.keys(vars).sort((a, b) => b.length - a.length);
+        let s = CostingEngine.normalizeExpr(expr);
+        const unifiedVars = {};
+        if (vars) {
+          Object.keys(vars).forEach(k => { unifiedVars[k.toUpperCase()] = Number(vars[k]) || 0; });
+        }
+        const names = Object.keys(unifiedVars).sort((a, b) => b.length - a.length);
         let safe = s;
         for (let i = 0; i < names.length; i++) {
           const n = names[i];
           const escaped = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const re = new RegExp('\\b' + escaped + '\\b', 'g');
-          safe = safe.replace(re, '(' + Number(vars[n]) + ')');
+          const re = new RegExp('\\b' + escaped + '\\b', 'gi');
+          safe = safe.replace(re, '(' + Number(unifiedVars[n]) + ')');
         }
         if (!/^[\d\s.\+\-\*\/\(\)]+$/.test(safe)) {
           throw new Error('Unsafe expression: ' + expr);
         }
         return (new Function('return (' + safe + ')'))();
       },
-      calculateItem(template, templateLines, widthFt, heightFt, options, settings, rates) {
+      validateFormula(expr, sampleVars) {
+        try {
+          const v = sampleVars || { W: 3.048, H: 1.8288, A: 5.574, L1: 3.048, L2: 3.048, L3: 3.6576, L4: 6.096, L5: 7.3152, L6: 3.6576, L7: 9.144 };
+          const res = CostingEngine.evalExpr(expr, v);
+          return { valid: true, result: res, error: null };
+        } catch(err) {
+          return { valid: false, result: null, error: err.message };
+        }
+      },
+      calculateItem(template, templateLines, widthFt, heightFt, options, settings, rates, allTemplates) {
+        options = options || {};
+        settings = settings || {};
+        rates = rates || {};
+        allTemplates = allTemplates || options.allTemplates || rates.allTemplates || (db && db.productTemplates) || CostingEngine.getSeedTemplates();
+
         const FT_TO_M = Number(settings.ft_to_m) || 0.3048;
+        const sqftPerSqm = Number(settings.sqft_per_sqm) || 10.764;
+        const wastagePct = Number(settings.wastage_pct) || 5;
+        const marginPct = Number(settings.margin_pct) || 35;
+        const gstPct = Number(settings.gst_pct) || 18;
+
         const W = widthFt * FT_TO_M;
         const H = heightFt * FT_TO_M;
         const A = W * H;
+
+        // COMBINATION PRODUCT (Section 1.4)
+        // Tall opening split into Fixed part + Operable part
+        // Rate/Sqft for whole opening = (Fixed price + Operable price) ÷ total opening area
+        const isCombo = template && (template.category === 'combo' || template.is_combo) && (template.fixed_template_id || template.operable_template_id);
+        if (isCombo) {
+          const fixedTpl = allTemplates.find(t => t.id === template.fixed_template_id || t.template_key === template.fixed_template_id) || allTemplates.find(t => t.id === 'tpl_fixed_window');
+          const operableTpl = allTemplates.find(t => t.id === template.operable_template_id || t.template_key === template.operable_template_id) || allTemplates.find(t => t.id === 'tpl_sliding_door');
+
+          const defaultOpH = Number(template.default_operable_h || template.default_operable_height_ft || 7);
+          let operableHFt = Number(options.operable_h_ft || options.operable_h || defaultOpH);
+          if (operableHFt >= heightFt || operableHFt <= 0) {
+            operableHFt = Math.round(heightFt * 0.4 * 10) / 10;
+          }
+          const fixedHFt = Math.max(0.1, heightFt - operableHFt);
+
+          const fixedRes = fixedTpl
+            ? CostingEngine.calculateItem(fixedTpl, fixedTpl.lines || [], widthFt, fixedHFt, Object.assign({}, options, { mesh: 'NA' }), settings, rates, allTemplates)
+            : { priceExTax: 0, subtotal: 0, wastage: 0, totalCost: 0, margin: 0, lines: [] };
+
+          const operableRes = operableTpl
+            ? CostingEngine.calculateItem(operableTpl, operableTpl.lines || [], widthFt, operableHFt, options, settings, rates, allTemplates)
+            : { priceExTax: 0, subtotal: 0, wastage: 0, totalCost: 0, margin: 0, lines: [] };
+
+          const totalPriceExTax = fixedRes.priceExTax + operableRes.priceExTax;
+          const totalAreaSqft = widthFt * heightFt;
+          const ratePerSqft = totalAreaSqft > 0 ? Math.round(totalPriceExTax / totalAreaSqft) : 0;
+          const ratePerSqm = A > 0 ? Math.round(totalPriceExTax / A) : 0;
+          const priceInclGst = Math.round(totalPriceExTax * (1 + gstPct / 100));
+
+          const comboBomLines = [];
+          (fixedRes.lines || []).forEach(l => {
+            comboBomLines.push(Object.assign({}, l, {
+              sl_no: 'F-' + l.sl_no,
+              description: '[Fixed ' + fixedHFt.toFixed(1) + 'ft] ' + l.description
+            }));
+          });
+          (operableRes.lines || []).forEach(l => {
+            comboBomLines.push(Object.assign({}, l, {
+              sl_no: 'O-' + l.sl_no,
+              description: '[Operable ' + operableHFt.toFixed(1) + 'ft] ' + l.description
+            }));
+          });
+
+          return {
+            widthFt, heightFt, options,
+            isCombo: true,
+            fixedHFt, operableHFt,
+            fixedPrice: fixedRes.priceExTax, operablePrice: operableRes.priceExTax,
+            W, H, A,
+            lines: comboBomLines,
+            subtotal: fixedRes.subtotal + operableRes.subtotal,
+            wastage: fixedRes.wastage + operableRes.wastage,
+            totalCost: fixedRes.totalCost + operableRes.totalCost,
+            margin: fixedRes.margin + operableRes.margin,
+            priceExTax: totalPriceExTax,
+            ratePerSqm,
+            ratePerSqft,
+            priceInclGst,
+            wastagePct, marginPct, gstPct
+          };
+        }
 
         const alRate = Number(settings.aluminium_rate_per_kg) || 500;
         const labourRate = Number(settings.labour_rate_per_sqm) || 500;
@@ -2848,11 +2940,14 @@
             const wt = Number(line.weight_kg_per_m) || 0;
             const rate = (unitPrice > 0) ? unitPrice : alRate;
             amount = totalMetres * wt * rate;
+          } else if (line.kind === 'gasket' || line.kind === 'brush_seal') {
+            amount = totalMetres * unitPrice;
+          } else if (line.kind === 'hardware') {
+            amount = nos * unitPrice;
           } else if (line.kind === 'labour' || line.kind === 'glass' || line.kind === 'mesh') {
-            amount = len * nos * unitPrice;
+            amount = len * unitPrice;
           } else {
-            const lEff = (len > 0) ? len : 1;
-            amount = lEff * nos * unitPrice;
+            amount = nos * unitPrice;
           }
 
           line.evaluatedLen = len;
@@ -2902,30 +2997,239 @@
       },
       getDefaultCostingSettings() {
         return { aluminium_rate_per_kg: 500, wastage_pct: 5, margin_pct: 35, gst_pct: 18, labour_rate_per_sqm: 500, sqft_per_sqm: 10.764, ft_to_m: 0.3048, last_changed_by: 'System', last_changed_at: '' };
+      },
+      getDefaultGlassTypes() {
+        return [
+          { id: 'g1', name: '5mm Clear', rate_per_sqm: 600 },
+          { id: 'g2', name: '4mm Frosted', rate_per_sqm: 600 },
+          { id: 'g3', name: '6mm Toughened', rate_per_sqm: 850 },
+          { id: 'g4', name: '8mm Toughened Clear', rate_per_sqm: 1200 },
+          { id: 'g5', name: '6mm Toughened Tinted Brown', rate_per_sqm: 2000 }
+        ];
+      },
+      getDefaultMeshTypes() {
+        return [{ id: 'm1', name: 'SS Mesh', rate_per_sqm: 290 }];
+      },
+      getDefaultHandleTypes() {
+        return [
+          { id: 'h1', name: 'Standard Handle', price: 0 },
+          { id: 'h2', name: 'Pop-up Handle', price: 110 },
+          { id: 'h3', name: 'Flush Handle', price: 85 },
+          { id: 'h4', name: 'Touch Lock', price: 45 }
+        ];
+      },
+      getSeedTemplates() {
+        return [
+          {
+            id: 'tpl_sliding_window', name: '2.5T - 2P Sliding Window', series: 'Domal 27', category: 'window', allows_mesh: true, default_handle: 'Touch Lock', default_glass: '6mm Toughened',
+            lines: [
+              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045' },
+              { sl_no: 2, description: 'Outer Frame Bottom', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045' },
+              { sl_no: 3, description: 'Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.28, profile_no: '5045' },
+              { sl_no: 4, description: 'Sliding Sash Both Side', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.78, profile_no: '5047' },
+              { sl_no: 5, description: 'Sliding Sash One Side', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 0.78, profile_no: '5047' },
+              { sl_no: 6, description: 'Interlock', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.35, profile_no: '5042' },
+              { sl_no: 7, description: 'Mesh Sash', kind: 'profile', length_expr: '3*W', nos_expr: '1', weight_kg_per_m: 0.90, profile_no: '5043' },
+              { sl_no: 8, description: 'Glazing Gasket for Shutter', kind: 'gasket', length_expr: 'L4+L5+L7', nos_expr: '1', unit_price: 12 },
+              { sl_no: 9, description: 'Brush Seal Shutter Frame', kind: 'brush_seal', length_expr: '8*W+8*H', nos_expr: '1', unit_price: 4 },
+              { sl_no: 10, description: 'Rollers', kind: 'hardware', length_expr: '0', nos_expr: '6', unit_price: 30 },
+              { sl_no: 11, description: 'Touch Lock', kind: 'hardware', length_expr: '0', nos_expr: '2', unit_price: 45 },
+              { sl_no: 12, description: 'Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 500 },
+              { sl_no: 13, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 },
+              { sl_no: 14, description: 'SS Mesh', kind: 'mesh', length_expr: 'A/2', nos_expr: '1', unit_price: 290, condition: "mesh != 'NA'" }
+            ]
+          },
+          {
+            id: 'tpl_sliding_door', name: '2.5T - 2P Sliding Door', series: 'Domal 27', category: 'door', allows_mesh: true, default_handle: 'Pop-up Handle', default_glass: '8mm Toughened Clear',
+            lines: [
+              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045' },
+              { sl_no: 2, description: 'Outer Frame Bottom', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045' },
+              { sl_no: 3, description: 'Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.28, profile_no: '5045' },
+              { sl_no: 4, description: 'Sliding Sash Both Side', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.78, profile_no: '5047' },
+              { sl_no: 5, description: 'Sliding Sash One Side', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 0.78, profile_no: '5047' },
+              { sl_no: 6, description: 'Interlock', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.35, profile_no: '5042' },
+              { sl_no: 7, description: 'Mesh Sash', kind: 'profile', length_expr: '3*W', nos_expr: '1', weight_kg_per_m: 0.90, profile_no: '5043' },
+              { sl_no: 8, description: 'Glazing Gasket for Shutter', kind: 'gasket', length_expr: 'L4+L5+L7', nos_expr: '1', unit_price: 12 },
+              { sl_no: 9, description: 'Brush Seal Shutter Frame', kind: 'brush_seal', length_expr: '8*W+8*H', nos_expr: '1', unit_price: 4 },
+              { sl_no: 10, description: 'Rollers', kind: 'hardware', length_expr: '0', nos_expr: '4', unit_price: 80 },
+              { sl_no: 11, description: 'Pop-up Handle', kind: 'hardware', length_expr: '0', nos_expr: '2', unit_price: 110 },
+              { sl_no: 12, description: 'Corner Cleat', kind: 'hardware', length_expr: '0', nos_expr: '4', unit_price: 31 },
+              { sl_no: 13, description: 'Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 500 },
+              { sl_no: 14, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 },
+              { sl_no: 15, description: 'SS Mesh', kind: 'mesh', length_expr: 'A/2', nos_expr: '1', unit_price: 290, condition: "mesh != 'NA'" }
+            ]
+          },
+          {
+            id: 'tpl_fixed_window', name: 'Fixed Window', series: 'Domal 27', category: 'window', allows_mesh: false, default_handle: 'Standard Handle', default_glass: '6mm Toughened',
+            lines: [
+              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008' },
+              { sl_no: 2, description: 'Outer Frame Vertical', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008' },
+              { sl_no: 3, description: 'Mullion', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.68, profile_no: '5006' },
+              { sl_no: 4, description: 'Glazing Bead Outer Frame', kind: 'profile', length_expr: 'L1+L2', nos_expr: '1', weight_kg_per_m: 0.26, profile_no: '5013' },
+              { sl_no: 5, description: 'Glazing Bead Mullion', kind: 'profile', length_expr: 'L3', nos_expr: '2', weight_kg_per_m: 0.26, profile_no: '5013' },
+              { sl_no: 6, description: 'Gasket for Beads', kind: 'gasket', length_expr: 'L4+L5', nos_expr: '1', unit_price: 10 },
+              { sl_no: 7, description: 'Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 600 },
+              { sl_no: 8, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+            ]
+          },
+          {
+            id: 'tpl_ventilator', name: 'Ventilator with Adjustable Louver', series: 'Domal 27', category: 'ventilator', allows_mesh: false, default_handle: 'Standard Handle', default_glass: '4mm Frosted',
+            lines: [
+              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008' },
+              { sl_no: 2, description: 'Outer Frame Vertical', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008' },
+              { sl_no: 3, description: 'Mullion Vertical', kind: 'profile', length_expr: 'H+0.15', nos_expr: '1', weight_kg_per_m: 0.65, profile_no: '5006' },
+              { sl_no: 4, description: 'Glazing Bead Outer Frame', kind: 'profile', length_expr: 'L1+L2', nos_expr: '1', weight_kg_per_m: 0.26, profile_no: '5013' },
+              { sl_no: 5, description: 'Glazing Bead Mullion', kind: 'profile', length_expr: 'L3', nos_expr: '2', weight_kg_per_m: 0.26, profile_no: '5013' },
+              { sl_no: 6, description: 'Gasket for Beads', kind: 'gasket', length_expr: 'L4+L5', nos_expr: '2', unit_price: 10 },
+              { sl_no: 7, description: 'Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 500 },
+              { sl_no: 8, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+            ]
+          },
+          {
+            id: 'tpl_combo_fixed_sliding_door',
+            name: 'Combo Fixed + 2.5T Sliding Door (F+SD)',
+            series: 'Domal 27',
+            category: 'combo',
+            fixed_template_id: 'tpl_fixed_window',
+            operable_template_id: 'tpl_sliding_door',
+            default_operable_h: 7,
+            allows_mesh: true,
+            default_glass: '8mm Toughened Clear',
+            default_handle: 'Pop-up Handle',
+            lines: []
+          }
+        ];
       }
     };
     window.CostingEngine = CostingEngine;
+
+    const rateCache = {};
     function lineCalc(l, q) {
-      if (l.type === 'section') return { amt: 0, gross: 0, disc: 0, cost: 0 };
-      const qty = num(l.qty);
+      if (!l || l.type === 'section') return { amt: 0, gross: 0, disc: 0, cost: 0, totalArea: 0 };
+      const qty = num(l.qty) || 0;
+      const dimUnit = (q && q.dimUnit) || l.dimUnit || 'ft';
+
       if (l.type === 'size') {
-        const k = UNIT_FT[q.dimUnit || 'mm'];
-        const area = num(l.w) * k * num(l.h) * k, billed = Math.max(area, num(l.minArea));
+        const k = UNIT_FT[dimUnit] || 1;
+        const wRaw = num(l.w);
+        const hRaw = num(l.h);
+        const wFt = dimUnit === 'ft' ? wRaw : r2(wRaw * k);
+        const hFt = dimUnit === 'ft' ? hRaw : r2(hRaw * k);
+
+        // Auto-costing template engine integration (Phase 2 & 3)
+        if (l.template_id || l.templateKey) {
+          const allTemplates = (db && db.productTemplates && db.productTemplates.length) ? db.productTemplates : CostingEngine.getSeedTemplates();
+          const template = allTemplates.find(t => t.id === l.template_id || t.template_key === l.template_id || t.id === l.templateKey) || allTemplates[0];
+          const settings = (db && db.costingSettings) || CostingEngine.getDefaultCostingSettings();
+          const allMats = (db && db.materials) || [];
+          const glassMats = allMats.filter(m => m.category === 'glass');
+          const meshMats = allMats.filter(m => m.category === 'mesh');
+          const hwMats = allMats.filter(m => m.category === 'hardware');
+
+          const rates = {
+            glass: glassMats.length ? glassMats.map(g => ({ id: g.id, name: g.name, rate_per_sqm: g.rate })) : CostingEngine.getDefaultGlassTypes(),
+            mesh: meshMats.length ? meshMats.map(m => ({ id: m.id, name: m.name, rate_per_sqm: m.rate })) : CostingEngine.getDefaultMeshTypes(),
+            handle: hwMats.length ? hwMats.map(h => ({ id: h.id, name: h.name, price: h.rate })) : CostingEngine.getDefaultHandleTypes()
+          };
+
+          const glassId = l.glass_id || l.glassName || (template && template.default_glass) || '6mm Toughened';
+          const meshOpt = l.mesh !== undefined ? l.mesh : (template && template.allows_mesh !== false ? 'SS Mesh' : 'NA');
+          const handleOpt = l.handle || (template && template.default_handle) || 'Standard Handle';
+
+          let calc = null;
+          if (wFt > 0 && hFt > 0 && template) {
+            const opH = l.operable_h_ft || l.operable_h || template.default_operable_h || '';
+            const cacheKey = [template.id, wFt, hFt, opH, glassId, meshOpt, handleOpt, settings.aluminium_rate_per_kg, settings.margin_pct].join('|');
+            if (rateCache[cacheKey]) {
+              calc = rateCache[cacheKey];
+            } else {
+              calc = CostingEngine.calculateItem(template, template.lines || [], wFt, hFt, {
+                glass_id: glassId,
+                mesh: meshOpt,
+                handle: handleOpt,
+                operable_h_ft: l.operable_h_ft || l.operable_h
+              }, settings, rates, allTemplates);
+              rateCache[cacheKey] = calc;
+            }
+          }
+
+          const calcRate = calc ? calc.ratePerSqft : num(l.rate);
+          const isOverride = !!(l.rate_override !== undefined && l.rate_override !== null && String(l.rate_override).trim() !== '' && num(l.rate_override) > 0);
+          const effectiveRate = isOverride ? num(l.rate_override) : calcRate;
+
+          const area = r2(wFt * hFt);
+          const billed = Math.max(area, num(l.minArea));
+          const totalArea = r2(billed * qty);
+          const unit = r2(billed * effectiveRate);
+          const gross = r2(unit * qty);
+          const disc = r2(gross * num(l.disc) / 100);
+          const amt = r2(gross - disc);
+          const singleCost = calc ? calc.totalCost : (billed * num(l.cost));
+          const cost = r2(singleCost * qty);
+
+          return {
+            area,
+            billed,
+            rate: effectiveRate,
+            calcRate,
+            isOverride,
+            rate_override_reason: l.rate_override_reason || '',
+            unit,
+            gross,
+            disc,
+            amt,
+            cost,
+            totalArea,
+            cost_breakdown: calc
+          };
+        }
+
+        // Standard legacy size calculation
+        const area = r2(wRaw * k * hRaw * k);
+        const minArea = num(l.minArea);
+        const billed = Math.max(area, minArea);
         const rate = num(l.rate) + num(l.glassAdd) + num(l.finishAdd);
-        const unit = billed * rate + num(l.hw), gross = unit * qty, disc = gross * num(l.disc) / 100;
-        return { area, billed, rate, unit, gross, disc, amt: gross - disc, cost: billed * num(l.cost) * qty, totalArea: billed * qty };
+        const hw = num(l.hw);
+        const unit = r2(billed * rate + hw);
+        const gross = r2(unit * qty);
+        const disc = r2(gross * num(l.disc) / 100);
+        const amt = r2(gross - disc);
+        const cost = r2(billed * num(l.cost) * qty);
+        const totalArea = r2(billed * qty);
+        return { area, billed, rate, unit, gross, disc, amt, cost, totalArea };
       }
-      const gross = qty * num(l.rate), disc = gross * num(l.disc) / 100;
-      return { gross, disc, amt: gross - disc, cost: qty * num(l.cost) };
+
+      // Standard item or lump sum
+      const rate = num(l.rate);
+      const gross = r2(qty * rate);
+      const disc = r2(gross * num(l.disc) / 100);
+      const amt = r2(gross - disc);
+      const cost = r2(qty * num(l.cost));
+      return { area: 0, billed: qty, rate, unit: rate, gross, disc, amt, cost, totalArea: 0 };
     }
+
     function calcTotals(q) {
       const s = db.settings; let sub = 0, gross = 0, lineDisc = 0, cost = 0, costedRev = 0, sizeArea = 0;
-      q.lines.forEach(l => { const c = lineCalc(l, q); sub += c.amt; gross += c.gross; lineDisc += c.disc; if (c.cost > 0) { cost += c.cost; costedRev += c.amt } if (c.totalArea) sizeArea += c.totalArea });
+      const lines = (q && q.lines) || [];
+      lines.forEach(l => {
+        const c = lineCalc(l, q);
+        sub += c.amt;
+        gross += c.gross;
+        lineDisc += c.disc;
+        if (c.cost > 0) { cost += c.cost; costedRev += c.amt }
+        if (c.totalArea) sizeArea += c.totalArea;
+      });
       sub = r2(sub);
+      gross = r2(gross);
+      lineDisc = r2(lineDisc);
+      cost = r2(cost);
+
+      const totalQty = lines.reduce((acc, l) => acc + (l.type !== 'section' ? num(l.qty) : 0), 0);
       const dAmt = r2(q.discType === 'pct' ? sub * num(q.discVal) / 100 : Math.min(num(q.discVal), sub));
-      const extras = r2((q.extras || []).reduce((a, e) => a + num(e.amount), 0));
+      const transport = num(q.transport_charges || q.transport || 0);
+      const extras = r2(((q && q.extras) || []).reduce((a, e) => a + num(e.amount), 0) + transport);
       const taxable = Math.max(r2(sub - dAmt + extras), 0);
-      const rate = q.gst ? num(q.gstRate) : 0;
+      const rate = q.gst ? num(q.gstRate !== undefined ? q.gstRate : (s.gstRate || 18)) : 0;
       let inter = false;
       if (q.gstType === 'igst') {
         inter = true;
@@ -2938,7 +3242,8 @@
       const gstAmt = r2(half * 2 + igst), raw = r2(taxable + gstAmt), grand = Math.round(raw);
       const effDisc = gross > 0 ? ((lineDisc + dAmt) / gross * 100) : 0;
       const margin = costedRev > 0 ? { amt: r2(costedRev - cost), pct: (costedRev - cost) / costedRev * 100, rev: costedRev } : null;
-      return { sub, dAmt, extras, taxable, rate, inter, cg: half, sg: half, ig: igst, gstAmt, round: r2(grand - raw), grand, effDisc, margin, sizeArea };
+      const avgRate = sizeArea > 0 ? Math.round(sub / sizeArea) : 0;
+      return { gross, lineDisc, sub, dAmt, extras, transport, taxable, rate, inter, cg: half, sg: half, ig: igst, gstAmt, round: r2(grand - raw), grand, effDisc, margin, sizeArea: r2(sizeArea), totalQty, avgRate };
     }
     function approvalReasons(q) {
       const s = db.settings, t = calcTotals(q);
@@ -4059,119 +4364,277 @@
             handle: mats.filter(m => m.category === 'hardware')
           };
           const defGlassId = tpl.default_glass ? (glassMats.find(g => g.name === tpl.default_glass)?.id || glassMats[0]?.id) : glassMats[0]?.id;
-          const previewRes = CostingEngine.calculateItem(tpl, tpl.lines, 10, 6, { glass_id: defGlassId, mesh: tpl.allows_mesh ? 'SS Mesh' : 'NA' }, cs, rates);
 
-          b.innerHTML = `<div class="card" style="margin-bottom:16px">
-            <div class="card-h">
-              <div style="display:flex;align-items:center;gap:10px">
-                <button class="btn sm" data-act="tplBack">← Back to Templates</button>
-                <div>
-                  <h3 style="margin:0">${esc(tpl.name)}</h3>
-                  <div class="mute sm">Series: <b>${esc(tpl.series || 'Domal 27')}</b> &bull; Category: ${esc(tpl.category || 'window')} &bull; Mesh: ${tpl.allows_mesh ? 'Allowed' : 'Not applicable'}</div>
+          if (tpl.category === 'combo') {
+            // Combo Template View (Section 1.4)
+            const fixedTpl = tpls.find(t => t.id === tpl.fixed_template_id || t.template_key === tpl.fixed_template_id) || tpls.find(t => t.id === 'tpl_fixed_window');
+            const operableTpl = tpls.find(t => t.id === tpl.operable_template_id || t.template_key === tpl.operable_template_id) || tpls.find(t => t.id === 'tpl_sliding_door');
+            const defOpH = Number(tpl.default_operable_h || 7);
+            const previewRes = CostingEngine.calculateItem(tpl, [], 4, 23, { glass_id: defGlassId, mesh: tpl.allows_mesh ? 'SS Mesh' : 'NA', operable_h_ft: defOpH }, cs, rates, tpls);
+
+            b.innerHTML = `<div class="card" style="margin-bottom:16px">
+              <div class="card-h">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <button class="btn sm" data-act="tplBack">← Back to Templates</button>
+                  <div>
+                    <h3 style="margin:0">${esc(tpl.name)} <span class="bd approved">Combo Product</span></h3>
+                    <div class="mute sm">Series: <b>${esc(tpl.series || 'Domal 27')}</b> &bull; Fixed: <b>${esc(fixedTpl ? fixedTpl.name : 'Fixed Window')}</b> &bull; Operable: <b>${esc(operableTpl ? operableTpl.name : 'Sliding Door')}</b></div>
+                  </div>
+                </div>
+                <div class="acts">
+                  ${ed ? `<button class="btn sm" data-act="tplEditMeta" data-id="${tpl.id}">✏️ Edit Combo Settings</button> <button class="btn sm" data-act="tplDuplicate" data-id="${tpl.id}">Duplicate</button> <button class="btn sm bad" data-act="tplDelete" data-id="${tpl.id}">Delete</button>` : ''}
                 </div>
               </div>
-              <div class="acts">
-                ${ed ? `<button class="btn sm" data-act="tplDuplicate" data-id="${tpl.id}">Duplicate</button>` : ''}
-              </div>
-            </div>
 
-            <!-- Live Preview Top Bar -->
-            <div style="background:var(--bg);padding:14px;border-radius:6px;border:1px solid var(--line);margin-bottom:16px">
-              <div style="font-weight:600;margin-bottom:10px;color:var(--pri)">⚡ Live Costing Preview &amp; Auto Recalculator</div>
-              <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
-                <label class="f" style="margin:0"><span>Width (ft)</span><input id="prev_w" type="number" step="any" value="10" style="width:90px" oninput="ACT.tplLiveRecalc()"></label>
-                <label class="f" style="margin:0"><span>Height (ft)</span><input id="prev_h" type="number" step="any" value="6" style="width:90px" oninput="ACT.tplLiveRecalc()"></label>
-                <label class="f" style="margin:0"><span>Glass Type</span>
-                  <select id="prev_glass" onchange="ACT.tplLiveRecalc()">
-                    ${glassMats.map(g => `<option value="${g.id}" ${g.id === defGlassId ? 'selected' : ''}>${esc(g.name)} (₹${g.rate}/sqm)</option>`).join('')}
-                  </select>
-                </label>
-                <label class="f" style="margin:0"><span>Mesh Provision</span>
-                  <select id="prev_mesh" onchange="ACT.tplLiveRecalc()">
-                    ${tpl.allows_mesh ? '<option value="SS Mesh" selected>SS Mesh (₹290/sqm)</option>' : ''}
-                    <option value="NA" ${!tpl.allows_mesh ? 'selected' : ''}>NA (No Mesh)</option>
-                  </select>
-                </label>
+              <!-- Combo Live Preview Top Bar -->
+              <div style="background:var(--bg);padding:14px;border-radius:6px;border:1px solid var(--line);margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                  <div style="font-weight:600;color:var(--pri)">⚡ Combo Opening Costing &amp; Blended Rate Recalculator</div>
+                  <div class="mute sm">Formula: Rate/Sqft = (Fixed Price + Operable Price) ÷ Total Area</div>
+                </div>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+                  <label class="f" style="margin:0"><span>Total Width (ft)</span><input id="prev_w" type="number" step="any" value="4" style="width:85px" oninput="ACT.tplLiveRecalc()"></label>
+                  <label class="f" style="margin:0"><span>Total Height (ft)</span><input id="prev_h" type="number" step="any" value="23" style="width:85px" oninput="ACT.tplLiveRecalc()"></label>
+                  <label class="f" style="margin:0"><span>Operable Height (ft)</span><input id="prev_oph" type="number" step="any" value="${defOpH}" style="width:85px" oninput="ACT.tplLiveRecalc()"></label>
+                  <label class="f" style="margin:0"><span>Glass Type</span>
+                    <select id="prev_glass" onchange="ACT.tplLiveRecalc()">
+                      ${glassMats.map(g => `<option value="${g.id}" ${g.id === defGlassId ? 'selected' : ''}>${esc(g.name)} (₹${g.rate}/sqm)</option>`).join('')}
+                    </select>
+                  </label>
+                  <label class="f" style="margin:0"><span>Mesh Provision</span>
+                    <select id="prev_mesh" onchange="ACT.tplLiveRecalc()">
+                      ${tpl.allows_mesh ? '<option value="SS Mesh" selected>SS Mesh (₹290/sqm)</option>' : ''}
+                      <option value="NA" ${!tpl.allows_mesh ? 'selected' : ''}>NA (No Mesh)</option>
+                    </select>
+                  </label>
+                </div>
+
+                <!-- Live Calculated Badges -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-top:14px">
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Total Opening Area</div>
+                    <div id="prev_res_area" style="font-weight:600">92.0 sqft (${previewRes.A.toFixed(2)} sqm)</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Fixed Part Price</div>
+                    <div id="prev_res_fixed" style="font-weight:600;color:var(--pri)">₹${(previewRes.fixedPrice || 0).toLocaleString('en-IN')}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Operable Part Price</div>
+                    <div id="prev_res_operable" style="font-weight:600;color:var(--pri)">₹${(previewRes.operablePrice || 0).toLocaleString('en-IN')}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Subtotal BOM</div>
+                    <div id="prev_res_subtotal" style="font-weight:600">₹${previewRes.subtotal.toFixed(2)}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Wastage (5%)</div>
+                    <div id="prev_res_wastage" style="font-weight:600">₹${previewRes.wastage.toFixed(2)}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Margin (35%)</div>
+                    <div id="prev_res_margin" style="font-weight:600">₹${previewRes.margin}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:2px solid var(--pri)">
+                    <div class="mute sm" style="color:var(--pri);font-weight:600">Total Price Ex-Tax</div>
+                    <div id="prev_res_price" style="font-size:18px;font-weight:700;color:var(--pri)">₹${previewRes.priceExTax.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:2px solid var(--pri)">
+                    <div class="mute sm" style="color:var(--pri);font-weight:600">Blended Rate / Sqft</div>
+                    <div id="prev_res_sqft" style="font-size:18px;font-weight:700;color:var(--pri)">₹${previewRes.ratePerSqft} / sqft</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Price Incl GST (18%)</div>
+                    <div id="prev_res_gst" style="font-weight:600">₹${previewRes.priceInclGst.toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
               </div>
 
-              <!-- Live Calculated Badges -->
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px">
-                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
-                  <div class="mute sm">Billing Area</div>
-                  <div id="prev_res_area" style="font-weight:600">60.0 sqft (${previewRes.A.toFixed(2)} sqm)</div>
+              <!-- Combo Sub-Templates Overview -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+                <div style="background:var(--bg);padding:12px;border-radius:6px;border:1px solid var(--line)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <b>Fixed Part Configuration:</b>
+                    ${fixedTpl ? `<button class="btn sm" data-act="tplOpen" data-id="${fixedTpl.id}">Inspect Fixed BOM →</button>` : ''}
+                  </div>
+                  <div class="sm mute">Template: <b>${esc(fixedTpl ? fixedTpl.name : 'Fixed Window')}</b> &bull; Lines: ${(fixedTpl?.lines || []).length} &bull; Height: <span id="combo_fixed_h_disp">${(23 - defOpH).toFixed(1)}</span> ft</div>
                 </div>
-                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
-                  <div class="mute sm">Subtotal BOM</div>
-                  <div id="prev_res_subtotal" style="font-weight:600">₹${previewRes.subtotal.toFixed(2)}</div>
-                </div>
-                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
-                  <div class="mute sm">Wastage (5%)</div>
-                  <div id="prev_res_wastage" style="font-weight:600">₹${previewRes.wastage.toFixed(2)}</div>
-                </div>
-                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
-                  <div class="mute sm">Total Cost</div>
-                  <div id="prev_res_totalcost" style="font-weight:600">₹${previewRes.totalCost.toFixed(2)}</div>
-                </div>
-                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
-                  <div class="mute sm">Margin (35%)</div>
-                  <div id="prev_res_margin" style="font-weight:600">₹${previewRes.margin}</div>
-                </div>
-                <div style="background:var(--card);padding:10px;border-radius:4px;border:2px solid var(--pri)">
-                  <div class="mute sm" style="color:var(--pri);font-weight:600">Price Ex-Tax</div>
-                  <div id="prev_res_price" style="font-size:18px;font-weight:700;color:var(--pri)">₹${previewRes.priceExTax.toLocaleString('en-IN')}</div>
-                </div>
-                <div style="background:var(--card);padding:10px;border-radius:4px;border:2px solid var(--pri)">
-                  <div class="mute sm" style="color:var(--pri);font-weight:600">Rate / Sq Ft</div>
-                  <div id="prev_res_sqft" style="font-size:18px;font-weight:700;color:var(--pri)">₹${previewRes.ratePerSqft} / sqft</div>
-                </div>
-                <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
-                  <div class="mute sm">Price Incl GST (18%)</div>
-                  <div id="prev_res_gst" style="font-weight:600">₹${previewRes.priceInclGst.toLocaleString('en-IN')}</div>
+                <div style="background:var(--bg);padding:12px;border-radius:6px;border:1px solid var(--line)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <b>Operable Part Configuration:</b>
+                    ${operableTpl ? `<button class="btn sm" data-act="tplOpen" data-id="${operableTpl.id}">Inspect Operable BOM →</button>` : ''}
+                  </div>
+                  <div class="sm mute">Template: <b>${esc(operableTpl ? operableTpl.name : 'Sliding Door')}</b> &bull; Lines: ${(operableTpl?.lines || []).length} &bull; Height: <span id="combo_op_h_disp">${defOpH.toFixed(1)}</span> ft</div>
                 </div>
               </div>
-            </div>
 
-            <!-- BOM Lines Table -->
-            <div class="card-h">
-              <h4>Bill of Materials (BOM Structure)</h4>
-              <div class="mute sm">Formulas evaluate W, H, A (metres/sqm) and prior profile total metres (L1, L2...).</div>
-            </div>
-            <div class="scx">
-              <table class="tbl sm">
-                <thead>
-                  <tr>
-                    <th>Sl</th><th>Profile No</th><th>Description</th><th>Kind</th>
-                    <th>Length Formula</th><th>Nos Formula</th><th class="r">kg/m</th><th class="r">Unit Price</th>
-                    <th class="r">Calc Length</th><th class="r">Calc Nos</th><th class="r">Line Amount (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${(tpl.lines || []).map((l, idx) => {
-                    const pl = previewRes.lines.find(x => x.sl_no === l.sl_no) || { evaluatedLen: 0, evaluatedNos: 0, amount: 0 };
-                    return `<tr>
-                      <td>${l.sl_no || (idx + 1)}</td>
-                      <td><b>${esc(l.profile_no || '-')}</b></td>
+              <!-- Consolidated Combo BOM Table -->
+              <div class="card-h">
+                <h4>Combined Bill of Materials (Fixed + Operable Sections)</h4>
+                <div class="mute sm">Displays the itemized profiles, hardware, glass, and labour for the full opening.</div>
+              </div>
+              <div class="scx">
+                <table class="tbl sm">
+                  <thead>
+                    <tr>
+                      <th>Part / Line</th><th>Description</th><th>Kind</th>
+                      <th class="r">Calc Length</th><th class="r">Calc Nos</th><th class="r">Total Metres</th><th class="r">Rate / kg / Unit</th><th class="r">Line Amount (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="combo_bom_body">
+                    ${(previewRes.lines || []).map(l => `<tr>
+                      <td><b>${esc(l.sl_no)}</b></td>
                       <td>${esc(l.description || '')}</td>
-                      <td><span class="bd pending">${esc(l.kind || 'profile')}</span></td>
-                      <td><code>${esc(l.length_expr || '')}</code></td>
-                      <td><code>${esc(l.nos_expr || '')}</code></td>
-                      <td class="r">${l.weight_kg_per_m ? inr(l.weight_kg_per_m, 2) : '-'}</td>
-                      <td class="r">${l.unit_price ? rs(l.unit_price) : (l.kind === 'profile' ? rs(cs.aluminium_rate_per_kg || 500) : '-')}</td>
-                      <td class="r" id="line_len_${l.sl_no}">${pl.evaluatedLen ? pl.evaluatedLen.toFixed(3) + ' m' : '-'}</td>
-                      <td class="r" id="line_nos_${l.sl_no}">${pl.evaluatedNos || '-'}</td>
-                      <td class="r" id="line_amt_${l.sl_no}" style="font-weight:600">${rs(pl.amount)}</td>
-                    </tr>`;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>`;
+                      <td><span class="bd ${l.kind === 'profile' ? 'pending' : 'approved'}">${esc(l.kind || 'item')}</span></td>
+                      <td class="r">${l.length ? l.length.toFixed(3) + ' m' : '-'}</td>
+                      <td class="r">${l.nos || '-'}</td>
+                      <td class="r">${l.totalMetres ? l.totalMetres.toFixed(3) + ' m' : '-'}</td>
+                      <td class="r">${l.kind === 'profile' ? rs(cs.aluminium_rate_per_kg || 500) + '/kg' : rs(l.unit_price)}</td>
+                      <td class="r" style="font-weight:600">${rs(l.amount)}</td>
+                    </tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>`;
+          } else {
+            // Standard Single-BOM Template View
+            const previewRes = CostingEngine.calculateItem(tpl, tpl.lines, 10, 6, { glass_id: defGlassId, mesh: tpl.allows_mesh ? 'SS Mesh' : 'NA' }, cs, rates);
+
+            b.innerHTML = `<div class="card" style="margin-bottom:16px">
+              <div class="card-h">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <button class="btn sm" data-act="tplBack">← Back to Templates</button>
+                  <div>
+                    <h3 style="margin:0">${esc(tpl.name)}</h3>
+                    <div class="mute sm">Series: <b>${esc(tpl.series || 'Domal 27')}</b> &bull; Category: <span class="bd approved">${esc(tpl.category || 'window')}</span> &bull; Mesh: ${tpl.allows_mesh ? 'Allowed' : 'Not applicable'} &bull; Default Glass: ${esc(tpl.default_glass || '6mm Toughened')}</div>
+                  </div>
+                </div>
+                <div class="acts">
+                  ${ed ? `
+                    <button class="btn pri sm" data-act="tplAddLine">+ Add BOM Line</button>
+                    <button class="btn sm" data-act="tplEditMeta" data-id="${tpl.id}">✏️ Edit Settings</button>
+                    <button class="btn sm" data-act="tplDuplicate" data-id="${tpl.id}">Duplicate</button>
+                    <button class="btn sm bad" data-act="tplDelete" data-id="${tpl.id}">Delete</button>
+                  ` : ''}
+                </div>
+              </div>
+
+              <!-- Live Preview Top Bar -->
+              <div style="background:var(--bg);padding:14px;border-radius:6px;border:1px solid var(--line);margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                  <div style="font-weight:600;color:var(--pri)">⚡ Live Costing Preview &amp; Auto Recalculator</div>
+                  <div class="mute sm">Changes to formulas or dimensions recalculate all line amounts instantly.</div>
+                </div>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+                  <label class="f" style="margin:0"><span>Width (ft)</span><input id="prev_w" type="number" step="any" value="10" style="width:90px" oninput="ACT.tplLiveRecalc()"></label>
+                  <label class="f" style="margin:0"><span>Height (ft)</span><input id="prev_h" type="number" step="any" value="6" style="width:90px" oninput="ACT.tplLiveRecalc()"></label>
+                  <label class="f" style="margin:0"><span>Glass Type</span>
+                    <select id="prev_glass" onchange="ACT.tplLiveRecalc()">
+                      ${glassMats.map(g => `<option value="${g.id}" ${g.id === defGlassId ? 'selected' : ''}>${esc(g.name)} (₹${g.rate}/sqm)</option>`).join('')}
+                    </select>
+                  </label>
+                  <label class="f" style="margin:0"><span>Mesh Provision</span>
+                    <select id="prev_mesh" onchange="ACT.tplLiveRecalc()">
+                      ${tpl.allows_mesh ? '<option value="SS Mesh" selected>SS Mesh (₹290/sqm)</option>' : ''}
+                      <option value="NA" ${!tpl.allows_mesh ? 'selected' : ''}>NA (No Mesh)</option>
+                    </select>
+                  </label>
+                </div>
+
+                <!-- Live Calculated Badges -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px">
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Billing Area</div>
+                    <div id="prev_res_area" style="font-weight:600">60.0 sqft (${previewRes.A.toFixed(2)} sqm)</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Subtotal BOM</div>
+                    <div id="prev_res_subtotal" style="font-weight:600">₹${previewRes.subtotal.toFixed(2)}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Wastage (5%)</div>
+                    <div id="prev_res_wastage" style="font-weight:600">₹${previewRes.wastage.toFixed(2)}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Total Cost</div>
+                    <div id="prev_res_totalcost" style="font-weight:600">₹${previewRes.totalCost.toFixed(2)}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Margin (35%)</div>
+                    <div id="prev_res_margin" style="font-weight:600">₹${previewRes.margin}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:2px solid var(--pri)">
+                    <div class="mute sm" style="color:var(--pri);font-weight:600">Price Ex-Tax</div>
+                    <div id="prev_res_price" style="font-size:18px;font-weight:700;color:var(--pri)">₹${previewRes.priceExTax.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:2px solid var(--pri)">
+                    <div class="mute sm" style="color:var(--pri);font-weight:600">Rate / Sq Ft</div>
+                    <div id="prev_res_sqft" style="font-size:18px;font-weight:700;color:var(--pri)">₹${previewRes.ratePerSqft} / sqft</div>
+                  </div>
+                  <div style="background:var(--card);padding:10px;border-radius:4px;border:1px solid var(--line)">
+                    <div class="mute sm">Price Incl GST (18%)</div>
+                    <div id="prev_res_gst" style="font-weight:600">₹${previewRes.priceInclGst.toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BOM Lines Table -->
+              <div class="card-h">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <h4 style="margin:0">Bill of Materials (BOM Structure) — ${(tpl.lines || []).length} lines</h4>
+                  ${ed ? `<button class="btn pri sm" data-act="tplAddLine">+ Add BOM Line</button>` : ''}
+                </div>
+                <div class="mute sm">Formulas evaluate W, H, A (metres/sqm) and prior profile total metres (L1, L2...). Use ↑/↓ to reorder.</div>
+              </div>
+              <div class="scx">
+                <table class="tbl sm">
+                  <thead>
+                    <tr>
+                      <th style="width:40px">Sl</th><th>Profile No</th><th>Description</th><th>Kind</th>
+                      <th>Length Formula</th><th>Nos Formula</th><th class="r">kg/m</th><th class="r">Unit Price</th>
+                      <th class="r">Calc Length</th><th class="r">Calc Nos</th><th class="r">Line Amount (₹)</th>
+                      ${ed ? '<th class="r">Actions</th>' : ''}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${(tpl.lines || []).map((l, idx) => {
+                      const pl = previewRes.lines.find(x => x.sl_no === l.sl_no) || { evaluatedLen: 0, evaluatedNos: 0, amount: 0 };
+                      return `<tr>
+                        <td><b>${l.sl_no || (idx + 1)}</b></td>
+                        <td><b>${esc(l.profile_no || '-')}</b></td>
+                        <td>${esc(l.description || '')}</td>
+                        <td><span class="bd ${l.kind === 'profile' ? 'pending' : 'approved'}">${esc(l.kind || 'profile')}</span></td>
+                        <td><code>${esc(l.length_expr || '')}</code></td>
+                        <td><code>${esc(l.nos_expr || '')}</code></td>
+                        <td class="r">${l.weight_kg_per_m ? inr(l.weight_kg_per_m, 2) : '-'}</td>
+                        <td class="r">${l.unit_price ? rs(l.unit_price) : (l.kind === 'profile' ? rs(cs.aluminium_rate_per_kg || 500) : '-')}</td>
+                        <td class="r" id="line_len_${l.sl_no}">${pl.evaluatedLen ? pl.evaluatedLen.toFixed(3) + ' m' : '-'}</td>
+                        <td class="r" id="line_nos_${l.sl_no}">${pl.evaluatedNos || '-'}</td>
+                        <td class="r" id="line_amt_${l.sl_no}" style="font-weight:600">${rs(pl.amount)}</td>
+                        ${ed ? `<td class="r nowrap">
+                          <button class="btn ghost sm" data-act="tplLineUp" data-sl="${l.sl_no}" ${idx === 0 ? 'disabled style="opacity:0.3"' : ''} title="Move Up">↑</button>
+                          <button class="btn ghost sm" data-act="tplLineDown" data-sl="${l.sl_no}" ${idx === (tpl.lines.length - 1) ? 'disabled style="opacity:0.3"' : ''} title="Move Down">↓</button>
+                          <button class="btn sm" data-act="tplEditLine" data-sl="${l.sl_no}" title="Edit Line">✏️</button>
+                          <button class="btn sm bad" data-act="tplDelLine" data-sl="${l.sl_no}" title="Delete Line">&times;</button>
+                        </td>` : ''}
+                      </tr>`;
+                    }).join('') || `<tr><td colspan="12"><div class="empty">No BOM lines in this template yet. Click "+ Add BOM Line" to create profiles, gaskets, hardware, or labour.</div></td></tr>`}
+                  </tbody>
+                </table>
+              </div>
+            </div>`;
+          }
         } else {
-          // Templates List
+          // Templates List View
           b.innerHTML = `<div class="card">
             <div class="card-h">
-              <h3>Product Costing Templates (Excel BOM Engine)</h3>
-              <div class="mute sm">Pre-configured product templates verified against Excel sheets 2TM, SD, F, and V.</div>
+              <div>
+                <h3 style="margin:0 0 4px">Product Costing Templates (Excel BOM Engine)</h3>
+                <div class="mute sm">Pre-configured &amp; custom templates verified against Excel costing sheets. Build, duplicate, and configure BOM lines and combo openings.</div>
+              </div>
+              <div class="acts">
+                ${ed ? `<button class="btn pri sm" data-act="tplNew">+ Add Template</button> <button class="btn sm" data-act="tplNewCombo">🔗 + Add Combo Template</button>` : ''}
+              </div>
             </div>
             <div class="scx">
               <table class="tbl">
@@ -4182,23 +4645,30 @@
                     <th>Category</th>
                     <th>Mesh Provision</th>
                     <th>Default Glass</th>
-                    <th>BOM Lines</th>
+                    <th>BOM Structure</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${tpls.map(t => `<tr>
-                    <td><b>${esc(t.name)}</b></td>
-                    <td>${esc(t.series || 'Domal 27')}</td>
-                    <td><span class="bd approved">${esc(t.category || 'window')}</span></td>
-                    <td>${t.allows_mesh ? '✓ SS Mesh' : '<span class="mute">No</span>'}</td>
-                    <td>${esc(t.default_glass || '6mm Toughened')}</td>
-                    <td>${(t.lines || []).length} lines</td>
-                    <td class="r nowrap">
-                      <button class="btn sm pri" data-act="tplOpen" data-id="${t.id}">View / Edit BOM &amp; Live Preview</button>
-                      ${ed ? `<button class="btn sm" data-act="tplDuplicate" data-id="${t.id}">Duplicate</button>` : ''}
-                    </td>
-                  </tr>`).join('') || `<tr><td colspan="7"><div class="empty">No templates found. Click Run seed or reload to initialize.</div></td></tr>`}
+                  ${tpls.map(t => {
+                    const isCombo = t.category === 'combo';
+                    return `<tr>
+                      <td><b>${esc(t.name)}</b></td>
+                      <td>${esc(t.series || 'Domal 27')}</td>
+                      <td><span class="bd ${isCombo ? 'approved' : 'pending'}">${esc(t.category || 'window')}</span></td>
+                      <td>${t.allows_mesh ? '✓ SS Mesh' : '<span class="mute">No</span>'}</td>
+                      <td>${esc(t.default_glass || '6mm Toughened')}</td>
+                      <td>${isCombo ? '<span style="color:var(--pri);font-weight:600">Fixed + Operable Combo</span>' : ((t.lines || []).length + ' lines')}</td>
+                      <td class="r nowrap">
+                        <button class="btn sm pri" data-act="tplOpen" data-id="${t.id}">View / Edit BOM &amp; Live Preview</button>
+                        ${ed ? `
+                          <button class="btn sm" data-act="tplEditMeta" data-id="${t.id}">Edit Info</button>
+                          <button class="btn sm" data-act="tplDuplicate" data-id="${t.id}">Duplicate</button>
+                          <button class="btn sm bad" data-act="tplDelete" data-id="${t.id}">Delete</button>
+                        ` : ''}
+                      </td>
+                    </tr>`;
+                  }).join('') || `<tr><td colspan="7"><div class="empty">No templates found. Click "+ Add Template" to create one.</div></td></tr>`}
                 </tbody>
               </table>
             </div>
@@ -4381,7 +4851,7 @@
       }
     }
 
-    // Material & Template Action Handlers
+    // Material & Template Action Handlers (Phase 3 Template Builder)
     ACT.tplOpen = b => { selectedTemplateId = b.dataset.id; drawRates(); };
     ACT.tplBack = () => { selectedTemplateId = null; drawRates(); };
     ACT.tplDuplicate = b => {
@@ -4393,12 +4863,513 @@
       db.productTemplates.push(copy);
       persist(true); toast('Template duplicated.'); drawRates();
     };
+    ACT.tplDelete = b => {
+      const tpls = db.productTemplates || [];
+      const tpl = tpls.find(t => t.id === b.dataset.id);
+      if (!tpl) return;
+      confirmBox(`Delete template "${esc(tpl.name)}"? This cannot be undone.`, () => {
+        db.productTemplates = tpls.filter(t => t.id !== tpl.id);
+        if (selectedTemplateId === tpl.id) selectedTemplateId = null;
+        persist(true);
+        toast(`Deleted template: ${tpl.name}`);
+        drawRates();
+      }, 'Delete Template', 'bad');
+    };
+    ACT.tplNew = () => {
+      const tpls = db.productTemplates || [];
+      const mats = db.materials || [];
+      const glassMats = mats.filter(m => m.category === 'glass');
+      const hwMats = mats.filter(m => m.category === 'hardware');
+      modal({
+        title: '✨ Create New Product Costing Template',
+        wide: true,
+        body: `<div class="grid g2">
+          <label class="f" style="grid-column:1/-1"><span>Template Name</span><input id="new_tpl_name" placeholder="e.g. 3 Track 3 Panel Sliding Window" required></label>
+          <label class="f"><span>Series</span><input id="new_tpl_series" value="Domal 27" placeholder="e.g. Domal 27, 40mm Series"></label>
+          <label class="f"><span>Category</span>
+            <select id="new_tpl_cat">
+              <option value="window">Window</option>
+              <option value="door">Door</option>
+              <option value="ventilator">Ventilator</option>
+            </select>
+          </label>
+          <label class="f"><span>Mesh Provision</span>
+            <select id="new_tpl_mesh">
+              <option value="true">Allowed (SS Mesh optional)</option>
+              <option value="false">Not Applicable (NA)</option>
+            </select>
+          </label>
+          <label class="f"><span>Default Glass</span>
+            <select id="new_tpl_glass">
+              ${glassMats.map(g => `<option value="${g.name}">${esc(g.name)} (₹${g.rate}/sqm)</option>`).join('') || '<option value="6mm Toughened">6mm Toughened</option>'}
+            </select>
+          </label>
+          <label class="f"><span>Default Handle</span>
+            <select id="new_tpl_handle">
+              ${hwMats.map(h => `<option value="${h.name}">${esc(h.name)}</option>`).join('') || '<option value="Standard Handle">Standard Handle</option>'}
+            </select>
+          </label>
+          <label class="f"><span>Copy Initial BOM Lines From</span>
+            <select id="new_tpl_copy_from">
+              <option value="">Blank (Start with empty BOM)</option>
+              ${tpls.filter(t => t.category !== 'combo').map(t => `<option value="${t.id}">${esc(t.name)} (${(t.lines || []).length} lines)</option>`).join('')}
+            </select>
+          </label>
+        </div>`,
+        okText: 'Create Template',
+        onOk: el => {
+          const name = ($('#new_tpl_name', el)?.value || '').trim();
+          if (!name) { toast('Please enter a template name.', 'bad'); return false; }
+          const series = ($('#new_tpl_series', el)?.value || 'Domal 27').trim();
+          const category = $('#new_tpl_cat', el)?.value || 'window';
+          const allows_mesh = $('#new_tpl_mesh', el)?.value === 'true';
+          const default_glass = $('#new_tpl_glass', el)?.value || '6mm Toughened';
+          const default_handle = $('#new_tpl_handle', el)?.value || 'Standard Handle';
+          const copyFromId = $('#new_tpl_copy_from', el)?.value;
+
+          let lines = [];
+          if (copyFromId) {
+            const src = tpls.find(t => t.id === copyFromId);
+            if (src && src.lines) lines = JSON.parse(JSON.stringify(src.lines));
+          }
+
+          const newId = 'tpl_' + uid();
+          const newTpl = {
+            id: newId,
+            name,
+            series,
+            category,
+            allows_mesh,
+            default_glass,
+            default_handle,
+            lines,
+            created_at: new Date().toISOString()
+          };
+          db.productTemplates.push(newTpl);
+          selectedTemplateId = newId;
+          persist(true);
+          toast(`Created template: ${name}! ✨`);
+          drawRates();
+          return true;
+        }
+      });
+    };
+    ACT.tplNewCombo = () => {
+      const tpls = db.productTemplates || [];
+      const nonCombos = tpls.filter(t => t.category !== 'combo');
+      const mats = db.materials || [];
+      const glassMats = mats.filter(m => m.category === 'glass');
+      modal({
+        title: '🔗 Create New Combined Product Template (Section 1.4)',
+        wide: true,
+        body: `<div class="mute sm" style="margin-bottom:12px">
+          A tall opening is split into a <b>Fixed part</b> and an <b>Operable part</b>. Each part is costed with its own BOM, then blended: <code>Rate/Sqft = (Fixed Price + Operable Price) ÷ Total Area</code>.
+        </div>
+        <div class="grid g2">
+          <label class="f" style="grid-column:1/-1"><span>Combo Template Name</span><input id="combo_tpl_name" placeholder="e.g. Combo Fixed + 2.5T Sliding Door (F+SD)" required></label>
+          <label class="f"><span>Series</span><input id="combo_tpl_series" value="Domal 27"></label>
+          <label class="f"><span>Default Operable Height (ft)</span><input type="number" step="any" id="combo_tpl_oph" value="7" placeholder="e.g. 7"></label>
+          <label class="f"><span>Fixed Part Template</span>
+            <select id="combo_tpl_fixed">
+              ${nonCombos.map(t => `<option value="${t.id}" ${t.id === 'tpl_fixed_window' ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+            </select>
+          </label>
+          <label class="f"><span>Operable Part Template</span>
+            <select id="combo_tpl_operable">
+              ${nonCombos.map(t => `<option value="${t.id}" ${t.id === 'tpl_sliding_door' ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+            </select>
+          </label>
+          <label class="f"><span>Default Glass</span>
+            <select id="combo_tpl_glass">
+              ${glassMats.map(g => `<option value="${g.name}">${esc(g.name)} (₹${g.rate}/sqm)</option>`).join('') || '<option value="8mm Toughened Clear">8mm Toughened Clear</option>'}
+            </select>
+          </label>
+          <label class="f"><span>Mesh Provision</span>
+            <select id="combo_tpl_mesh">
+              <option value="true">Allowed (SS Mesh)</option>
+              <option value="false">Not Applicable (NA)</option>
+            </select>
+          </label>
+        </div>`,
+        okText: 'Create Combo Template',
+        onOk: el => {
+          const name = ($('#combo_tpl_name', el)?.value || '').trim();
+          if (!name) { toast('Please enter a combo template name.', 'bad'); return false; }
+          const series = ($('#combo_tpl_series', el)?.value || 'Domal 27').trim();
+          const fixed_template_id = $('#combo_tpl_fixed', el)?.value;
+          const operable_template_id = $('#combo_tpl_operable', el)?.value;
+          const default_operable_h = Number($('#combo_tpl_oph', el)?.value) || 7;
+          const default_glass = $('#combo_tpl_glass', el)?.value || '8mm Toughened Clear';
+          const allows_mesh = $('#combo_tpl_mesh', el)?.value === 'true';
+
+          const newId = 'tpl_combo_' + uid();
+          const newTpl = {
+            id: newId,
+            name,
+            series,
+            category: 'combo',
+            fixed_template_id,
+            operable_template_id,
+            default_operable_h,
+            allows_mesh,
+            default_glass,
+            default_handle: 'Pop-up Handle',
+            lines: [],
+            created_at: new Date().toISOString()
+          };
+          db.productTemplates.push(newTpl);
+          selectedTemplateId = newId;
+          persist(true);
+          toast(`Created combo template: ${name}! 🔗`);
+          drawRates();
+          return true;
+        }
+      });
+    };
+    ACT.tplEditMeta = b => {
+      const tpls = db.productTemplates || [];
+      const tpl = tpls.find(t => t.id === (b.dataset.id || selectedTemplateId));
+      if (!tpl) return;
+      const nonCombos = tpls.filter(t => t.category !== 'combo');
+      const mats = db.materials || [];
+      const glassMats = mats.filter(m => m.category === 'glass');
+      const hwMats = mats.filter(m => m.category === 'hardware');
+      const isCombo = tpl.category === 'combo';
+
+      modal({
+        title: `✏️ Edit Template Settings — ${esc(tpl.name)}`,
+        wide: true,
+        body: `<div class="grid g2">
+          <label class="f" style="grid-column:1/-1"><span>Template Name</span><input id="edit_tpl_name" value="${esc(tpl.name)}" required></label>
+          <label class="f"><span>Series</span><input id="edit_tpl_series" value="${esc(tpl.series || 'Domal 27')}"></label>
+          ${isCombo ? `
+            <label class="f"><span>Default Operable Height (ft)</span><input type="number" step="any" id="edit_tpl_oph" value="${tpl.default_operable_h || 7}"></label>
+            <label class="f"><span>Fixed Part Template</span>
+              <select id="edit_tpl_fixed">
+                ${nonCombos.map(t => `<option value="${t.id}" ${t.id === tpl.fixed_template_id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+              </select>
+            </label>
+            <label class="f"><span>Operable Part Template</span>
+              <select id="edit_tpl_operable">
+                ${nonCombos.map(t => `<option value="${t.id}" ${t.id === tpl.operable_template_id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+              </select>
+            </label>
+          ` : `
+            <label class="f"><span>Category</span>
+              <select id="edit_tpl_cat">
+                <option value="window" ${tpl.category === 'window' ? 'selected' : ''}>Window</option>
+                <option value="door" ${tpl.category === 'door' ? 'selected' : ''}>Door</option>
+                <option value="ventilator" ${tpl.category === 'ventilator' ? 'selected' : ''}>Ventilator</option>
+              </select>
+            </label>
+            <label class="f"><span>Default Handle</span>
+              <select id="edit_tpl_handle">
+                ${hwMats.map(h => `<option value="${h.name}" ${h.name === tpl.default_handle ? 'selected' : ''}>${esc(h.name)}</option>`).join('') || '<option value="Standard Handle">Standard Handle</option>'}
+              </select>
+            </label>
+          `}
+          <label class="f"><span>Mesh Provision</span>
+            <select id="edit_tpl_mesh">
+              <option value="true" ${tpl.allows_mesh ? 'selected' : ''}>Allowed (SS Mesh)</option>
+              <option value="false" ${!tpl.allows_mesh ? 'selected' : ''}>Not Applicable (NA)</option>
+            </select>
+          </label>
+          <label class="f"><span>Default Glass</span>
+            <select id="edit_tpl_glass">
+              ${glassMats.map(g => `<option value="${g.name}" ${g.name === tpl.default_glass ? 'selected' : ''}>${esc(g.name)} (₹${g.rate}/sqm)</option>`).join('')}
+            </select>
+          </label>
+        </div>`,
+        okText: 'Save Settings',
+        onOk: el => {
+          const name = ($('#edit_tpl_name', el)?.value || '').trim();
+          if (!name) { toast('Template name is required.', 'bad'); return false; }
+          tpl.name = name;
+          tpl.series = ($('#edit_tpl_series', el)?.value || 'Domal 27').trim();
+          tpl.allows_mesh = $('#edit_tpl_mesh', el)?.value === 'true';
+          tpl.default_glass = $('#edit_tpl_glass', el)?.value || tpl.default_glass;
+
+          if (isCombo) {
+            tpl.default_operable_h = Number($('#edit_tpl_oph', el)?.value) || 7;
+            tpl.fixed_template_id = $('#edit_tpl_fixed', el)?.value;
+            tpl.operable_template_id = $('#edit_tpl_operable', el)?.value;
+          } else {
+            tpl.category = $('#edit_tpl_cat', el)?.value || tpl.category;
+            tpl.default_handle = $('#edit_tpl_handle', el)?.value || tpl.default_handle;
+          }
+
+          persist(true);
+          toast('Template settings updated! ✅');
+          drawRates();
+          return true;
+        }
+      });
+    };
+    ACT.tplAddLine = () => {
+      const tpls = db.productTemplates || [];
+      const tpl = tpls.find(t => t.id === selectedTemplateId);
+      if (!tpl) return;
+      tpl.lines = tpl.lines || [];
+      const nextSl = tpl.lines.length + 1;
+      const mats = db.materials || [];
+      const profMats = mats.filter(m => m.category === 'profile');
+
+      modal({
+        title: `+ Add BOM Line #${nextSl} to ${esc(tpl.name)}`,
+        wide: true,
+        body: `<div class="grid g2">
+          <label class="f" style="grid-column:1/-1">
+            <span>⚡ Quick Fill from Profiles Master</span>
+            <select id="line_quick_prof">
+              <option value="">-- Choose Profile to Auto-Fill (Optional) --</option>
+              ${profMats.map(p => `<option value="${p.id}" data-code="${esc(p.code)}" data-name="${esc(p.name)}" data-wt="${p.weightPerM || p.weight_kg_per_m || 0}">${esc(p.code || '')} - ${esc(p.name)} (${p.weightPerM || p.weight_kg_per_m || 0} kg/m)</option>`).join('')}
+            </select>
+          </label>
+          <label class="f"><span>Line Kind</span>
+            <select id="line_kind">
+              <option value="profile">Aluminium Profile (kg/m × Aluminium Rate)</option>
+              <option value="gasket">Glazing Gasket (metres × Rate/m)</option>
+              <option value="brush_seal">Brush Seal (metres × Rate/m)</option>
+              <option value="hardware">Hardware (Nos × Unit Price)</option>
+              <option value="labour">Labour (Area A × Labour Rate/sqm)</option>
+              <option value="glass">Glass (Area A × Glass Rate/sqm)</option>
+              <option value="mesh">SS Mesh (Area A/2 × Mesh Rate/sqm)</option>
+            </select>
+          </label>
+          <label class="f"><span>Profile No / Code</span><input id="line_prof_no" placeholder="e.g. 5045"></label>
+          <label class="f" style="grid-column:1/-1"><span>Description</span><input id="line_desc" placeholder="e.g. Outer Frame Top" required></label>
+          <label class="f">
+            <span>Length Formula (m or sqm)</span>
+            <input id="line_len_expr" placeholder="e.g. W, H, 3*W, L1+L2, 8*W+8*H, A" value="W">
+            <div id="len_eval_hint" class="note sm" style="margin-top:4px">Variables: W, H, A, L1..L${nextSl - 1}</div>
+          </label>
+          <label class="f">
+            <span>Nos Formula (Count)</span>
+            <input id="line_nos_expr" placeholder="e.g. 1, 2, 4" value="1">
+            <div id="nos_eval_hint" class="note sm" style="margin-top:4px">Evaluated line count</div>
+          </label>
+          <label class="f"><span>Weight (kg/m) — Profiles Only</span><input type="number" step="any" id="line_wt" value="1.28"></label>
+          <label class="f"><span>Unit Price (₹) — Hardware/Gasket</span><input type="number" step="any" id="line_uprice" value="0" placeholder="0 = use master/catalogue rate"></label>
+          <label class="f" style="grid-column:1/-1"><span>Condition (Optional)</span><input id="line_cond" placeholder="e.g. mesh != 'NA'"></label>
+        </div>`,
+        okText: 'Add Line to BOM',
+        onOk: el => {
+          const desc = ($('#line_desc', el)?.value || '').trim();
+          if (!desc) { toast('Description is required.', 'bad'); return false; }
+          const kind = $('#line_kind', el)?.value || 'profile';
+          const profile_no = ($('#line_prof_no', el)?.value || '').trim();
+          const length_expr = ($('#line_len_expr', el)?.value || '0').trim();
+          const nos_expr = ($('#line_nos_expr', el)?.value || '1').trim();
+          const weight_kg_per_m = Number($('#line_wt', el)?.value) || 0;
+          const unit_price = Number($('#line_uprice', el)?.value) || 0;
+          const condition = ($('#line_cond', el)?.value || '').trim();
+
+          tpl.lines.push({
+            sl_no: nextSl,
+            profile_no,
+            description: desc,
+            kind,
+            length_expr,
+            nos_expr,
+            weight_kg_per_m,
+            unit_price,
+            condition
+          });
+
+          persist(true);
+          toast(`Added BOM line #${nextSl}: ${desc}`);
+          drawRates();
+          return true;
+        }
+      });
+
+      setTimeout(() => {
+        const quick = $('#line_quick_prof');
+        if (quick) {
+          quick.onchange = () => {
+            const opt = quick.selectedOptions[0];
+            if (opt && opt.value) {
+              if ($('#line_prof_no')) $('#line_prof_no').value = opt.dataset.code || '';
+              if ($('#line_desc')) $('#line_desc').value = opt.dataset.name || '';
+              if ($('#line_wt')) $('#line_wt').value = opt.dataset.wt || 0;
+              if ($('#line_kind')) $('#line_kind').value = 'profile';
+            }
+          };
+        }
+        const lenInp = $('#line_len_expr');
+        const lenHint = $('#len_eval_hint');
+        if (lenInp && lenHint) {
+          lenInp.oninput = () => {
+            const v = CostingEngine.validateFormula(lenInp.value);
+            lenHint.innerHTML = v.valid
+              ? `<span style="color:var(--ok)">✓ Evaluated sample length: <b>${v.result.toFixed(3)} m</b></span>`
+              : `<span style="color:var(--bad)">⚠ ${esc(v.error)}</span>`;
+          };
+        }
+        const nosInp = $('#line_nos_expr');
+        const nosHint = $('#nos_eval_hint');
+        if (nosInp && nosHint) {
+          nosInp.oninput = () => {
+            const v = CostingEngine.validateFormula(nosInp.value);
+            nosHint.innerHTML = v.valid
+              ? `<span style="color:var(--ok)">✓ Evaluated count: <b>${v.result}</b></span>`
+              : `<span style="color:var(--bad)">⚠ ${esc(v.error)}</span>`;
+          };
+        }
+      }, 50);
+    };
+    ACT.tplEditLine = b => {
+      const sl = Number(b.dataset.sl);
+      const tpls = db.productTemplates || [];
+      const tpl = tpls.find(t => t.id === selectedTemplateId);
+      if (!tpl || !tpl.lines) return;
+      const line = tpl.lines.find(l => l.sl_no === sl);
+      if (!line) return;
+      const mats = db.materials || [];
+      const profMats = mats.filter(m => m.category === 'profile');
+
+      modal({
+        title: `✏️ Edit BOM Line #${sl} — ${esc(line.description)}`,
+        wide: true,
+        body: `<div class="grid g2">
+          <label class="f" style="grid-column:1/-1">
+            <span>⚡ Quick Fill from Profiles Master</span>
+            <select id="line_quick_prof">
+              <option value="">-- Choose Profile to Auto-Fill (Optional) --</option>
+              ${profMats.map(p => `<option value="${p.id}" data-code="${esc(p.code)}" data-name="${esc(p.name)}" data-wt="${p.weightPerM || p.weight_kg_per_m || 0}">${esc(p.code || '')} - ${esc(p.name)} (${p.weightPerM || p.weight_kg_per_m || 0} kg/m)</option>`).join('')}
+            </select>
+          </label>
+          <label class="f"><span>Line Kind</span>
+            <select id="line_kind">
+              <option value="profile" ${line.kind === 'profile' ? 'selected' : ''}>Aluminium Profile (kg/m × Aluminium Rate)</option>
+              <option value="gasket" ${line.kind === 'gasket' ? 'selected' : ''}>Glazing Gasket (metres × Rate/m)</option>
+              <option value="brush_seal" ${line.kind === 'brush_seal' ? 'selected' : ''}>Brush Seal (metres × Rate/m)</option>
+              <option value="hardware" ${line.kind === 'hardware' ? 'selected' : ''}>Hardware (Nos × Unit Price)</option>
+              <option value="labour" ${line.kind === 'labour' ? 'selected' : ''}>Labour (Area A × Labour Rate/sqm)</option>
+              <option value="glass" ${line.kind === 'glass' ? 'selected' : ''}>Glass (Area A × Glass Rate/sqm)</option>
+              <option value="mesh" ${line.kind === 'mesh' ? 'selected' : ''}>SS Mesh (Area A/2 × Mesh Rate/sqm)</option>
+            </select>
+          </label>
+          <label class="f"><span>Profile No / Code</span><input id="line_prof_no" value="${esc(line.profile_no || '')}" placeholder="e.g. 5045"></label>
+          <label class="f" style="grid-column:1/-1"><span>Description</span><input id="line_desc" value="${esc(line.description || '')}" required></label>
+          <label class="f">
+            <span>Length Formula (m or sqm)</span>
+            <input id="line_len_expr" value="${esc(line.length_expr || '')}" placeholder="e.g. W, H, 3*W, L1+L2">
+            <div id="len_eval_hint" class="note sm" style="margin-top:4px">Variables: W, H, A, L1..L${sl - 1}</div>
+          </label>
+          <label class="f">
+            <span>Nos Formula (Count)</span>
+            <input id="line_nos_expr" value="${esc(line.nos_expr || '1')}" placeholder="e.g. 1, 2, 4">
+            <div id="nos_eval_hint" class="note sm" style="margin-top:4px">Evaluated line count</div>
+          </label>
+          <label class="f"><span>Weight (kg/m) — Profiles Only</span><input type="number" step="any" id="line_wt" value="${line.weight_kg_per_m || 0}"></label>
+          <label class="f"><span>Unit Price (₹) — Hardware/Gasket</span><input type="number" step="any" id="line_uprice" value="${line.unit_price || 0}"></label>
+          <label class="f" style="grid-column:1/-1"><span>Condition (Optional)</span><input id="line_cond" value="${esc(line.condition || '')}" placeholder="e.g. mesh != 'NA'"></label>
+        </div>`,
+        okText: 'Save Line Changes',
+        onOk: el => {
+          const desc = ($('#line_desc', el)?.value || '').trim();
+          if (!desc) { toast('Description is required.', 'bad'); return false; }
+          line.description = desc;
+          line.kind = $('#line_kind', el)?.value || 'profile';
+          line.profile_no = ($('#line_prof_no', el)?.value || '').trim();
+          line.length_expr = ($('#line_len_expr', el)?.value || '0').trim();
+          line.nos_expr = ($('#line_nos_expr', el)?.value || '1').trim();
+          line.weight_kg_per_m = Number($('#line_wt', el)?.value) || 0;
+          line.unit_price = Number($('#line_uprice', el)?.value) || 0;
+          line.condition = ($('#line_cond', el)?.value || '').trim();
+
+          persist(true);
+          toast(`Updated BOM line #${sl}! ✅`);
+          drawRates();
+          return true;
+        }
+      });
+
+      setTimeout(() => {
+        const quick = $('#line_quick_prof');
+        if (quick) {
+          quick.onchange = () => {
+            const opt = quick.selectedOptions[0];
+            if (opt && opt.value) {
+              if ($('#line_prof_no')) $('#line_prof_no').value = opt.dataset.code || '';
+              if ($('#line_desc')) $('#line_desc').value = opt.dataset.name || '';
+              if ($('#line_wt')) $('#line_wt').value = opt.dataset.wt || 0;
+              if ($('#line_kind')) $('#line_kind').value = 'profile';
+            }
+          };
+        }
+        const lenInp = $('#line_len_expr');
+        const lenHint = $('#len_eval_hint');
+        if (lenInp && lenHint) {
+          lenInp.oninput = () => {
+            const v = CostingEngine.validateFormula(lenInp.value);
+            lenHint.innerHTML = v.valid
+              ? `<span style="color:var(--ok)">✓ Evaluated sample length: <b>${v.result.toFixed(3)} m</b></span>`
+              : `<span style="color:var(--bad)">⚠ ${esc(v.error)}</span>`;
+          };
+        }
+        const nosInp = $('#line_nos_expr');
+        const nosHint = $('#nos_eval_hint');
+        if (nosInp && nosHint) {
+          nosInp.oninput = () => {
+            const v = CostingEngine.validateFormula(nosInp.value);
+            nosHint.innerHTML = v.valid
+              ? `<span style="color:var(--ok)">✓ Evaluated count: <b>${v.result}</b></span>`
+              : `<span style="color:var(--bad)">⚠ ${esc(v.error)}</span>`;
+          };
+        }
+      }, 50);
+    };
+    ACT.tplDelLine = b => {
+      const sl = Number(b.dataset.sl);
+      const tpls = db.productTemplates || [];
+      const tpl = tpls.find(t => t.id === selectedTemplateId);
+      if (!tpl || !tpl.lines) return;
+      confirmBox(`Delete BOM line #${sl}?`, () => {
+        tpl.lines = tpl.lines.filter(l => l.sl_no !== sl);
+        tpl.lines.forEach((l, i) => l.sl_no = i + 1);
+        persist(true);
+        toast(`Deleted BOM line #${sl}.`);
+        drawRates();
+      }, 'Delete Line', 'bad');
+    };
+    ACT.tplLineUp = b => {
+      const sl = Number(b.dataset.sl);
+      const tpls = db.productTemplates || [];
+      const tpl = tpls.find(t => t.id === selectedTemplateId);
+      if (!tpl || !tpl.lines) return;
+      const idx = tpl.lines.findIndex(l => l.sl_no === sl);
+      if (idx <= 0) return;
+      const tmp = tpl.lines[idx - 1];
+      tpl.lines[idx - 1] = tpl.lines[idx];
+      tpl.lines[idx] = tmp;
+      tpl.lines.forEach((l, i) => l.sl_no = i + 1);
+      persist(true);
+      drawRates();
+    };
+    ACT.tplLineDown = b => {
+      const sl = Number(b.dataset.sl);
+      const tpls = db.productTemplates || [];
+      const tpl = tpls.find(t => t.id === selectedTemplateId);
+      if (!tpl || !tpl.lines) return;
+      const idx = tpl.lines.findIndex(l => l.sl_no === sl);
+      if (idx < 0 || idx >= tpl.lines.length - 1) return;
+      const tmp = tpl.lines[idx + 1];
+      tpl.lines[idx + 1] = tpl.lines[idx];
+      tpl.lines[idx] = tmp;
+      tpl.lines.forEach((l, i) => l.sl_no = i + 1);
+      persist(true);
+      drawRates();
+    };
     ACT.tplLiveRecalc = () => {
       const w = num($('#prev_w') ? $('#prev_w').value : 10) || 10;
       const h = num($('#prev_h') ? $('#prev_h').value : 6) || 6;
       const glassId = $('#prev_glass') ? $('#prev_glass').value : '';
       const mesh = $('#prev_mesh') ? $('#prev_mesh').value : 'SS Mesh';
-      const tpl = (db.productTemplates || []).find(t => t.id === selectedTemplateId);
+      const opH = num($('#prev_oph') ? $('#prev_oph').value : 7) || 7;
+      const tpls = db.productTemplates || [];
+      const tpl = tpls.find(t => t.id === selectedTemplateId);
       if (!tpl) return;
       const cs = db.costingSettings || CostingEngine.getDefaultCostingSettings();
       const mats = db.materials || [];
@@ -4407,25 +5378,55 @@
         mesh: mats.filter(m => m.category === 'mesh'),
         handle: mats.filter(m => m.category === 'hardware')
       };
-      const res = CostingEngine.calculateItem(tpl, tpl.lines, w, h, { glass_id: glassId, mesh: mesh }, cs, rates);
-      if ($('#prev_res_area')) $('#prev_res_area').textContent = `${(w * h).toFixed(1)} sqft (${res.A.toFixed(2)} sqm)`;
-      if ($('#prev_res_subtotal')) $('#prev_res_subtotal').textContent = '₹' + res.subtotal.toFixed(2);
-      if ($('#prev_res_wastage')) $('#prev_res_wastage').textContent = '₹' + res.wastage.toFixed(2);
-      if ($('#prev_res_totalcost')) $('#prev_res_totalcost').textContent = '₹' + res.totalCost.toFixed(2);
-      if ($('#prev_res_margin')) $('#prev_res_margin').textContent = '₹' + res.margin;
-      if ($('#prev_res_price')) $('#prev_res_price').textContent = '₹' + res.priceExTax.toLocaleString('en-IN');
-      if ($('#prev_res_sqm')) $('#prev_res_sqm').textContent = '₹' + res.ratePerSqm.toLocaleString('en-IN') + ' / sqm';
-      if ($('#prev_res_sqft')) $('#prev_res_sqft').textContent = '₹' + res.ratePerSqft + ' / sqft';
-      if ($('#prev_res_gst')) $('#prev_res_gst').textContent = '₹' + res.priceInclGst.toLocaleString('en-IN');
 
-      res.lines.forEach(l => {
-        const amtEl = $(`#line_amt_${l.sl_no}`);
-        if (amtEl) amtEl.textContent = rs(l.amount);
-        const lenEl = $(`#line_len_${l.sl_no}`);
-        if (lenEl) lenEl.textContent = l.evaluatedLen.toFixed(3) + ' m';
-        const nosEl = $(`#line_nos_${l.sl_no}`);
-        if (nosEl) nosEl.textContent = l.evaluatedNos;
-      });
+      if (tpl.category === 'combo') {
+        const res = CostingEngine.calculateItem(tpl, [], w, h, { glass_id: glassId, mesh: mesh, operable_h_ft: opH }, cs, rates, tpls);
+        if ($('#prev_res_area')) $('#prev_res_area').textContent = `${(w * h).toFixed(1)} sqft (${res.A.toFixed(2)} sqm)`;
+        if ($('#prev_res_fixed')) $('#prev_res_fixed').textContent = '₹' + (res.fixedPrice || 0).toLocaleString('en-IN');
+        if ($('#prev_res_operable')) $('#prev_res_operable').textContent = '₹' + (res.operablePrice || 0).toLocaleString('en-IN');
+        if ($('#prev_res_subtotal')) $('#prev_res_subtotal').textContent = '₹' + res.subtotal.toFixed(2);
+        if ($('#prev_res_wastage')) $('#prev_res_wastage').textContent = '₹' + res.wastage.toFixed(2);
+        if ($('#prev_res_margin')) $('#prev_res_margin').textContent = '₹' + res.margin;
+        if ($('#prev_res_price')) $('#prev_res_price').textContent = '₹' + res.priceExTax.toLocaleString('en-IN');
+        if ($('#prev_res_sqft')) $('#prev_res_sqft').textContent = '₹' + res.ratePerSqft + ' / sqft';
+        if ($('#prev_res_gst')) $('#prev_res_gst').textContent = '₹' + res.priceInclGst.toLocaleString('en-IN');
+        if ($('#combo_fixed_h_disp')) $('#combo_fixed_h_disp').textContent = res.fixedHFt ? res.fixedHFt.toFixed(1) : (h - opH).toFixed(1);
+        if ($('#combo_op_h_disp')) $('#combo_op_h_disp').textContent = res.operableHFt ? res.operableHFt.toFixed(1) : opH.toFixed(1);
+
+        const bomBody = $('#combo_bom_body');
+        if (bomBody && res.lines) {
+          bomBody.innerHTML = res.lines.map(l => `<tr>
+            <td><b>${esc(l.sl_no)}</b></td>
+            <td>${esc(l.description || '')}</td>
+            <td><span class="bd ${l.kind === 'profile' ? 'pending' : 'approved'}">${esc(l.kind || 'item')}</span></td>
+            <td class="r">${l.length ? l.length.toFixed(3) + ' m' : '-'}</td>
+            <td class="r">${l.nos || '-'}</td>
+            <td class="r">${l.totalMetres ? l.totalMetres.toFixed(3) + ' m' : '-'}</td>
+            <td class="r">${l.kind === 'profile' ? rs(cs.aluminium_rate_per_kg || 500) + '/kg' : rs(l.unit_price)}</td>
+            <td class="r" style="font-weight:600">${rs(l.amount)}</td>
+          </tr>`).join('');
+        }
+      } else {
+        const res = CostingEngine.calculateItem(tpl, tpl.lines, w, h, { glass_id: glassId, mesh: mesh }, cs, rates);
+        if ($('#prev_res_area')) $('#prev_res_area').textContent = `${(w * h).toFixed(1)} sqft (${res.A.toFixed(2)} sqm)`;
+        if ($('#prev_res_subtotal')) $('#prev_res_subtotal').textContent = '₹' + res.subtotal.toFixed(2);
+        if ($('#prev_res_wastage')) $('#prev_res_wastage').textContent = '₹' + res.wastage.toFixed(2);
+        if ($('#prev_res_totalcost')) $('#prev_res_totalcost').textContent = '₹' + res.totalCost.toFixed(2);
+        if ($('#prev_res_margin')) $('#prev_res_margin').textContent = '₹' + res.margin;
+        if ($('#prev_res_price')) $('#prev_res_price').textContent = '₹' + res.priceExTax.toLocaleString('en-IN');
+        if ($('#prev_res_sqm')) $('#prev_res_sqm').textContent = '₹' + res.ratePerSqm.toLocaleString('en-IN') + ' / sqm';
+        if ($('#prev_res_sqft')) $('#prev_res_sqft').textContent = '₹' + res.ratePerSqft + ' / sqft';
+        if ($('#prev_res_gst')) $('#prev_res_gst').textContent = '₹' + res.priceInclGst.toLocaleString('en-IN');
+
+        res.lines.forEach(l => {
+          const amtEl = $(`#line_amt_${l.sl_no}`);
+          if (amtEl) amtEl.textContent = rs(l.amount);
+          const lenEl = $(`#line_len_${l.sl_no}`);
+          if (lenEl) lenEl.textContent = l.evaluatedLen ? l.evaluatedLen.toFixed(3) + ' m' : (l.length ? l.length.toFixed(3) + ' m' : '-');
+          const nosEl = $(`#line_nos_${l.sl_no}`);
+          if (nosEl) nosEl.textContent = l.evaluatedNos || l.nos || '-';
+        });
+      }
     };
     ACT.matEdit = b => {
       const id = b.dataset.id;
@@ -5837,15 +6838,25 @@
       const q = db.quotes.find(x => x.id === id), m = $('#main');
       if (!q || !visibleQuote(q)) { m.innerHTML = `<div class="empty">This quote was not found or you do not have access. <a href="#/quotes">Back to quotes</a></div>`; return }
       Q = q; const ro = !canEdit(q);
+      const isDraft = ['draft'].includes(q.status);
+      const currentCosting = (db && db.costingSettings) || CostingEngine.getDefaultCostingSettings();
+      const snap = q.costingSettingsSnapshot;
+      const ratesChanged = isDraft && snap && (
+        snap.aluminium_rate_per_kg !== currentCosting.aluminium_rate_per_kg ||
+        snap.margin_pct !== currentCosting.margin_pct ||
+        snap.labour_rate_per_sqm !== currentCosting.labour_rate_per_sqm
+      );
+
       m.innerHTML = `<div class="ph"><div><a href="#/quotes" class="sm">&lsaquo; All quotes</a><h1>${esc(q.no)} ${statusBadge(q.status)}</h1><div class="mute sm">Created by ${esc(userName(q.createdBy))} on ${fmtDate(new Date(q.createdAt).toISOString().slice(0, 10))}${q.rev ? ' &middot; Revision ' + q.rev : ''}${q.superseded ? ' &middot; Replaced by a newer revision' : ''}</div></div><div class="acts" id="topActs"></div></div>
+  ${ratesChanged ? `<div class="note" style="margin-bottom:14px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;display:flex;align-items:center;justify-content:space-between"><div><b>⚠️ Costing Settings Changed:</b> The aluminium or labour rate in Settings was changed since this draft was saved.</div><button type="button" class="btn sm pri" data-act="recalcQuoteRates">Recalculate All Lines</button></div>` : ''}
   ${ro && !q.superseded ? `<div class="note" style="margin-bottom:14px">${q.status === 'pending' ? 'This quote is waiting for approval and cannot be edited.' : ['approved', 'sent', 'won', 'lost'].includes(q.status) ? 'This quote is locked. To change it, create a revision.' : 'You cannot edit this quote.'}</div>` : ''}
   ${q.status === 'rejected' && q.reviewNote ? `<div class="note" style="margin-bottom:14px;background:var(--bad-l);border-color:#e3b4b4"><b>Rejected:</b> ${esc(q.reviewNote)}</div>` : ''}
   <div class="qg"><div><fieldset class="fs" ${ro ? 'disabled' : ''}>
    <div class="card"><h3>Customer and project</h3><div id="custCard"></div></div>
-   <div class="card"><div class="card-h"><h3>Items and pricing</h3><div class="acts"><button class="btn sm" data-act="aiDraftQuote" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:0;font-weight:600">✨ AI Assistant</button><button class="btn sm" data-act="searchHistoryItems">🔍 Rate History Search</button><button class="btn sm pri" data-act="addSize">Add window, door or facade</button><button class="btn sm" data-act="addBoq">Add BOQ item</button><button class="btn sm" data-act="addSec">Add heading</button></div></div>
-    <div class="grid g2" style="margin-bottom:12px"><label class="f"><span>Sizes are entered in</span><select data-q="dimUnit"><option value="mm" ${q.dimUnit === 'mm' ? 'selected' : ''}>Millimetres (mm)</option><option value="ft" ${q.dimUnit === 'ft' ? 'selected' : ''}>Feet (ft)</option><option value="in" ${q.dimUnit === 'in' ? 'selected' : ''}>Inches (in)</option><option value="m" ${q.dimUnit === 'm' ? 'selected' : ''}>Metres (m)</option></select></label></div>
+   <div class="card"><div class="card-h"><h3>Items and pricing</h3><div class="acts"><button class="btn sm" data-act="aiDraftQuote" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:0;font-weight:600">✨ AI Assistant</button><button class="btn sm" data-act="openSiteMeasurementSheet" style="background:var(--card);font-weight:600">📐 Site Measurement (M-Sheet)</button><button class="btn sm" data-act="searchHistoryItems">🔍 Rate History Search</button><button class="btn sm pri" data-act="addSize">+ Add Window / Door (Auto-Costing)</button><button class="btn sm" data-act="addBoq">+ Add BOQ item</button><button class="btn sm" data-act="addSec">+ Add Floor / Section</button></div></div>
+    <div class="grid g2" style="margin-bottom:12px"><label class="f"><span>Sizes are entered in</span><select data-q="dimUnit"><option value="ft" ${(!q.dimUnit || q.dimUnit === 'ft') ? 'selected' : ''}>Feet (ft)</option><option value="mm" ${q.dimUnit === 'mm' ? 'selected' : ''}>Millimetres (mm)</option><option value="in" ${q.dimUnit === 'in' ? 'selected' : ''}>Inches (in)</option><option value="m" ${q.dimUnit === 'm' ? 'selected' : ''}>Metres (m)</option></select></label></div>
     <div id="lines"></div>
-    <div class="acts" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:8px"><button class="btn sm" data-act="aiDraftQuote" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:0;font-weight:600">✨ AI Assistant</button><button class="btn sm" data-act="searchHistoryItems">🔍 Rate History Search</button><button class="btn sm pri" data-act="addSize">+ Add window, door or facade</button><button class="btn sm" data-act="addBoq">+ Add BOQ item</button><button class="btn sm" data-act="addSec">+ Add heading</button></div></div>
+    <div class="acts" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:8px"><button class="btn sm" data-act="aiDraftQuote" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:0;font-weight:600">✨ AI Assistant</button><button class="btn sm" data-act="openSiteMeasurementSheet" style="background:var(--card);font-weight:600">📐 Site Measurement (M-Sheet)</button><button class="btn sm" data-act="searchHistoryItems">🔍 Rate History Search</button><button class="btn sm pri" data-act="addSize">+ Add Window / Door (Auto-Costing)</button><button class="btn sm" data-act="addBoq">+ Add BOQ item</button><button class="btn sm" data-act="addSec">+ Add Floor / Section</button></div></div>
    <div class="card"><h3>Extra charges</h3><div class="mute sm" style="margin-bottom:8px">Transport, installation, scaffolding and similar. Added before GST.</div><div id="extras"></div><button class="btn sm" data-act="addExtra">Add charge</button></div>
    <div class="card"><h3>Payment schedule</h3><div id="pays"></div><button class="btn sm" data-act="addPay">Add stage</button></div>
    <div class="card"><h3>Terms and notes</h3><div class="grid">
@@ -5854,6 +6865,7 @@
   </fieldset></div>
   <aside class="qside"><div class="card"><h3>Summary</h3><fieldset class="fs" ${ro ? 'disabled' : ''}>
     <div class="grid g2" style="margin-bottom:8px">
+      <label class="f" style="grid-column:1/-1"><span>Transportation charges (&#8377;)</span><input type="number" step="any" min="0" data-q="transport_charges" data-t="n" value="${q.transport_charges !== undefined ? q.transport_charges : ''}" placeholder="e.g. 6000"></label>
       <label class="f"><span>Discount type</span><select data-q="discType" id="q_discType"><option value="pct" ${q.discType === 'pct' ? 'selected' : ''}>Percentage (%)</option><option value="amt" ${q.discType === 'amt' ? 'selected' : ''}>Lump sum (&#8377;)</option></select></label>
       <label class="f"><span id="discValLabel">${q.discType === 'amt' ? 'Discount Amount (&#8377;)' : 'Enter Discount %'}</span><input type="number" step="any" min="0" id="q_discVal" data-q="discVal" data-t="n" value="${q.discVal || ''}" placeholder="${q.discType === 'amt' ? 'e.g. 5000' : 'e.g. 10'}"></label>
       <div style="grid-column:1/-1;display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:-2px 0 6px">
@@ -5865,7 +6877,7 @@
         <button type="button" class="chip sm" data-act="setDiscPct" data-v="20">20%</button>
       </div>
       <label class="chk" style="grid-column:1/-1"><input type="checkbox" data-q="gst" data-t="b" ${q.gst ? 'checked' : ''}> Charge GST</label>
-      <label class="f"><span>GST rate (%)</span><input type="number" step="any" min="0" data-q="gstRate" data-t="n" value="${q.gstRate}"></label>
+      <label class="f"><span>GST rate (%)</span><input type="number" step="any" min="0" data-q="gstRate" data-t="n" value="${q.gstRate !== undefined ? q.gstRate : 18}"></label>
       <label class="f" style="grid-column:1/-1"><span>GST tax option</span><select data-q="gstType"><option value="auto" ${(!q.gstType || q.gstType === 'auto') ? 'selected' : ''}>Auto (Place of supply vs state)</option><option value="igst" ${q.gstType === 'igst' ? 'selected' : ''}>IGST (Interstate)</option><option value="cgst_sgst" ${q.gstType === 'cgst_sgst' ? 'selected' : ''}>CGST + SGST (Intrastate)</option></select></label></div></fieldset>
     <div id="totbox"></div></div>
    <div id="aprBox"></div><div id="mgnBox"></div>
@@ -5874,6 +6886,8 @@
    <div class="card"><h3>Activity</h3><ul class="hist" id="logs"></ul></div></aside></div>`;
       drawCustCard(); drawLines(); drawExtras(); drawPays(); drawActs(); refreshCalc(); drawSide();
       // Load payment tracking
+      loadPayments(q.id);
+    }
       loadPayments(q.id);
     }
     // Payment tracking (supports both Cloud and Local offline mode)
@@ -5969,7 +6983,7 @@
       $('#custCard').innerHTML = `<div class="grid g2">
    <label class="f" style="grid-column:1/-1"><span>Pick a saved customer</span><select id="custSel"><option value="">Type details manually</option>${db.customers.slice().sort((a, b) => a.name.localeCompare(b.name)).map(x => `<option value="${x.id}" ${x.id === q.customerId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
    <label class="f"><span>Customer name</span><input data-c="name" value="${esc(c.name)}"></label>
-   <label class="f"><span>Contact person</span><input data-c="contact" value="${esc(c.contact)}"></label>
+   <label class="f"><span>Contact person / CEO</span><input data-c="contact" value="${esc(c.contact)}"></label>
    <label class="f"><span>Phone</span><input data-c="phone" value="${esc(c.phone)}"></label>
    <label class="f"><span>Email</span><input data-c="email" value="${esc(c.email)}"></label>
    <label class="f"><span>Customer GSTIN</span><input data-c="gstin" value="${esc(c.gstin)}"></label>
@@ -5979,16 +6993,23 @@
    <label class="f"><span>Site location</span><input data-q="site" value="${esc(q.site)}"></label>
    <label class="f"><span>Quotation date</span><input type="date" data-q="date" value="${q.date}"></label>
    <label class="f"><span>Valid for (days)</span><input type="number" min="1" data-q="validity" data-t="n" value="${q.validity}"></label>
-   <label class="f"><span>Prepared By (Name)</span><input data-q="preparedByName" value="${esc(q.preparedByName || (me ? me.name : ''))}"></label>
+   <label class="f"><span>Prepared By (PRE Name)</span><input data-q="preparedByName" value="${esc(q.preparedByName || q.pre_name || (me ? me.name : ''))}"></label>
+   <label class="f"><span>PRE Phone Number</span><input data-q="pre_phone" value="${esc(q.pre_phone || (me && me.phone) || '')}" placeholder="e.g. +91 98765 43210"></label>
+   <label class="f" style="grid-column:1/-1"><span>Series Line (Quotation Header)</span><input data-q="series_line" value="${esc(q.series_line || 'Aluminium Windows – Domal 27 Series – Black (matt finish) powder coated')}" placeholder="e.g. Aluminium Windows – Domal 27 Series – Black (matt finish) powder coated"></label>
    <label class="f"><span>Authorised Signatory</span><select data-q="authorisedBy"><option value="Manager" ${(q.authorisedBy || 'Manager') === 'Manager' ? 'selected' : ''}>Manager</option><option value="Managing Director (MD)" ${q.authorisedBy === 'Managing Director (MD)' ? 'selected' : ''}>Managing Director (MD)</option><option value="Project Head" ${q.authorisedBy === 'Project Head' ? 'selected' : ''}>Project Head</option><option value="Prepared Person Only" ${q.authorisedBy === 'Prepared Person Only' ? 'selected' : ''}>Prepared Person Only</option></select></label>
-   <label class="f" style="grid-column:1/-1"><span>Subject line (printed above the table)</span><input data-q="subject" placeholder="Supply and installation of aluminium windows and doors" value="${esc(q.subject)}"></label>
+   <label class="f" style="grid-column:1/-1"><span>Subject line (printed above the table)</span><input data-q="subject" placeholder="Supply & fixing of aluminium windows work" value="${esc(q.subject || 'Supply & fixing of aluminium windows work')}"></label>
    <label class="f" style="grid-column:1/-1"><span>Introduction</span><textarea data-q="intro" rows="3">${esc(q.intro)}</textarea></label></div>`;
     }
     function lineHTML(l, i, n) {
       const mg = canViewMargin(), num_ = Q.lines.slice(0, i + 1).filter(x => x.type !== 'section').length;
       const ctr = `<div class="ln-c"><button class="btn ghost sm" data-act="lnUp" title="Move up" ${i === 0 ? 'disabled' : ''}>&uarr;</button><button class="btn ghost sm" data-act="lnDown" title="Move down" ${i === n - 1 ? 'disabled' : ''}>&darr;</button><button class="btn ghost sm" data-act="lnDup" title="Duplicate">Copy</button><button class="btn ghost sm bad" data-act="lnDel" title="Delete">Delete</button></div>`;
-      if (l.type === 'section') return `<div class="ln sec" data-lid="${l.id}"><div class="ln-h"><input ${gl(l, 'title')} value="${esc(l.title)}" placeholder="Heading, for example Ground floor" style="flex:1;min-width:160px">${ctr}</div></div>`;
-      if (l.type === 'boq') return `<div class="ln" data-lid="${l.id}"><div class="ln-h"><span class="ln-n">${num_}</span><span class="mute sm">BOQ item</span><span class="sp"></span>${ctr}</div><div class="ln-b one"><div class="ln-f">
+
+      if (l.type === 'section') {
+        return `<div class="ln sec" data-lid="${l.id}"><div class="ln-h"><span style="font-size:1.15rem;margin-right:6px">🏢</span><input ${gl(l, 'title')} value="${esc(l.title)}" placeholder="Floor / Section Heading (e.g. GROUND FLOOR, FIRST FLOOR, LIVING ROOM)" style="flex:1;min-width:180px;font-weight:700;font-size:1.05rem;color:var(--pri)">${ctr}</div></div>`;
+      }
+
+      if (l.type === 'boq') {
+        return `<div class="ln" data-lid="${l.id}"><div class="ln-h"><span class="ln-n">${num_}</span><span class="mute sm">BOQ item</span><span class="sp"></span>${ctr}</div><div class="ln-b one"><div class="ln-f">
     <label class="f s6"><span>Item name</span><input ${gl(l, 'name')} value="${esc(l.name)}" placeholder="e.g. Glass Partition"></label>
     <label class="f s6"><span>Description <span class="mute">(scope of work)</span></span><textarea rows="3" ${gl(l, 'desc')} placeholder="e.g. Supply and fixing of glass partition using 45mm series aluminium section with necessary hardwares">${esc(l.desc || '')}</textarea></label>
     <label class="f"><span>Quantity</span><input type="number" step="any" min="0" ${gl(l, 'qty', 'n')} value="${l.qty}"></label>
@@ -5998,24 +7019,118 @@
     ${mg ? `<label class="f s2"><span>Your cost / unit (internal)</span><input type="number" step="any" min="0" ${gl(l, 'cost', 'n')} value="${l.cost || ''}"></label>` : ''}
     <div class="f s6 boq-img-wrap"><span class="f-lbl">Image <span class="mute">(optional, shown in quotation)</span></span><div class="boq-img-row">${l.img ? `<img class="boq-thumb" src="${l.img}" alt="item image">` : '<span class="mute sm">No image</span>'}<label class="btn sm boq-img-btn">Attach image<input type="file" accept="image/*" class="boq-img-input" data-imgfor="${l.id}" style="display:none"></label>${l.img ? `<button class="btn sm bad boq-img-rm" data-rmimg="${l.id}">Remove</button>` : ''}</div></div>
     <div class="ln-calc" data-calc="${l.id}"></div></div></div></div>`;
-      const gs = db.settings.glass, fs = db.settings.finish;
-      const gopts = (arr, cur) => (arr.some(o => o.name === cur) || !cur ? '' : `<option value="-1" selected>${esc(cur)} (not in list)</option>`) + arr.map((o, k) => `<option value="${k}" ${o.name === cur ? 'selected' : ''}>${esc(o.name)}${o.add ? ' (+' + o.add + ')' : ''}</option>`).join('');
-      return `<div class="ln" data-lid="${l.id}"><div class="ln-h"><span class="ln-n">${num_}</span><input class="tag" ${gl(l, 'tag')} value="${esc(l.tag)}" placeholder="Mark, e.g. W1" aria-label="Mark"><input class="loc" ${gl(l, 'loc')} value="${esc(l.loc)}" placeholder="Location, e.g. Master bedroom" aria-label="Location">${ctr}</div>
-   <div class="ln-b"><div style="display:flex;flex-direction:column;align-items:center;min-width:64px;gap:6px">${glyph(l.glyph)}<div id="svgprev_${l.id}" style="margin-top:4px">${num(l.w) > 0 && num(l.h) > 0 ? windowSvg({type: l.glyph || 'slider', w: num(l.w), h: num(l.h), maxW: 100, maxH: 75}) : ''}</div></div><div class="ln-f">
-    <label class="f s6"><span>Item</span><input ${gl(l, 'name')} value="${esc(l.name)}"></label>
-    <label class="f s6"><span>Specification (printed on the quotation)</span><textarea rows="2" ${gl(l, 'spec')}>${esc(l.spec)}</textarea></label>
-    <label class="f"><span>Width</span><input type="number" step="any" min="0" ${gl(l, 'w', 'n')} value="${l.w}"></label>
-    <label class="f"><span>Height</span><input type="number" step="any" min="0" ${gl(l, 'h', 'n')} value="${l.h}"></label>
-    <label class="f"><span>Qty</span><input type="number" step="any" min="0" ${gl(l, 'qty', 'n')} value="${l.qty}"></label>
-    <label class="f s2"><span>Base rate / sq ft</span><input type="number" step="any" min="0" ${gl(l, 'rate', 'n')} value="${l.rate}"></label>
-    <label class="f"><span>Disc. %</span><input type="number" step="any" min="0" max="100" ${gl(l, 'disc', 'n')} value="${l.disc || ''}"></label>
-    <label class="f s3"><span>Glass</span><select ${gl(l, 'glass')}>${gopts(gs, l.glassName)}</select></label>
-    <label class="f s3"><span>Finish</span><select ${gl(l, 'finish')}>${gopts(fs, l.finishName)}</select></label>
-    <label class="f s2"><span>Hardware per unit (&#8377;)</span><input type="number" step="any" min="0" ${gl(l, 'hw', 'n')} value="${l.hw || ''}"></label>
-    <label class="f s2"><span>Min. billable area (sq ft)</span><input type="number" step="any" min="0" ${gl(l, 'minArea', 'n')} value="${l.minArea || ''}"></label>
-    ${mg ? `<label class="f s2"><span>Your cost / sq ft (internal)</span><input type="number" step="any" min="0" ${gl(l, 'cost', 'n')} value="${l.cost || ''}"></label>` : ''}
-    <div style="grid-column:1/-1;margin-top:4px"><button class="btn sm" data-act="openCalcSheet" data-lid="${l.id}">🧮 Profile Cost Calculator Sheet</button></div>
-    <div class="ln-calc" data-calc="${l.id}"></div></div></div></div>`;
+      }
+
+      // l.type === 'size': Auto-Costing Window / Door Row
+      const qUnit = Q.dimUnit || 'ft';
+      const allTemplates = (db && db.productTemplates && db.productTemplates.length) ? db.productTemplates : CostingEngine.getSeedTemplates();
+      const currentTpl = allTemplates.find(t => t.id === l.template_id || t.template_key === l.template_id || t.id === l.templateKey) || allTemplates[0];
+      const allowsMesh = currentTpl ? (currentTpl.allows_mesh !== false) : true;
+
+      const allMats = (db && db.materials) || [];
+      const glassMats = allMats.filter(m => m.category === 'glass');
+      const glassList = glassMats.length ? glassMats.map(g => ({ id: g.id, name: g.name, rate: g.rate })) : CostingEngine.getDefaultGlassTypes().map(g => ({ id: g.id, name: g.name, rate: g.rate_per_sqm }));
+      const handleMats = allMats.filter(m => m.category === 'hardware');
+      const handleList = handleMats.length ? handleMats.map(h => ({ id: h.id, name: h.name, price: h.rate })) : CostingEngine.getDefaultHandleTypes();
+
+      const curGlass = l.glass_id || l.glassName || (currentTpl && currentTpl.default_glass) || '6mm Toughened';
+      const curMesh = l.mesh !== undefined ? l.mesh : (allowsMesh ? 'SS Mesh' : 'NA');
+      const curHandle = l.handle || (currentTpl && currentTpl.default_handle) || 'Standard Handle';
+
+      const tplOpts = allTemplates.map(t => `<option value="${t.id}" ${(currentTpl && (currentTpl.id === t.id || currentTpl.template_key === t.id)) ? 'selected' : ''}>${esc(t.name)} (${esc(t.series || 'Domal 27')})</option>`).join('');
+      const gOpts = glassList.map(g => `<option value="${esc(g.id || g.name)}" ${(curGlass === g.id || curGlass === g.name) ? 'selected' : ''}>${esc(g.name)} (₹${g.rate || g.rate_per_sqm}/sqm)</option>`).join('');
+      const hOpts = handleList.map(h => `<option value="${esc(h.name)}" ${curHandle === h.name ? 'selected' : ''}>${esc(h.name)}${h.price ? ' (+₹' + h.price + ')' : ''}</option>`).join('');
+
+      const c = lineCalc(l, Q);
+      const isOverride = c.isOverride;
+      const calcRate = c.calcRate || c.rate;
+
+      return `<div class="ln" data-lid="${l.id}">
+  <div class="ln-h">
+    <span class="ln-n">${num_}</span>
+    <input class="tag" ${gl(l, 'tag')} value="${esc(l.tag || '')}" placeholder="Mark, e.g. W1" aria-label="Mark">
+    <input class="loc" ${gl(l, 'loc')} value="${esc(l.loc || '')}" placeholder="Location, e.g. Living Room" aria-label="Location">
+    <span class="sp"></span>
+    ${ctr}
+  </div>
+  <div class="ln-b">
+    <div style="display:flex;flex-direction:column;align-items:center;min-width:64px;gap:6px">
+      ${glyph(l.glyph || 'slider')}
+      <div id="svgprev_${l.id}" style="margin-top:4px">
+        ${num(l.w) > 0 && num(l.h) > 0 ? windowSvg({type: l.glyph || 'slider', w: num(l.w), h: num(l.h), maxW: 100, maxH: 75}) : ''}
+      </div>
+    </div>
+    <div class="ln-f">
+      <label class="f s4">
+        <span>Product Template (Auto-Costing)</span>
+        <select data-lid-template="${l.id}">
+          <option value="">-- Choose Template --</option>
+          ${tplOpts}
+        </select>
+      </label>
+      <label class="f s4">
+        <span>Item Name</span>
+        <input ${gl(l, 'name')} value="${esc(l.name || (currentTpl ? currentTpl.name : ''))}" placeholder="e.g. 2.5T 2P Sliding Window">
+      </label>
+      <label class="f s4">
+        <span>Specification</span>
+        <input ${gl(l, 'spec')} value="${esc(l.spec || (currentTpl ? (currentTpl.series || 'Domal 27') + ' Series' : ''))}" placeholder="Specification">
+      </label>
+
+      <label class="f s2">
+        <span>Width (${qUnit}) <button type="button" class="chip sm" data-act="quickMmToFt" data-field="w" data-lid="${l.id}" title="Convert mm to ft">mm&rarr;ft</button></span>
+        <input type="number" step="any" min="0" ${gl(l, 'w', 'n')} value="${l.w}" placeholder="Width">
+      </label>
+      <label class="f s2">
+        <span>Height (${qUnit}) <button type="button" class="chip sm" data-act="quickMmToFt" data-field="h" data-lid="${l.id}" title="Convert mm to ft">mm&rarr;ft</button></span>
+        <input type="number" step="any" min="0" ${gl(l, 'h', 'n')} value="${l.h}" placeholder="Height">
+      </label>
+      <label class="f s2">
+        <span>Quantity</span>
+        <input type="number" step="any" min="0" ${gl(l, 'qty', 'n')} value="${l.qty}">
+      </label>
+
+      <label class="f s3">
+        <span>Glass Type</span>
+        <select ${gl(l, 'glass_id')}>
+          ${gOpts}
+        </select>
+      </label>
+      <label class="f s3">
+        <span>Mesh Option</span>
+        <select ${gl(l, 'mesh')} ${allowsMesh ? '' : 'disabled'}>
+          <option value="SS Mesh" ${curMesh === 'SS Mesh' ? 'selected' : ''}>SS Mesh (₹290/sqm)</option>
+          <option value="NA" ${curMesh === 'NA' || !allowsMesh ? 'selected' : ''}>NA (No Mesh)</option>
+        </select>
+      </label>
+      <label class="f s3">
+        <span>Handle Type</span>
+        <select ${gl(l, 'handle')}>
+          ${hOpts}
+        </select>
+      </label>
+      <label class="f s3">
+        <span>Disc. %</span>
+        <input type="number" step="any" min="0" max="100" ${gl(l, 'disc', 'n')} value="${l.disc || ''}">
+      </label>
+
+      <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 0;border-top:1px dashed var(--line);margin-top:4px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button type="button" class="btn sm" data-act="viewBOM" data-lid="${l.id}" style="font-weight:600">🧮 View Cost Breakdown</button>
+          ${isOverride ? `
+            <span class="chip sm warn" title="${esc(l.rate_override_reason || 'Custom override')}">OVERRIDE: ₹${l.rate_override}/sqft</span>
+            <button type="button" class="btn ghost sm bad" data-act="clearRateOverride" data-lid="${l.id}">Reset Rate</button>
+          ` : `
+            <button type="button" class="btn ghost sm" data-act="promptRateOverride" data-lid="${l.id}">✏️ Override Rate</button>
+          `}
+        </div>
+        <div class="mute sm">Calculated Benchmark Rate: <b style="color:var(--pri)">₹${calcRate} / sq ft</b></div>
+      </div>
+
+      <div class="ln-calc" data-calc="${l.id}"></div>
+    </div>
+  </div>
+</div>`;
     }
     function drawLines() {
       const L = Q.lines;
@@ -6025,18 +7140,25 @@
       const c = lineCalc(l, Q);
       if (l.type === 'boq') return `<span>Quantity &times; rate <b>${rs(c.gross)}</b></span>${c.disc ? `<span>Discount <b>&minus;${rs(c.disc)}</b></span>` : ''}<span class="amt">Amount <b>${rs(c.amt)}</b></span>`;
       if (num(l.w) <= 0 || num(l.h) <= 0) return `<span class="mute">Enter width and height to see the price.</span><span class="amt">Amount <b>${rs(0)}</b></span>`;
-      return `<span>Area <b>${inr(c.area)}</b> sq ft each${c.billed > c.area ? ` (billed as <b>${inr(c.billed)}</b>)` : ''}</span><span>Rate <b>${rs(c.rate)}</b> / sq ft</span><span>Price each <b>${rs(c.unit)}</b></span><span>Total area <b>${inr(c.totalArea)}</b> sq ft</span>${c.disc ? `<span>Discount <b>&minus;${rs(c.disc)}</b></span>` : ''}<span class="amt">Amount <b>${rs(c.amt)}</b></span>`;
+      return `<span>Area <b>${inr(c.area, 2)}</b> sq ft each</span><span>Total Area <b>${inr(c.totalArea, 2)}</b> sq ft</span><span>Rate <b>${rs(c.rate)}</b> / sq ft${c.isOverride ? ' <b style="color:var(--warn)">(Override)</b>' : ''}</span><span>Price each <b>${rs(c.unit)}</b></span>${c.disc ? `<span>Discount <b>&minus;${rs(c.disc)}</b></span>` : ''}<span class="amt">Amount <b>${rs(c.amt)}</b></span>`;
     }
     function totHTML(t) {
       const q = Q, words = rupeesWords(t.grand);
-      return `<table class="tot"><tr><td>Items subtotal</td><td class="r">${rs(t.sub)}</td></tr>
+      return `<table class="tot">
+  <tr><td>Total Items Qty</td><td class="r"><b>${inr(t.totalQty)} nos</b></td></tr>
+  <tr><td>Total Area</td><td class="r"><b>${inr(t.sizeArea, 2)} sq ft</b></td></tr>
+  <tr><td>Items subtotal</td><td class="r"><b>${rs(t.sub)}</b></td></tr>
+  ${t.sizeArea > 0 ? `<tr><td>Average rate</td><td class="r"><b>${rs(t.avgRate)} / sq ft</b></td></tr>` : ''}
   ${t.dAmt ? `<tr><td>Discount${q.discType === 'pct' ? ' (' + num(q.discVal) + '%)' : ''}</td><td class="r">&minus;${rs(t.dAmt)}</td></tr>` : ''}
-  ${t.extras ? `<tr><td>Extra charges</td><td class="r">${rs(t.extras)}</td></tr>` : ''}
-  <tr><td>Taxable value</td><td class="r">${rs(t.taxable)}</td></tr>
+  <tr><td>Transportation charges</td><td class="r">${rs(num(q.transport_charges) || 0)}</td></tr>
+  ${(q.extras || []).filter(e => num(e.amount)).map(e => `<tr><td>${esc(e.label || 'Extra charge')}</td><td class="r">${rs(num(e.amount))}</td></tr>`).join('')}
+  <tr><td>Taxable value (Ex-GST)</td><td class="r"><b>${rs(t.taxable)}</b></td></tr>
   ${q.gst ? (t.inter ? `<tr><td>IGST (${t.rate}%)</td><td class="r">${rs(t.ig)}</td></tr>` : `<tr><td>CGST (${t.rate / 2}%)</td><td class="r">${rs(t.cg)}</td></tr><tr><td>SGST (${t.rate / 2}%)</td><td class="r">${rs(t.sg)}</td></tr>`) : `<tr><td>GST</td><td class="r mute">Not charged</td></tr>`}
   ${t.round ? `<tr><td>Round off</td><td class="r">${t.round > 0 ? '+' : '&minus;'}${rs(Math.abs(t.round))}</td></tr>` : ''}
-  <tr class="gt"><td>Grand total</td><td class="r">${rs(t.grand)}</td></tr></table><div class="mute sm" style="margin-top:8px">${esc(words)}</div>
-  ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied (' + (q.gstType === 'igst' ? 'Manual selection' : 'Interstate supply') + ').' : 'CGST & SGST applied (' + (q.gstType === 'cgst_sgst' ? 'Manual selection' : 'Intrastate supply') + ').'}</div>` : ''}`;
+  <tr class="gt"><td>Grand total (Incl. GST)</td><td class="r">${rs(t.grand)}</td></tr>
+</table>
+<div class="mute sm" style="margin-top:8px">${esc(words)}</div>
+${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied (' + (q.gstType === 'igst' ? 'Manual selection' : 'Interstate supply') + ').' : 'CGST & SGST applied (' + (q.gstType === 'cgst_sgst' ? 'Manual selection' : 'Intrastate supply') + ').'}</div>` : ''}`;
     }
     function refreshCalc() {
       Q.lines.forEach(l => { const e = $(`[data-calc="${l.id}"]`); if (e) e.innerHTML = lineCalcHTML(l) });
@@ -6153,6 +7275,33 @@
     }
     document.addEventListener('input', onField); document.addEventListener('change', onField);
 
+    /* Product Template dropdown change handler */
+    document.addEventListener('change', e => {
+      const t = e.target;
+      if (t && t.dataset && t.dataset.lidTemplate && Q) {
+        const lid = t.dataset.lidTemplate;
+        const l = Q.lines.find(x => x.id === lid);
+        if (!l) return;
+        const tplId = t.value;
+        const allTemplates = (db && db.productTemplates && db.productTemplates.length) ? db.productTemplates : CostingEngine.getSeedTemplates();
+        const tpl = allTemplates.find(x => x.id === tplId || x.template_key === tplId);
+        if (tpl) {
+          l.template_id = tpl.id;
+          l.name = tpl.name;
+          l.spec = (tpl.series || 'Domal 27') + ' Series Aluminium Powder Coated';
+          l.glyph = tpl.category === 'door' ? 'door' : 'slider';
+          if (tpl.default_glass) l.glass_id = tpl.default_glass;
+          if (tpl.allows_mesh !== false) l.mesh = 'SS Mesh';
+          else l.mesh = 'NA';
+          if (tpl.default_handle) l.handle = tpl.default_handle;
+          touch();
+          drawLines();
+          refreshCalc();
+          toast(`Applied template: ${tpl.name}`);
+        }
+      }
+    });
+
     /* BOQ image upload / remove */
     document.addEventListener('change', e => {
       const inp = e.target.closest('.boq-img-input'); if (!inp) return;
@@ -6181,14 +7330,67 @@
     function mkBoq(p) { return { id: uid(), type: 'boq', _libId: p ? p.id : '', name: p ? p.desc : '', desc: '', img: '', qty: 1, unit: p ? p.unit : 'nos', rate: p ? p.rate : 0, cost: p ? p.cost : 0, disc: 0 } }
     function addLine(l) { Q.lines.push(l); touch(); drawLines(); refreshCalc(); const e = $(`[data-lid="${l.id}"] input,[data-lid="${l.id}"] textarea`); if (e) { e.scrollIntoView({ block: 'center', behavior: 'smooth' }); e.focus({ preventScroll: true }) } }
     function picker(kind) {
+      const tpls = (db && db.productTemplates && db.productTemplates.length) ? db.productTemplates : CostingEngine.getSeedTemplates();
       const list = kind === 'size' ? db.products : db.items;
-      const el = modal({ title: kind === 'size' ? 'Add window, door or facade' : 'Add BOQ item', noFooter: true, wide: true, body: `<input type="search" id="pkq" placeholder="Search the rate library"><div class="pk"><button data-pk="">${kind === 'size' ? 'Blank item (type everything yourself)' : 'Blank item (type everything yourself)'}</button><div id="pkl" style="display:grid;gap:6px"></div></div>` });
+      const el = modal({
+        title: kind === 'size' ? 'Add window, door or facade' : 'Add BOQ item',
+        noFooter: true,
+        wide: true,
+        body: `<input type="search" id="pkq" placeholder="Search templates or products...">
+          <div class="pk">
+            <button data-pk="blank">${kind === 'size' ? 'Blank window / manual entry' : 'Blank BOQ item'}</button>
+            ${kind === 'size' ? `<div style="font-weight:700;margin:12px 0 6px;color:var(--pri)">⚡ Excel Auto-Costing Templates:</div>
+            <div style="display:grid;gap:6px;margin-bottom:12px">
+              ${tpls.map(t => `<button data-pktpl="${t.id}">${glyph(t.category === 'door' ? 'door' : 'slider', 28)}<span><b>${esc(t.name)}</b><small>${esc(t.series || 'Domal 27')} Series &bull; Auto-costing BOM</small></span></button>`).join('')}
+            </div>
+            <div style="font-weight:700;margin:10px 0 6px">Standard Catalogue Products:</div>` : ''}
+            <div id="pkl" style="display:grid;gap:6px"></div>
+          </div>`
+      });
       const draw = () => {
         const t = $('#pkq', el).value.trim().toLowerCase();
-        $('#pkl', el).innerHTML = list.filter(p => !t || (p.name || p.desc).toLowerCase().includes(t) || (p.category || '').toLowerCase().includes(t)).map(p => kind === 'size' ? `<button data-pk="${p.id}">${glyph(p.glyph, 30)}<span><b>${esc(p.name)}</b><small>${rs(p.rate)} per sq ft</small></span></button>` : `<button data-pk="${p.id}"><span><b>${esc(p.desc)}</b><small>${esc(p.category)}, ${rs(p.rate)} per ${esc(p.unit)}</small></span></button>`).join('') || '<div class="mute">Nothing matches. Use a blank item.</div>'
+        $('#pkl', el).innerHTML = list.filter(p => !t || (p.name || p.desc).toLowerCase().includes(t) || (p.category || '').toLowerCase().includes(t)).map(p => kind === 'size' ? `<button data-pk="${p.id}">${glyph(p.glyph, 30)}<span><b>${esc(p.name)}</b><small>${rs(p.rate)} per sq ft</small></span></button>` : `<button data-pk="${p.id}"><span><b>${esc(p.desc)}</b><small>${esc(p.category)}, ${rs(p.rate)} per ${esc(p.unit)}</small></span></button>`).join('') || '<div class="mute">Nothing matches.</div>';
       };
-      draw(); $('#pkq', el).oninput = draw;
-      el.addEventListener('click', e => { const b = e.target.closest('[data-pk]'); if (!b) return; const p = list.find(x => x.id === b.dataset.pk); closeModal(); addLine(kind === 'size' ? mkSize(p) : mkBoq(p)) });
+      draw();
+      $('#pkq', el).oninput = draw;
+      el.addEventListener('click', e => {
+        const tplBtn = e.target.closest('[data-pktpl]');
+        if (tplBtn) {
+          const tplId = tplBtn.dataset.pktpl;
+          const tpl = tpls.find(x => x.id === tplId || x.template_key === tplId);
+          closeModal();
+          if (tpl) {
+            addLine({
+              id: uid(),
+              type: 'size',
+              template_id: tpl.id,
+              name: tpl.name,
+              spec: (tpl.series || 'Domal 27') + ' Series Aluminium Powder Coated',
+              glyph: tpl.category === 'door' ? 'door' : 'slider',
+              w: 10,
+              h: 6,
+              qty: 1,
+              rate: 0,
+              cost: 0,
+              glass_id: tpl.default_glass || '6mm Toughened',
+              mesh: tpl.allows_mesh !== false ? 'SS Mesh' : 'NA',
+              handle: tpl.default_handle || 'Standard Handle',
+              disc: 0
+            });
+          }
+          return;
+        }
+        const b = e.target.closest('[data-pk]');
+        if (!b) return;
+        if (b.dataset.pk === 'blank') {
+          closeModal();
+          addLine(kind === 'size' ? mkSize(null) : mkBoq(null));
+          return;
+        }
+        const p = list.find(x => x.id === b.dataset.pk);
+        closeModal();
+        addLine(kind === 'size' ? mkSize(p) : mkBoq(p));
+      });
     }
     const lineIdx = b => Q.lines.findIndex(l => l.id === b.closest('[data-lid]').dataset.lid);
     Object.assign(ACT, {
@@ -6336,6 +7538,316 @@
           $('#cs_results').innerHTML = `<div>Total Profile Length: <b>${inr(profMeters, 2)} m</b></div><div>Profile Weight (w/ wastage): <b>${inr(profW, 2)} kg</b></div><div>Profile Cost: <b>${rs(profCost, 0)}</b></div><div>Glass Cost: <b>${rs(glassCost, 0)}</b></div><div>Hardware Cost: <b>${rs(hwCost, 0)}</b></div><div>Labor & Fab: <b>${rs(laborCost, 0)}</b></div><div style="grid-column:1/-1;border-top:1px dashed var(--line);padding-top:6px">Net Unit Cost: <b>${rs(netCost, 0)}</b> | Margin: <b>+${margin}%</b></div><div style="grid-column:1/-1;font-size:1.05rem;color:var(--pri);font-weight:700">Computed Selling Price: ${rs(grand, 0)} &nbsp;&rarr;&nbsp; ${rs(rateSqFt, 2)} / sq ft</div>`;
         };
         setTimeout(() => { ['cs_profSelect', 'cs_config', 'cs_weightPerM', 'cs_ratePerKg', 'cs_wastage', 'cs_glassRate', 'cs_hwRate', 'cs_laborRate', 'cs_margin'].forEach(id => { const el = $('#' + id); if (el) { el.oninput = updateCalc; el.onchange = updateCalc } }); updateCalc() }, 50);
+      },
+      recalcQuoteRates() {
+        if (!Q) return;
+        Q.costingSettingsSnapshot = JSON.parse(JSON.stringify(db.costingSettings || CostingEngine.getDefaultCostingSettings()));
+        touch();
+        drawLines();
+        refreshCalc();
+        toast('Recalculated all lines with updated costing settings! ✅');
+      },
+      quickMmToFt(b) {
+        const lid = b.dataset.lid, field = b.dataset.field;
+        const l = Q && Q.lines.find(x => x.id === lid);
+        if (!l) return;
+        modal({
+          title: `📐 Convert MM to Feet (Rule 1.3)`,
+          body: `<div class="f">
+            <span>Enter measurement in millimeters (mm):</span>
+            <input type="number" id="mmInput" placeholder="e.g. 3000" autofocus style="font-size:1.15rem;padding:8px;margin-top:6px;width:100%;box-sizing:border-box">
+            <div id="mmResult" class="note" style="margin-top:12px;font-size:0.95rem">Type mm above to see the converted billing feet.</div>
+          </div>`,
+          okText: 'Apply to Field',
+          onOk: el => {
+            const mmVal = num($('#mmInput', el).value);
+            if (mmVal <= 0) { toast('Enter a valid mm value.', 'bad'); return false; }
+            const feet = CostingEngine.roundFeetFromMm(mmVal);
+            l[field] = feet;
+            touch();
+            drawLines();
+            refreshCalc();
+            toast(`Converted ${mmVal} mm &rarr; ${feet} ft.`);
+            return true;
+          }
+        });
+        setTimeout(() => {
+          const inp = $('#mmInput');
+          const res = $('#mmResult');
+          if (inp && res) {
+            inp.oninput = () => {
+              const v = num(inp.value);
+              if (v > 0) {
+                const ft = v / 304.8;
+                const rounded = CostingEngine.roundFeetFromMm(v);
+                res.innerHTML = `<b>${v} mm</b> = ${ft.toFixed(2)} ft &rarr; rounded billing feet: <b style="color:var(--pri);font-size:1.15em">${rounded} ft</b>`;
+              } else {
+                res.textContent = 'Type mm above to see the converted billing feet.';
+              }
+            };
+            inp.focus();
+          }
+        }, 50);
+      },
+      openSiteMeasurementSheet() {
+        if (!Q) return;
+        const templates = (db && db.productTemplates && db.productTemplates.length) ? db.productTemplates : CostingEngine.getSeedTemplates();
+
+        modal({
+          title: '📐 Site Measurement Sheet (M-Sheet)',
+          wide: true,
+          body: `<div class="mute sm" style="margin-bottom:12px">
+            Enter site measurements in <b>millimeters (mm)</b>. The system converts mm into billing feet using company rounding (rule 1.3). Compare actual area vs billing area and click <b>Import to Quote</b> to append these items.
+          </div>
+          <div style="max-height:360px;overflow-y:auto;margin-bottom:14px">
+            <table class="tbl" id="msheetTbl">
+              <thead>
+                <tr>
+                  <th>Location / Mark</th>
+                  <th>Window Type</th>
+                  <th style="width:90px">W (mm)</th>
+                  <th style="width:90px">H (mm)</th>
+                  <th style="width:60px">Qty</th>
+                  <th>W (ft)</th>
+                  <th>H (ft)</th>
+                  <th>Actual Sqft</th>
+                  <th>Billing Sqft</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="msheetBody"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg2);border-radius:6px">
+            <button type="button" class="btn sm" id="addMRowBtn">+ Add Measurement Row</button>
+            <div id="msheetTotals" class="sm"><b>Total:</b> 0 items &middot; Actual: 0 sqft &middot; Billing: 0 sqft</div>
+          </div>`,
+          okText: 'Import to Quote',
+          onOk: () => {
+            if (!window.__MSHEET_ROWS__ || !window.__MSHEET_ROWS__.length) {
+              toast('No measurement rows to import.', 'bad');
+              return false;
+            }
+            let count = 0;
+            window.__MSHEET_ROWS__.forEach(r => {
+              if (r.wMm > 0 && r.hMm > 0) {
+                const wFt = CostingEngine.roundFeetFromMm(r.wMm);
+                const hFt = CostingEngine.roundFeetFromMm(r.hMm);
+                const tpl = templates.find(t => t.id === r.tplId) || templates[0];
+                Q.lines.push({
+                  id: uid(),
+                  type: 'size',
+                  template_id: tpl.id,
+                  name: tpl.name,
+                  spec: (tpl.series || 'Domal 27') + ' Series',
+                  tag: r.mark || '',
+                  loc: r.loc || '',
+                  glyph: tpl.category === 'door' ? 'door' : 'slider',
+                  w: wFt,
+                  h: hFt,
+                  qty: r.qty || 1,
+                  glass_id: r.glass || '6mm Toughened',
+                  mesh: tpl.allows_mesh !== false ? 'SS Mesh' : 'NA',
+                  handle: tpl.default_handle || 'Standard Handle',
+                  disc: 0,
+                  rate: 0,
+                  cost: 0
+                });
+                count++;
+              }
+            });
+            touch();
+            drawLines();
+            refreshCalc();
+            toast(`Imported ${count} items from site measurement sheet! ✅`);
+            return true;
+          }
+        });
+
+        // Initialize M-Sheet rows state
+        window.__MSHEET_ROWS__ = [
+          { mark: 'W1', loc: 'Ground Floor', tplId: templates[0].id, wMm: 3000, hMm: 1850, qty: 1, glass: '6mm Toughened' },
+          { mark: 'D1', loc: 'Balcony', tplId: templates[1] ? templates[1].id : templates[0].id, wMm: 2450, hMm: 2450, qty: 1, glass: '8mm Toughened Clear' }
+        ];
+
+        const renderMRows = () => {
+          const b = $('#msheetBody');
+          if (!b) return;
+          b.innerHTML = window.__MSHEET_ROWS__.map((r, i) => {
+            const wFt = r.wMm > 0 ? CostingEngine.roundFeetFromMm(r.wMm) : 0;
+            const hFt = r.hMm > 0 ? CostingEngine.roundFeetFromMm(r.hMm) : 0;
+            const actualSqft = r.wMm > 0 && r.hMm > 0 ? ((r.wMm * r.hMm * (r.qty || 1) * 10.764) / 1000000).toFixed(2) : '0';
+            const billingSqft = (wFt * hFt * (r.qty || 1)).toFixed(2);
+            return `<tr>
+              <td><input style="width:110px" value="${esc(r.mark || '')}" data-mi="${i}" data-mf="mark" placeholder="Mark / Loc"></td>
+              <td><select style="width:140px" data-mi="${i}" data-mf="tplId">${templates.map(t => `<option value="${t.id}" ${t.id === r.tplId ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></td>
+              <td><input type="number" style="width:80px" value="${r.wMm || ''}" data-mi="${i}" data-mf="wMm"></td>
+              <td><input type="number" style="width:80px" value="${r.hMm || ''}" data-mi="${i}" data-mf="hMm"></td>
+              <td><input type="number" style="width:50px" value="${r.qty || 1}" data-mi="${i}" data-mf="qty"></td>
+              <td class="r" style="font-weight:700;color:var(--pri)">${wFt} ft</td>
+              <td class="r" style="font-weight:700;color:var(--pri)">${hFt} ft</td>
+              <td class="r mute">${actualSqft}</td>
+              <td class="r"><b>${billingSqft}</b></td>
+              <td><button type="button" class="btn ghost sm bad" data-mrm="${i}">&times;</button></td>
+            </tr>`;
+          }).join('');
+
+          // Update summary totals
+          let totQty = 0, totAct = 0, totBill = 0;
+          window.__MSHEET_ROWS__.forEach(r => {
+            const q = num(r.qty) || 1;
+            totQty += q;
+            if (r.wMm > 0 && r.hMm > 0) {
+              totAct += (r.wMm * r.hMm * q * 10.764) / 1000000;
+              const wFt = CostingEngine.roundFeetFromMm(r.wMm);
+              const hFt = CostingEngine.roundFeetFromMm(r.hMm);
+              totBill += wFt * hFt * q;
+            }
+          });
+          const totEl = $('#msheetTotals');
+          if (totEl) {
+            totEl.innerHTML = `<b>Total:</b> ${totQty} items &middot; Actual Area: <b>${totAct.toFixed(1)} sq ft</b> &middot; Billing Area: <b style="color:var(--pri)">${totBill.toFixed(1)} sq ft</b> (${(totBill - totAct >= 0 ? '+' : '') + (totBill - totAct).toFixed(1)} diff)`;
+          }
+        };
+
+        setTimeout(() => {
+          renderMRows();
+          const modalBody = $('#msheetTbl');
+          if (modalBody) {
+            modalBody.oninput = e => {
+              const t = e.target;
+              if (t.dataset.mi !== undefined) {
+                const i = +t.dataset.mi, f = t.dataset.mf;
+                window.__MSHEET_ROWS__[i][f] = ['wMm', 'hMm', 'qty'].includes(f) ? num(t.value) : t.value;
+                renderMRows();
+              }
+            };
+            modalBody.onclick = e => {
+              const b = e.target.closest('[data-mrm]');
+              if (b) {
+                window.__MSHEET_ROWS__.splice(+b.dataset.mrm, 1);
+                renderMRows();
+              }
+            };
+          }
+          const addBtn = $('#addMRowBtn');
+          if (addBtn) {
+            addBtn.onclick = () => {
+              window.__MSHEET_ROWS__.push({ mark: 'W' + (window.__MSHEET_ROWS__.length + 1), loc: '', tplId: templates[0].id, wMm: 1500, hMm: 1200, qty: 1, glass: '6mm Toughened' });
+              renderMRows();
+            };
+          }
+        }, 50);
+      },
+      viewBOM(b) {
+        const lid = b.dataset.lid;
+        const l = Q && Q.lines.find(x => x.id === lid);
+        if (!l) return;
+        const c = lineCalc(l, Q);
+        const calc = c.cost_breakdown;
+        if (!calc) {
+          toast('Please enter valid width and height to calculate the BOM.', 'bad');
+          return;
+        }
+
+        const lines = calc.lines || [];
+        modal({
+          title: `🧮 Bill of Materials (BOM) & Costing — ${esc(l.name || 'Window Item')}`,
+          wide: true,
+          body: `${calc.isCombo ? `<div class="note" style="margin-bottom:10px;background:var(--bg2)">🔗 <b>Combination Opening (Section 1.4):</b> Fixed Part (<b>${calc.fixedHFt.toFixed(1)} ft</b> &rarr; ₹${(calc.fixedPrice || 0).toLocaleString('en-IN')}) + Operable Part (<b>${calc.operableHFt.toFixed(1)} ft</b> &rarr; ₹${(calc.operablePrice || 0).toLocaleString('en-IN')}) &bull; Total: <b>₹${calc.priceExTax.toLocaleString('en-IN')}</b> &bull; Blended Rate: <b style="color:var(--pri)">₹${calc.ratePerSqft} / sqft</b></div>` : ''}
+          <div class="mute sm" style="margin-bottom:12px">
+            <b>Dimensions:</b> ${calc.widthFt} ft &times; ${calc.heightFt} ft (${calc.W.toFixed(3)} m &times; ${calc.H.toFixed(3)} m) &bull;
+            <b>Costing Area A:</b> ${calc.A.toFixed(3)} sqm &bull;
+            <b>Billing Area:</b> ${inr(c.area, 2)} sq ft
+          </div>
+          <div style="max-height:380px;overflow-y:auto;margin-bottom:14px">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th style="width:30px">Sl</th>
+                  <th>Description</th>
+                  <th>Kind</th>
+                  <th class="r">Length / Nos</th>
+                  <th class="r">Total Metres</th>
+                  <th class="r">kg/m or Unit Price</th>
+                  <th class="r">Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${lines.map(bl => `<tr>
+                  <td>${bl.sl_no}</td>
+                  <td><b>${esc(bl.description)}</b></td>
+                  <td><span class="chip sm">${esc(bl.kind)}</span></td>
+                  <td class="r">${bl.length ? bl.length.toFixed(2) + 'm' : ''} ${bl.nos ? '&times; ' + bl.nos : ''}</td>
+                  <td class="r">${bl.totalMetres ? inr(bl.totalMetres, 2) + ' m' : '-'}</td>
+                  <td class="r">${bl.weight_kg_per_m ? inr(bl.weight_kg_per_m, 2) + ' kg/m' : (bl.unit_price ? rs(bl.unit_price) : '-')}</td>
+                  <td class="r"><b>${rs(bl.amount)}</b></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="card" style="background:var(--bg2);padding:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.95rem">
+              <div>Subtotal (Sum of BOM): <b>${rs(calc.subtotal)}</b></div>
+              <div>Wastage (${calc.wastagePct}%): <b>+${rs(calc.wastage)}</b></div>
+              <div>Total Cost (BOM + Wastage): <b style="color:var(--bad)">${rs(calc.totalCost)}</b></div>
+              <div>Markup / Margin (${calc.marginPct}%): <b style="color:var(--ok)">+${rs(calc.margin)}</b></div>
+              <div style="grid-column:1/-1;border-top:1px dashed var(--line);padding-top:8px;font-size:1.05rem">
+                Selling Price (1 window): <b>${rs(calc.priceExTax)}</b> &bull;
+                Rate / Sqm: <b>${rs(calc.ratePerSqm)} / sqm</b> &bull;
+                <b>Billing Rate / Sqft: <span style="color:var(--pri);font-size:1.2em">${rs(calc.ratePerSqft)} / sq ft</span></b>
+              </div>
+            </div>
+          </div>`,
+          noFooter: true
+        });
+      },
+      promptRateOverride(b) {
+        const lid = b.dataset.lid;
+        const l = Q && Q.lines.find(x => x.id === lid);
+        if (!l) return;
+        const c = lineCalc(l, Q);
+        const curCalcRate = c.calcRate || c.rate;
+
+        modal({
+          title: `✏️ Manual Rate Override — ${esc(l.name || 'Window')}`,
+          body: `<div class="f" style="margin-bottom:12px">
+            <span>Auto-Calculated Benchmark Rate: <b>₹${curCalcRate} / sq ft</b></span>
+          </div>
+          <label class="f" style="margin-bottom:12px">
+            <span>Override Rate per Sq Ft (₹):</span>
+            <input type="number" step="any" min="1" id="ovRateInput" value="${l.rate_override || curCalcRate}" autofocus style="font-size:1.15rem;padding:8px;width:100%;box-sizing:border-box">
+          </label>
+          <label class="f">
+            <span>Reason for Override (Required):</span>
+            <input id="ovReasonInput" value="${esc(l.rate_override_reason || '')}" placeholder="e.g. Competitive price match, client bulk negotiation" style="padding:8px;width:100%;box-sizing:border-box">
+          </label>`,
+          okText: 'Apply Override',
+          onOk: el => {
+            const rVal = num($('#ovRateInput', el).value);
+            const rReason = ($('#ovReasonInput', el).value || '').trim();
+            if (rVal <= 0) { toast('Enter a valid positive rate.', 'bad'); return false; }
+            if (!rReason) { toast('Please provide a reason for the override.', 'bad'); return false; }
+            l.rate_override = rVal;
+            l.rate_override_reason = rReason;
+            touch();
+            drawLines();
+            refreshCalc();
+            toast(`Rate overridden to ₹${rVal} / sq ft.`);
+            return true;
+          }
+        });
+      },
+      clearRateOverride(b) {
+        const lid = b.dataset.lid;
+        const l = Q && Q.lines.find(x => x.id === lid);
+        if (!l) return;
+        l.rate_override = null;
+        l.rate_override_reason = '';
+        touch();
+        drawLines();
+        refreshCalc();
+        toast('Reverted to auto-calculated benchmark rate.');
       },
       setDiscPct(b) {
         if (!Q) return;
@@ -6522,16 +8034,41 @@
         drawH();
       }
     });
-    function setStatus(s, note) { Q.status = s; Q.updatedAt = Date.now(); logq(Q, note); persist(true); viewQuote(Q.id) }
+    function setStatus(s, note) {
+      Q.status = s;
+      Q.updatedAt = Date.now();
+      if (['approved', 'sent', 'won'].includes(s)) {
+        Q.costingSettingsSnapshot = JSON.parse(JSON.stringify(db.costingSettings || CostingEngine.getDefaultCostingSettings()));
+        (Q.lines || []).forEach(l => {
+          if (l.type === 'size') {
+            const c = lineCalc(l, Q);
+            if (c && c.cost_breakdown) {
+              l.cost_breakdown = JSON.parse(JSON.stringify(c.cost_breakdown));
+            }
+          }
+        });
+      }
+      logq(Q, note);
+      persist(true);
+      viewQuote(Q.id);
+    }
 
     /* ========== printable document ========== */
     function docHTML(q) {
-      const s = db.settings, t = calcTotals(q), c = q.cust, unit = q.dimUnit || 'mm'; let n = 0;
+      const s = db.settings, t = calcTotals(q), c = q.cust, unit = q.dimUnit || 'ft'; let n = 0;
       const exp = addDays(q.date, num(q.validity) || 0);
       const rows = q.lines.map(l => {
-        if (l.type === 'section') return `<tr class="sec"><td colspan="6">${esc(l.title)}</td></tr>`;
+        if (l.type === 'section') return `<tr class="sec"><td colspan="6" style="font-weight:700;background:var(--bg2, #f3f4f6)">${esc(l.title)}</td></tr>`;
         n++; const k = lineCalc(l, q);
-        if (l.type === 'size') return `<tr><td class="c">${n}</td><td><div class="doc-item">${glyph(l.glyph, 34)}<div><span class="big">${esc(l.name)}</span>${l.tag || l.loc ? `<div class="doc-spec">${[l.tag && 'Mark ' + esc(l.tag), esc(l.loc)].filter(Boolean).join(' - ')}</div>` : ''}${l.spec ? `<div class="doc-spec">${nl2(l.spec)}</div>` : ''}<div class="doc-spec">${esc(l.glassName)}; ${esc(l.finishName)}</div><div class="doc-spec">Area ${inr(k.billed)} sq ft each, ${inr(k.totalArea)} sq ft in total${num(l.hw) ? `; hardware ${rs(num(l.hw))} each` : ''}${num(l.disc) ? `; less ${num(l.disc)}%` : ''}</div></div></div></td><td class="r">${num(l.w)} &times; ${num(l.h)} ${unit}</td><td class="r">${num(l.qty)} nos</td><td class="r">${rs(k.rate)}<div class="doc-spec">per sq ft</div></td><td class="r"><b>${rs(k.amt)}</b></td></tr>`;
+        if (l.type === 'size') {
+          const specParts = [
+            l.spec,
+            l.glass_id || l.glassName,
+            (l.mesh && l.mesh !== 'NA' ? 'Mesh: ' + l.mesh : null),
+            (l.handle ? 'Handle: ' + l.handle : null)
+          ].filter(Boolean);
+          return `<tr><td class="c">${n}</td><td><div class="doc-item">${glyph(l.glyph || 'slider', 34)}<div><span class="big">${esc(l.name)}</span>${l.tag || l.loc ? `<div class="doc-spec">${[l.tag && 'Mark ' + esc(l.tag), esc(l.loc)].filter(Boolean).join(' - ')}</div>` : ''}${specParts.length ? `<div class="doc-spec">${esc(specParts.join('; '))}</div>` : ''}<div class="doc-spec">Area ${inr(k.billed, 2)} sq ft each, ${inr(k.totalArea, 2)} sq ft in total${num(l.disc) ? `; less ${num(l.disc)}%` : ''}</div></div></div></td><td class="r">${num(l.w)} &times; ${num(l.h)} ${unit}</td><td class="r">${num(l.qty)} nos</td><td class="r">${rs(k.rate)}<div class="doc-spec">per sq ft</div></td><td class="r"><b>${rs(k.amt)}</b></td></tr>`;
+        }
         return `<tr><td class="c">${n}</td><td><div class="doc-boq-row">${l.img ? `<img class="doc-boq-img" src="${l.img}" alt="">` : ''}<div><span class="big">${esc(l.name) || nl2(l.desc)}</span>${l.name && l.desc ? `<div class="doc-spec">${nl2(l.desc)}</div>` : ''}${num(l.disc) ? `<div class="doc-spec">Less ${num(l.disc)}%</div>` : ''}</div></div></td><td class="r"></td><td class="r">${num(l.qty)} ${esc(l.unit)}</td><td class="r">${rs(num(l.rate))}<div class="doc-spec">per ${esc(l.unit)}</div></td><td class="r"><b>${rs(k.amt)}</b></td></tr>`;
       }).join('');
       const pays = (q.pay || []).filter(p => p.label || p.pct);
@@ -6565,13 +8102,15 @@
     <table class="doc-info"><tr><td>Quotation no.</td><td><b>${esc(q.no)}</b></td></tr><tr><td>Date</td><td>${fmtDate(q.date)}</td></tr><tr><td>Valid until</td><td>${fmtDate(exp)}</td></tr>${q.rev ? `<tr><td>Revision</td><td>${q.rev}</td></tr>` : ''}</table></div>
    <div class="doc-parties"><div><small>Quotation for</small><b>${esc(c.name)}</b>${c.contact ? `<br>Attn: ${esc(c.contact)}` : ''}${c.address ? `<br>${nl2(c.address)}` : ''}${c.phone || c.email ? `<br>${[esc(c.phone), esc(c.email)].filter(Boolean).join(' | ')}` : ''}${c.gstin ? `<br>GSTIN: ${esc(c.gstin)}` : ''}</div>
     <div><small>Project</small><b>${esc(q.project || '-')}</b>${q.site ? `<br>Site: ${esc(q.site)}` : ''}<br>Place of supply: ${esc(q.pos || s.state)}</div></div>
+   ${q.series_line ? `<div class="doc-sub" style="font-weight:600;margin-bottom:3px">${esc(q.series_line)}</div>` : ''}
    ${q.subject ? `<div class="doc-sub">Sub: ${esc(q.subject)}</div>` : ''}
    ${q.intro ? `<div class="doc-intro">${esc(q.intro)}</div>` : ''}
    <table class="doc-tbl"><thead><tr><th style="width:26px">#</th><th>Description</th><th class="r">Size</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>${rows || '<tr><td colspan="6">No items</td></tr>'}</tbody></table>
    <div class="doc-sum"><div class="doc-words"><b>Amount in words</b><br>${esc(rupeesWords(t.grand))}</div>
     <table class="doc-tot"><tr><td>Items subtotal</td><td class="r">${rs(t.sub)}</td></tr>${t.dAmt ? `<tr><td>Discount${q.discType === 'pct' ? ' (' + num(q.discVal) + '%)' : ''}</td><td class="r">&minus;${rs(t.dAmt)}</td></tr>` : ''}
+    ${num(q.transport_charges) ? `<tr><td>Transportation charges</td><td class="r">${rs(num(q.transport_charges))}</td></tr>` : ''}
     ${(q.extras || []).filter(e => num(e.amount)).map(e => `<tr><td>${esc(e.label || 'Extra charge')}</td><td class="r">${rs(num(e.amount))}</td></tr>`).join('')}
-    ${t.dAmt || t.extras ? `<tr><td>Taxable value</td><td class="r">${rs(t.taxable)}</td></tr>` : ''}
+    ${t.dAmt || t.extras || num(q.transport_charges) ? `<tr><td>Taxable value</td><td class="r">${rs(t.taxable)}</td></tr>` : ''}
     ${q.gst ? (t.inter ? `<tr><td>IGST @ ${t.rate}%</td><td class="r">${rs(t.ig)}</td></tr>` : `<tr><td>CGST @ ${t.rate / 2}%</td><td class="r">${rs(t.cg)}</td></tr><tr><td>SGST @ ${t.rate / 2}%</td><td class="r">${rs(t.sg)}</td></tr>`) : '<tr><td>GST</td><td class="r">Not charged</td></tr>'}
     ${t.round ? `<tr><td>Round off</td><td class="r">${t.round > 0 ? '+' : '&minus;'}${rs(Math.abs(t.round))}</td></tr>` : ''}
     <tr class="gt"><td>Grand total</td><td class="r">${rs(t.grand)}</td></tr></table></div>
@@ -6581,7 +8120,7 @@
    ${q.notes ? `<h4>Notes</h4><div>${nl2(q.notes)}</div>` : ''}
    <div class="doc-sign">
      <div>
-       Prepared By:<br><b>${esc(q.preparedByName || userName(q.createdBy))}</b>
+       Prepared By:<br><b>${esc(q.preparedByName || q.pre_name || userName(q.createdBy))}</b>${q.pre_phone ? `<br><small class="mute">Tel: ${esc(q.pre_phone)}</small>` : ''}
        <div style="height:36px"></div>
        <div class="ln2">Signature &amp; Date</div>
      </div>

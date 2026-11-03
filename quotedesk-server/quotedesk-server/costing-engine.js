@@ -19,18 +19,34 @@ function roundFeetFromMm(mm) {
   return whole + 1;
 }
 
+// Normalize expression: replace special chars (×, ÷), implicit multiplication (3W -> 3*W), and trim
+function normalizeExpr(expr) {
+  if (!expr || String(expr).trim() === '') return '0';
+  var s = String(expr).trim();
+  s = s.replace(/×/g, '*').replace(/÷/g, '/');
+  // insert * between number and variable, e.g. 3W -> 3*W, 8H -> 8*H, 2L1 -> 2*L1
+  s = s.replace(/(\d+)\s*([A-Za-z])/g, '$1 * $2');
+  return s;
+}
+
 // Safe expression parser (no eval)
 // Variables: W, H, A (dimensions), L1..Ln (total metres of prior lines)
 function evalExpr(expr, vars) {
   if (!expr || String(expr).trim() === '') return 0;
-  var s = String(expr).trim();
-  var names = Object.keys(vars).sort(function(a, b) { return b.length - a.length; });
+  var s = normalizeExpr(expr);
+  var unifiedVars = {};
+  if (vars) {
+    Object.keys(vars).forEach(function(k) {
+      unifiedVars[k.toUpperCase()] = Number(vars[k]) || 0;
+    });
+  }
+  var names = Object.keys(unifiedVars).sort(function(a, b) { return b.length - a.length; });
   var safe = s;
   for (var i = 0; i < names.length; i++) {
     var n = names[i];
     var escaped = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    var re = new RegExp('\\b' + escaped + '\\b', 'g');
-    safe = safe.replace(re, '(' + Number(vars[n]) + ')');
+    var re = new RegExp('\\b' + escaped + '\\b', 'gi');
+    safe = safe.replace(re, '(' + Number(unifiedVars[n]) + ')');
   }
   if (!/^[\d\s.\+\-\*\/\(\)]+$/.test(safe)) {
     throw new Error('Unsafe expression: ' + expr);
@@ -38,12 +54,101 @@ function evalExpr(expr, vars) {
   return (new Function('return (' + safe + ')'))();
 }
 
+// Live formula validator for UI template builder
+function validateFormula(expr, sampleVars) {
+  try {
+    var v = sampleVars || { W: 3.048, H: 1.8288, A: 5.574, L1: 3.048, L2: 3.048, L3: 3.6576, L4: 6.096, L5: 7.3152, L6: 3.6576, L7: 9.144 };
+    var res = evalExpr(expr, v);
+    return { valid: true, result: res, error: null };
+  } catch(err) {
+    return { valid: false, result: null, error: err.message };
+  }
+}
+
 // Main calculation function
-function calculateItem(template, templateLines, widthFt, heightFt, options, settings, rates) {
+function calculateItem(template, templateLines, widthFt, heightFt, options, settings, rates, allTemplates) {
+  options = options || {};
+  settings = settings || {};
+  rates = rates || {};
+  allTemplates = allTemplates || options.allTemplates || rates.allTemplates || (typeof getSeedTemplates === 'function' ? getSeedTemplates() : []);
+
   var FT_TO_M = Number(settings.ft_to_m) || 0.3048;
+  var sqftPerSqm = Number(settings.sqft_per_sqm) || 10.764;
+  var wastagePct = Number(settings.wastage_pct) || 5;
+  var marginPct  = Number(settings.margin_pct)  || 35;
+  var gstPct     = Number(settings.gst_pct)     || 18;
+
   var W = widthFt  * FT_TO_M;  // metres
   var H = heightFt * FT_TO_M;  // metres
   var A = W * H;                // sqm
+
+  // COMBINATION PRODUCT (Section 1.4)
+  // A tall opening is split into a fixed part and an operable part.
+  // Each part is costed with its own BOM, then:
+  // Rate/Sqft for the whole opening = (Fixed price + Operable price) ÷ total opening area.
+  var isCombo = template && (template.category === 'combo' || template.is_combo) && (template.fixed_template_id || template.operable_template_id);
+  if (isCombo) {
+    var fixedTpl = allTemplates.find(function(t) {
+      return t.id === template.fixed_template_id || t.template_key === template.fixed_template_id;
+    }) || allTemplates.find(function(t) { return t.id === 'tpl_fixed_window'; });
+
+    var operableTpl = allTemplates.find(function(t) {
+      return t.id === template.operable_template_id || t.template_key === template.operable_template_id;
+    }) || allTemplates.find(function(t) { return t.id === 'tpl_sliding_door'; });
+
+    var defaultOpH = Number(template.default_operable_h || template.default_operable_height_ft || 7);
+    var operableHFt = Number(options.operable_h_ft || options.operable_h || defaultOpH);
+    if (operableHFt >= heightFt || operableHFt <= 0) {
+      operableHFt = Math.round(heightFt * 0.4 * 10) / 10;
+    }
+    var fixedHFt = Math.max(0.1, heightFt - operableHFt);
+
+    var fixedRes = fixedTpl
+      ? calculateItem(fixedTpl, fixedTpl.lines || [], widthFt, fixedHFt, Object.assign({}, options, { mesh: 'NA' }), settings, rates, allTemplates)
+      : { priceExTax: 0, subtotal: 0, wastage: 0, totalCost: 0, margin: 0, lines: [] };
+
+    var operableRes = operableTpl
+      ? calculateItem(operableTpl, operableTpl.lines || [], widthFt, operableHFt, options, settings, rates, allTemplates)
+      : { priceExTax: 0, subtotal: 0, wastage: 0, totalCost: 0, margin: 0, lines: [] };
+
+    var totalPriceExTax = fixedRes.priceExTax + operableRes.priceExTax;
+    var totalAreaSqft = widthFt * heightFt;
+    var ratePerSqft = totalAreaSqft > 0 ? Math.round(totalPriceExTax / totalAreaSqft) : 0;
+    var ratePerSqm = A > 0 ? Math.round(totalPriceExTax / A) : 0;
+    var priceInclGst = Math.round(totalPriceExTax * (1 + gstPct / 100));
+
+    var comboBomLines = [];
+    (fixedRes.lines || []).forEach(function(l) {
+      comboBomLines.push(Object.assign({}, l, {
+        sl_no: 'F-' + l.sl_no,
+        description: '[Fixed ' + fixedHFt.toFixed(1) + 'ft] ' + l.description
+      }));
+    });
+    (operableRes.lines || []).forEach(function(l) {
+      comboBomLines.push(Object.assign({}, l, {
+        sl_no: 'O-' + l.sl_no,
+        description: '[Operable ' + operableHFt.toFixed(1) + 'ft] ' + l.description
+      }));
+    });
+
+    return {
+      widthFt: widthFt, heightFt: heightFt, options: options,
+      isCombo: true,
+      fixedHFt: fixedHFt, operableHFt: operableHFt,
+      fixedPrice: fixedRes.priceExTax, operablePrice: operableRes.priceExTax,
+      W: W, H: H, A: A,
+      lines: comboBomLines,
+      subtotal: fixedRes.subtotal + operableRes.subtotal,
+      wastage: fixedRes.wastage + operableRes.wastage,
+      totalCost: fixedRes.totalCost + operableRes.totalCost,
+      margin: fixedRes.margin + operableRes.margin,
+      priceExTax: totalPriceExTax,
+      ratePerSqm: ratePerSqm,
+      ratePerSqft: ratePerSqft,
+      priceInclGst: priceInclGst,
+      wastagePct: wastagePct, marginPct: marginPct, gstPct: gstPct
+    };
+  }
 
   var alRate    = Number(settings.aluminium_rate_per_kg) || 500;
   var labourRate = Number(settings.labour_rate_per_sqm) || 500;
@@ -303,6 +408,20 @@ function getSeedTemplates() {
         { sl_no: 7, description: 'Labour',                   kind: 'labour',  length_expr: 'A',      nos_expr: '1', unit_price: 500 },
         { sl_no: 8, description: 'Glass',                    kind: 'glass',   length_expr: 'A',      nos_expr: '1', unit_price: 0   }
       ]
+    },
+    // Template 5: Combo Fixed + 2.5T Sliding Door (F+SD) (Section 1.4 & Section 4)
+    {
+      id: 'tpl_combo_fixed_sliding_door',
+      name: 'Combo Fixed + 2.5T Sliding Door (F+SD)',
+      series: 'Domal 27',
+      category: 'combo',
+      fixed_template_id: 'tpl_fixed_window',
+      operable_template_id: 'tpl_sliding_door',
+      default_operable_h: 7,
+      allows_mesh: true,
+      default_glass: '8mm Toughened Clear',
+      default_handle: 'Pop-up Handle',
+      lines: []
     }
   ];
 }
@@ -448,7 +567,9 @@ function seedCostingData(db) {
 
 module.exports = {
   roundFeetFromMm: roundFeetFromMm,
+  normalizeExpr: normalizeExpr,
   evalExpr: evalExpr,
+  validateFormula: validateFormula,
   calculateItem: calculateItem,
   quoteTotals: quoteTotals,
   getDefaultCostingSettings: getDefaultCostingSettings,
