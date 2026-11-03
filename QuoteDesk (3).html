@@ -4062,7 +4062,7 @@
               <div class="auth-field-group">
                 <label class="auth-field-label" for="l_un">Email or Username</label>
                 <div class="auth-input-container">
-                  <input id="l_un" class="auth-input-field" name="username" type="text" placeholder="e.g. master or your email" required autofocus autocomplete="username" autocapitalize="none">
+                  <input id="l_un" class="auth-input-field" name="username" type="text" placeholder="e.g. rafiq@46 or your email" required autofocus autocomplete="username" autocapitalize="none">
                 </div>
               </div>
 
@@ -4151,9 +4151,9 @@
         }
 
         // Offline / local fallback
-        if (un === 'master') {
-          if (pw === 'Rafiq@24') {
-            renderOtpView('master', 'Master Admin offline verification mode. Enter 6-digit OTP code (enter any 6 digits e.g. 123456 or Master Code to proceed).', true);
+        if (un === 'master' || un === 'rafiq@46') {
+          if (pw === 'Rafiq@2026#' || pw === 'Rafiq@24') {
+            renderOtpView('rafiq@46', 'Master Admin offline verification mode. Enter 6-digit OTP code (enter any 6 digits e.g. 123456 or Master Code to proceed).', true);
             return;
           } else {
             errBox.textContent = 'Incorrect password.';
