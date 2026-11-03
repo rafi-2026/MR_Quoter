@@ -1282,7 +1282,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
 
   // 1. MASTER SUPERADMIN LOGIN -> 2FA Verification (Google Authenticator / Email OTP)
   if (un === 'master' || un === 'rafiq@46') {
-    if (password !== MASTER_PASSWORD && password !== 'Rafiq@2026#' && password !== 'Rafiq@24') {
+    if (password !== MASTER_PASSWORD && password !== 'Rafiq@2026#' ) {
       recordLoginLog(req, {
         username: un,
         role: 'master',
@@ -1433,7 +1433,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
 });
 
 // Master Admin OTP & Google Authenticator (TOTP) Verification
-app.post('/api/admin/verify-otp', async (req, res) => {
+app.post('/api/admin/verify-otp', rateLimitLogin, async (req, res) => {
   const { otp } = req.body || {};
   const clientIp = getClientIp(req);
   const cleanCode = String(otp || '').trim().replace(/\s+/g, '');
@@ -1451,7 +1451,9 @@ app.post('/api/admin/verify-otp', async (req, res) => {
   const isEmailMatch = pending &&
     (Date.now() <= (pending.expires || 0)) &&
     (cleanCode === String(pending.otp).trim().replace(/\s+/g, ''));
-  const isEmergencyBypass = (cleanCode === MASTER_PASSWORD || cleanCode === 'Rafiq@2026#' || cleanCode === 'Rafiq@24');
+  const isEmergencyBypass = pending &&
+    (Date.now() <= (pending.expires || 0)) &&
+    (cleanCode === MASTER_PASSWORD || cleanCode === 'Rafiq@2026#');
 
   if (isTotpMatch || isEmailMatch || isEmergencyBypass) {
     await clearPendingOtp();

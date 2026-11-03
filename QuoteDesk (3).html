@@ -3808,7 +3808,7 @@
             <span style="font-size:1.6rem">🟢</span>
             <div>
               <b>System Status: Operational</b> &middot; MongoDB Atlas Cloud Connected
-              <div style="font-size:0.8rem;color:#15803d">Dual Admin OTP Broadcast: rafioffl20@gmail.com & rafiqtn70@gmail.com</div>
+              <div style="font-size:0.8rem;color:#15803d">Dual Admin 2FA Protection: Active • Multi-Channel Verification Enabled</div>
             </div>
           </div>
 
@@ -4062,7 +4062,7 @@
               <div class="auth-field-group">
                 <label class="auth-field-label" for="l_un">Email or Username</label>
                 <div class="auth-input-container">
-                  <input id="l_un" class="auth-input-field" name="username" type="text" placeholder="e.g. rafiq@46 or your email" required autofocus autocomplete="username" autocapitalize="none">
+                  <input id="l_un" class="auth-input-field" name="username" type="text" placeholder="e.g. name@company.com or username" required autofocus autocomplete="username" autocapitalize="none">
                 </div>
               </div>
 
@@ -4151,18 +4151,6 @@
         }
 
         // Offline / local fallback
-        if (un === 'master' || un === 'rafiq@46') {
-          if (pw === 'Rafiq@2026#' || pw === 'Rafiq@24') {
-            renderOtpView('rafiq@46', 'Master Admin offline verification mode. Enter 6-digit OTP code (enter any 6 digits e.g. 123456 or Master Code to proceed).', true);
-            return;
-          } else {
-            errBox.textContent = 'Incorrect password.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Sign In';
-            return;
-          }
-        }
 
         const u = (db.users || []).find(x => (x.username && x.username.toLowerCase() === un) || (x.email && x.email.toLowerCase() === un));
         if (!u || !(await checkPw(u, pw))) {
