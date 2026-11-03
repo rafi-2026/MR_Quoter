@@ -745,6 +745,54 @@
       }
     }
 
+    /* Mobile Responsive Polish (Phase 5) */
+    @media(max-width:640px) {
+      .ov {
+        padding: 8px;
+      }
+      .modal {
+        width: 100% !important;
+        max-height: 96vh;
+        border-radius: 6px;
+      }
+      .modal-h {
+        padding: 10px 14px;
+        font-size: 0.95rem;
+      }
+      .modal-b {
+        padding: 12px 14px;
+      }
+      .modal-f {
+        padding: 10px 14px;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .ph {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .ph .acts {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .kpis {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .chips {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+      }
+      .scx {
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+
     /* modal + toast */
     .ov {
       position: fixed;
@@ -3258,16 +3306,47 @@
     }
     function validateQuote(q) {
       const e = [];
-      if (!q.cust.name.trim()) e.push('Enter the customer name.');
+      if (!q.cust || !String(q.cust.name || '').trim()) e.push('Enter the customer name.');
       const ls = q.lines.filter(l => l.type !== 'section');
-      if (!ls.length) e.push('Add at least one item.');
+      if (!ls.length) e.push('Add at least one item to the quotation.');
+
+      const unit = q.dimUnit || 'ft';
+      // Max bounds per unit
+      const maxW = unit === 'mm' ? 15000 : unit === 'm' ? 15 : unit === 'in' ? 600 : 50;
+      const maxH = unit === 'mm' ? 9000 : unit === 'm' ? 9 : unit === 'in' ? 360 : 30;
+      const minDim = unit === 'mm' ? 150 : unit === 'm' ? 0.15 : unit === 'in' ? 6 : 0.5;
+
       ls.forEach((l, i) => {
         const lbl = 'Item ' + (q.lines.filter(x => x.type !== 'section').indexOf(l) + 1);
-        if (!String(l.name || l.desc || '').trim()) e.push(lbl + ': add a description.');
-        if (l.type === 'size' && (num(l.w) <= 0 || num(l.h) <= 0)) e.push(lbl + ': enter width and height.');
-        if (num(l.qty) <= 0) e.push(lbl + ': quantity must be above zero.');
-        if (lineCalc(l, q).amt <= 0) e.push(lbl + ': amount is zero. Check the rate.');
+        const name = String(l.name || l.desc || '').trim();
+        if (!name) e.push(lbl + ': add a description or item name.');
+        
+        // Zero / negative quantity check
+        if (num(l.qty) <= 0) e.push(lbl + ` (${name || 'Item'}): quantity must be greater than zero.`);
+
+        if (l.type === 'size') {
+          const w = num(l.w), h = num(l.h);
+          if (w <= 0 || h <= 0) {
+            e.push(lbl + ` (${name || 'Window'}): enter valid positive width and height.`);
+          } else {
+            // Size limit checks
+            if (w < minDim) e.push(lbl + ` (${name}): width (${w} ${unit}) is below minimum size (${minDim} ${unit}).`);
+            if (h < minDim) e.push(lbl + ` (${name}): height (${h} ${unit}) is below minimum size (${minDim} ${unit}).`);
+            if (w > maxW) e.push(lbl + ` (${name}): width (${w} ${unit}) exceeds maximum limit (${maxW} ${unit}).`);
+            if (h > maxH) e.push(lbl + ` (${name}): height (${h} ${unit}) exceeds maximum limit (${maxH} ${unit}).`);
+          }
+
+          // Missing glass check (windows/doors/ventilators require glass)
+          const hasGlass = !!(l.glass_id || l.glassName || (l.spec && /glass|toughened|frosted|tinted|dgu|clear/i.test(l.spec)));
+          if (!hasGlass) {
+            e.push(lbl + ` (${name || 'Window'}): missing glass selection. Please choose a glass type.`);
+          }
+        }
+
+        const amt = lineCalc(l, q).amt;
+        if (amt <= 0) e.push(lbl + ` (${name || 'Item'}): calculated amount is zero. Check dimensions and rate.`);
       });
+
       const ps = (q.pay || []).reduce((a, p) => a + num(p.pct), 0);
       if (q.pay && q.pay.length && Math.abs(ps - 100) > 0.001) e.push('Payment schedule adds up to ' + ps + '%, not 100%.');
       return e;
@@ -4003,19 +4082,25 @@
     async function generateQuotePdfBlob(q) {
       const container = document.createElement('div');
       container.style.position = 'fixed';
-      container.style.left = '-9999px';
+      container.style.left = '0';
       container.style.top = '0';
       container.style.width = '210mm';
+      container.style.maxWidth = '210mm';
+      container.style.zIndex = '-9999';
+      container.style.pointerEvents = 'none';
+      container.style.opacity = '1';
       container.style.background = '#ffffff';
       container.innerHTML = `<div class="sheet doc" style="box-shadow:none;margin:0;padding:0;width:100%">${docHTML(q)}</div>`;
       document.body.appendChild(container);
-      renderDocQr(container, q);
+      renderDocQr(q, container);
+      // Wait for layout and canvas rendering
+      await new Promise(r => setTimeout(r, 150));
 
       const opt = {
         margin: [6, 6, 6, 6],
         filename: `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
@@ -4397,15 +4482,198 @@
     let custQ = '';
     function viewCustomers() {
       const m = $('#main');
-      m.innerHTML = `<div class="ph"><div><h1>Customers</h1></div><div class="acts"><button class="btn pri" data-act="custEdit">Add customer</button></div></div>
+      m.innerHTML = `<div class="ph"><div><h1>Customers</h1><div class="mute">Manage customer contacts, addresses, and GST details for quotations.</div></div><div class="acts"><button class="btn" data-act="custImport">📥 Import Customers</button><button class="btn ghost" data-act="custExport">📊 Export CSV</button><button class="btn pri" data-act="custEdit">Add customer</button></div></div>
   <div class="tools"><input type="search" id="csearch" placeholder="Search customers" value="${esc(custQ)}"></div><div class="card" style="padding:6px 10px"><div class="scx" id="ctable"></div></div>`;
       $('#csearch').oninput = e => { custQ = e.target.value; drawCust() }; drawCust();
     }
     function drawCust() {
       const t = custQ.trim().toLowerCase();
       const list = db.customers.filter(c => !t || [c.name, c.contact, c.phone, c.gstin, c.city].join(' ').toLowerCase().includes(t)).sort((a, b) => a.name.localeCompare(b.name));
-      $('#ctable').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>Name</th><th>Contact</th><th>City / state</th><th>GSTIN</th><th class="r">Quotes</th><th></th></tr></thead><tbody>${list.map(c => `<tr><td><b>${esc(c.name)}</b></td><td>${esc(c.contact)}<div class="mute sm">${esc(c.phone)} ${esc(c.email)}</div></td><td>${esc(c.city)}<div class="mute sm">${esc(c.state)}</div></td><td>${esc(c.gstin)}</td><td class="r">${db.quotes.filter(q => q.customerId === c.id && !q.superseded).length}</td><td class="r nowrap"><button class="btn sm" data-act="custQuote" data-id="${c.id}">New quote</button> <button class="btn sm" data-act="custEdit" data-id="${c.id}">Edit</button> <button class="btn sm bad" data-act="custDel" data-id="${c.id}">Delete</button></td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="margin:10px">${db.customers.length ? 'No customers match.' : 'No customers yet. Add one here, or type details directly on a quote.'}</div>`;
+      $('#ctable').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>Name</th><th>Contact</th><th>City / state</th><th>GSTIN</th><th class="r">Quotes</th><th></th></tr></thead><tbody>${list.map(c => `<tr><td><b>${esc(c.name)}</b></td><td>${esc(c.contact)}<div class="mute sm">${esc(c.phone)} ${esc(c.email)}</div></td><td>${esc(c.city)}<div class="mute sm">${esc(c.state)}</div></td><td>${esc(c.gstin)}</td><td class="r">${db.quotes.filter(q => q.customerId === c.id && !q.superseded).length}</td><td class="r nowrap"><button class="btn sm" data-act="custQuote" data-id="${c.id}">New quote</button> <button class="btn sm" data-act="custEdit" data-id="${c.id}">Edit</button> <button class="btn sm bad" data-act="custDel" data-id="${c.id}">Delete</button></td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="margin:10px">${db.customers.length ? 'No customers match.' : 'No customers yet. Add one here, import from CSV, or type details directly on a quote.'}</div>`;
     }
+
+    ACT.custExport = () => {
+      const custs = db.customers || [];
+      if (!custs.length) { toast('No customers to export.', 'bad'); return; }
+      const rows = [['Customer Name / Company', 'Contact Person', 'Phone', 'Email', 'GSTIN', 'Address', 'City', 'State']];
+      custs.forEach(c => {
+        rows.push([c.name || '', c.contact || '', c.phone || '', c.email || '', c.gstin || '', c.address || '', c.city || '', c.state || '']);
+      });
+      const csv = '\uFEFF' + rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      download(`Customers_${today()}.csv`, csv, 'text/csv');
+      toast('Exported customer list to CSV.');
+    };
+
+    ACT.custImport = () => {
+      let parsedCustomers = [];
+      modal({
+        title: '📥 Import Existing Customers',
+        wide: true,
+        body: `<div style="display:flex;flex-direction:column;gap:14px">
+          <div class="note">
+            <b>Bulk import customers</b> from CSV or Excel (.xlsx / .csv).<br>
+            Columns supported: <code>Name / Company</code>, <code>Contact Person</code>, <code>Phone</code>, <code>Email</code>, <code>GSTIN</code>, <code>Address</code>, <code>City</code>, <code>State</code>.
+          </div>
+          <div class="grid g2" style="align-items:end">
+            <label class="f">
+              <span>Choose CSV or Excel file</span>
+              <input type="file" id="ci_file" accept=".csv, .xlsx, .xls, text/csv">
+            </label>
+            <div style="font-size:0.85rem;color:#64748b;padding-bottom:10px">
+              Upload a spreadsheet file or paste comma-separated rows below.
+            </div>
+          </div>
+          <label class="f">
+            <span>Or paste raw CSV text:</span>
+            <textarea id="ci_text" rows="5" placeholder="Name, Contact, Phone, Email, GSTIN, Address, City, State&#10;Apex Builders, Vijay, 9840123456, vijay@apex.in, 33AAACA1234A1Z5, 12 Mount Rd, Chennai, Tamil Nadu"></textarea>
+          </label>
+          <div id="ci_status" style="font-size:0.9rem;font-weight:600;color:#0284c7"></div>
+          <div id="ci_preview" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;display:none"></div>
+        </div>`,
+        okText: 'Import Customers',
+        onOk: () => {
+          if (!parsedCustomers.length) {
+            toast('No valid customer rows found to import.', 'bad');
+            return false;
+          }
+          let added = 0, skipped = 0;
+          db.customers = db.customers || [];
+          parsedCustomers.forEach(c => {
+            const cleanName = (c.name || '').trim().toLowerCase();
+            const cleanPhone = (c.phone || '').replace(/\D/g, '');
+            const exists = db.customers.some(x => 
+              (x.name && x.name.trim().toLowerCase() === cleanName) ||
+              (cleanPhone && x.phone && x.phone.replace(/\D/g, '') === cleanPhone)
+            );
+            if (!exists) {
+              db.customers.push({
+                id: uid(),
+                name: c.name || '',
+                contact: c.contact || '',
+                phone: c.phone || '',
+                email: c.email || '',
+                gstin: (c.gstin || '').toUpperCase(),
+                address: c.address || '',
+                city: c.city || '',
+                state: c.state || db.settings.state || 'Tamil Nadu'
+              });
+              added++;
+            } else {
+              skipped++;
+            }
+          });
+          persist(true);
+          drawCust();
+          toast(`✅ Successfully imported ${added} customers${skipped ? ` (${skipped} duplicates skipped)` : ''}!`);
+          return true;
+        }
+      });
+
+      function parseRows(rawRows) {
+        if (!rawRows || !rawRows.length) return [];
+        const headerRow = rawRows[0].map(h => String(h || '').trim().toLowerCase());
+        const findCol = regex => headerRow.findIndex(h => regex.test(h));
+        const idxName = findCol(/name|company|customer|client/);
+        const idxContact = findCol(/contact|person|attn|rep/);
+        const idxPhone = findCol(/phone|mobile|cell|tel|contact.*no/);
+        const idxEmail = findCol(/email|mail/);
+        const idxGstin = findCol(/gst|gstin|tax/);
+        const idxAddr = findCol(/address|addr|street/);
+        const idxCity = findCol(/city|town/);
+        const idxState = findCol(/state|province/);
+
+        const res = [];
+        for (let i = 1; i < rawRows.length; i++) {
+          const r = rawRows[i];
+          if (!r || !r.length) continue;
+          const name = String((idxName >= 0 ? r[idxName] : r[0]) || '').trim();
+          if (!name) continue;
+          res.push({
+            name,
+            contact: String((idxContact >= 0 ? r[idxContact] : r[1]) || '').trim(),
+            phone: String((idxPhone >= 0 ? r[idxPhone] : r[2]) || '').trim(),
+            email: String((idxEmail >= 0 ? r[idxEmail] : r[3]) || '').trim(),
+            gstin: String((idxGstin >= 0 ? r[idxGstin] : r[4]) || '').trim(),
+            address: String((idxAddr >= 0 ? r[idxAddr] : r[5]) || '').trim(),
+            city: String((idxCity >= 0 ? r[idxCity] : r[6]) || '').trim(),
+            state: String((idxState >= 0 ? r[idxState] : r[7]) || '').trim()
+          });
+        }
+        return res;
+      }
+
+      function updatePreview(customers) {
+        parsedCustomers = customers;
+        const statusEl = $('#ci_status');
+        const prevEl = $('#ci_preview');
+        if (!customers.length) {
+          if (statusEl) statusEl.textContent = 'No valid rows detected yet.';
+          if (prevEl) prevEl.style.display = 'none';
+          return;
+        }
+        if (statusEl) statusEl.textContent = `✓ Ready to import ${customers.length} customer${customers.length !== 1 ? 's' : ''}:`;
+        if (prevEl) {
+          prevEl.style.display = 'block';
+          prevEl.innerHTML = `<table class="tbl sm">
+            <thead>
+              <tr><th>#</th><th>Name</th><th>Contact</th><th>Phone</th><th>GSTIN</th><th>City</th></tr>
+            </thead>
+            <tbody>
+              ${customers.map((c, i) => `<tr>
+                <td>${i + 1}</td>
+                <td><b>${esc(c.name)}</b></td>
+                <td>${esc(c.contact || '-')}</td>
+                <td>${esc(c.phone || '-')}</td>
+                <td>${esc(c.gstin || '-')}</td>
+                <td>${esc(c.city || '-')}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`;
+        }
+      }
+
+      const fileInp = $('#ci_file');
+      if (fileInp) {
+        fileInp.onchange = e => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = evt => {
+            try {
+              if (typeof XLSX !== 'undefined') {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                updatePreview(parseRows(rows));
+              } else {
+                const text = new TextDecoder().decode(evt.target.result);
+                const rows = text.split(/\r?\n/).map(l => l.split(','));
+                updatePreview(parseRows(rows));
+              }
+            } catch (err) {
+              toast('Could not parse file: ' + err.message, 'bad');
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        };
+      }
+
+      const textInp = $('#ci_text');
+      if (textInp) {
+        textInp.oninput = () => {
+          const val = textInp.value.trim();
+          if (!val) { updatePreview([]); return; }
+          const lines = val.split(/\r?\n/).filter(Boolean);
+          const rows = lines.map(l => {
+            if (l.includes('\t')) return l.split('\t');
+            const match = l.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+            return match ? match.map(m => m.replace(/^"|"$/g, '').trim()) : l.split(',');
+          });
+          updatePreview(parseRows(rows));
+        };
+      }
+    };
     ACT.custEdit = b => {
       const c = b.dataset.id ? db.customers.find(x => x.id === b.dataset.id) : { name: '', contact: '', phone: '', email: '', gstin: '', address: '', city: '', state: db.settings.state };
       modal({
@@ -4466,7 +4734,8 @@
         ['gaskets', 'Gaskets & Seals'],
         ['products', 'Custom Products'],
         ['items', 'BOQ items'],
-        ['options', 'Legacy options']
+        ['options', 'Legacy options'],
+        ['audit', '📜 Rate Change Audit Log']
       ];
       m.innerHTML = `<div class="ph"><div><h1>Rate library</h1><div class="mute">${ed ? 'Rates, materials and BOM templates set here are used by the auto costing engine for accurate quotation pricing.' : 'Read only. Manager or authorised roles can change rates and templates.'}</div></div></div>
   <div class="note" style="margin-bottom:14px">Materials, rates and product templates are specific to your company. All BOM line amounts calculate automatically with Excel-matching precision.</div>
@@ -4976,11 +5245,55 @@
         b.innerHTML = `<div class="card"><div class="card-h"><h3>Size-based products (rate per sq ft)</h3>${ed ? '<button class="btn pri sm" data-act="prodEdit">Add product</button>' : ''}</div><div class="scx"><table class="tbl"><thead><tr><th>Product</th><th>Type</th><th class="r">Rate / sq ft</th><th class="r">Min area</th>${ed ? '<th class="r">Cost / sq ft</th><th></th>' : ''}</tr></thead><tbody>${db.products.map(p => `<tr><td><b>${esc(p.name)}</b><div class="mute sm">${esc(p.desc)}</div></td><td>${esc(GLYPHS[p.glyph] || '')}</td><td class="r">${rs(p.rate)}</td><td class="r">${p.minArea ? inr(p.minArea) + ' sq ft' : '-'}</td>${ed ? `<td class="r">${p.cost ? rs(p.cost) : '-'}</td><td class="r nowrap"><button class="btn sm" data-act="prodEdit" data-id="${p.id}">Edit</button> <button class="btn sm bad" data-act="prodDel" data-id="${p.id}">Delete</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="6"><div class="empty">No products yet.</div></td></tr>`}</tbody></table></div></div>`;
       } else if (rateTab === 'items') {
         b.innerHTML = `<div class="card"><div class="card-h"><h3>BOQ items (construction, interiors, other works)</h3>${ed ? '<button class="btn pri sm" data-act="itemEdit">Add item</button>' : ''}</div><div class="scx"><table class="tbl"><thead><tr><th>Category</th><th>Description</th><th>Unit</th><th class="r">Rate</th>${ed ? '<th class="r">Cost</th><th></th>' : ''}</tr></thead><tbody>${db.items.map(p => `<tr><td>${esc(p.category)}</td><td>${esc(p.desc)}</td><td>${esc(p.unit)}</td><td class="r">${rs(p.rate)}</td>${ed ? `<td class="r">${p.cost ? rs(p.cost) : '-'}</td><td class="r nowrap"><button class="btn sm" data-act="itemEdit" data-id="${p.id}">Edit</button> <button class="btn sm bad" data-act="itemDel" data-id="${p.id}">Delete</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="6"><div class="empty">No items yet.</div></td></tr>`}</tbody></table></div></div>`;
+      } else if (rateTab === 'audit') {
+        const logs = db.rateAuditLog || [];
+        b.innerHTML = `<div class="card">
+          <div class="card-h">
+            <div>
+              <h3 style="margin:0 0 4px">📜 Rate &amp; Costing Change Audit Trail</h3>
+              <div class="mute sm">Chronological audit log tracking every change to aluminium rates, labour, margins, wastage and material prices.</div>
+            </div>
+            ${logs.length && ed ? '<button class="btn sm ghost bad" data-act="clearRateAudit">Clear Log</button>' : ''}
+          </div>
+          <div class="scx">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Date &amp; Time</th>
+                  <th>Modified By</th>
+                  <th>Category</th>
+                  <th>Parameter / Item</th>
+                  <th class="r">Previous Value</th>
+                  <th class="r">New Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${logs.map(l => `<tr>
+                  <td class="nowrap">${new Date(l.timestamp).toLocaleString('en-IN')}</td>
+                  <td><b>${esc(l.user)}</b> <span class="mute sm">(${esc(l.role || 'Admin')})</span></td>
+                  <td><span class="bd ${l.category && l.category.includes('Settings') ? 'approved' : 'pending'}">${esc(l.category)}</span></td>
+                  <td><b>${esc(l.param)}</b></td>
+                  <td class="r" style="color:#64748b;text-decoration:line-through">${esc(l.oldValue)}</td>
+                  <td class="r font-bold" style="color:#0284c7">${esc(l.newValue)}</td>
+                </tr>`).join('') || `<tr><td colspan="6"><div class="empty">No rate changes recorded yet. When rates or settings are updated, logs will automatically appear here.</div></td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
       } else {
         const tbl = (key, title) => `<div class="card"><div class="card-h"><h3>${title}</h3>${ed ? `<button class="btn sm" data-act="optAdd" data-k="${key}">Add option</button>` : ''}</div><div class="mute sm" style="margin-bottom:8px">Extra charge per sq ft added to the base rate.</div>${(db.settings[key] || []).map((o, i) => `<div class="row2"><input value="${esc(o.name)}" data-opt="${key}" data-i="${i}" data-f="name" ${ed ? '' : 'disabled'}><input type="number" step="any" value="${o.add}" data-opt="${key}" data-i="${i}" data-f="add" ${ed ? '' : 'disabled'}>${ed ? `<button class="btn sm bad" data-act="optDel" data-k="${key}" data-i="${i}">Remove</button>` : '<span></span>'}</div>`).join('')}</div>`;
         b.innerHTML = `<div class="grid g2">${tbl('glass', 'Glass options')}${tbl('finish', 'Finish options')}</div>`;
       }
     }
+
+    ACT.clearRateAudit = () => {
+      confirmBox('Are you sure you want to clear the rate change audit log?', () => {
+        db.rateAuditLog = [];
+        persist(true);
+        drawRates();
+        toast('Rate audit log cleared.');
+      }, 'Clear Log', 'bad');
+    };
 
     // Material & Template Action Handlers (Phase 3 Template Builder)
     ACT.tplOpen = b => { selectedTemplateId = b.dataset.id; drawRates(); };
@@ -5590,6 +5903,24 @@
           d.weight_kg_per_m = num(d.weight_kg_per_m);
           d.rate = num(d.rate);
           d.active = true;
+
+          // Audit log for material rate changes
+          if (id && m) {
+            db.rateAuditLog = db.rateAuditLog || [];
+            if (m.rate !== d.rate) {
+              db.rateAuditLog.unshift({
+                id: uid(),
+                timestamp: Date.now(),
+                user: (me && me.name) ? me.name : 'User',
+                role: (me && me.role) ? me.role : 'Admin',
+                category: `Material: ${m.category || 'Item'}`,
+                param: `${m.name} Rate`,
+                oldValue: `₹${m.rate} / ${m.unit || 'unit'}`,
+                newValue: `₹${d.rate} / ${d.unit || 'unit'}`
+              });
+            }
+          }
+
           if (id) Object.assign(m, d);
           else mats.push({ id: uid(), ...d });
           persist(true); drawRates(); toast('Material saved.');
@@ -6793,14 +7124,44 @@
       try {
         const cst = g('#set_costing');
         if (cst) {
+          const oldCs = JSON.parse(JSON.stringify(db.costingSettings || CostingEngine.getDefaultCostingSettings()));
+          const newAlRate = num(cst.alRate) || 500;
+          const newWastage = num(cst.wastagePct) || 5;
+          const newMargin = num(cst.marginPct) || 35;
+          const newGst = num(cst.gstPct) || 18;
+          const newLabour = num(cst.labourRate) || 500;
+          const newSqftPerSqm = num(cst.sqftPerSqm) || 10.764;
+
+          db.rateAuditLog = db.rateAuditLog || [];
+          const logAudit = (param, oldVal, newVal, unit) => {
+            if (oldVal !== newVal) {
+              db.rateAuditLog.unshift({
+                id: uid(),
+                timestamp: Date.now(),
+                user: (me && me.name) ? me.name : 'User',
+                role: (me && me.role) ? me.role : 'Admin',
+                category: 'Costing Settings',
+                param,
+                oldValue: `${oldVal}${unit || ''}`,
+                newValue: `${newVal}${unit || ''}`
+              });
+            }
+          };
+          logAudit('Aluminium Rate', oldCs.aluminium_rate_per_kg, newAlRate, ' ₹/kg');
+          logAudit('Wastage Margin', oldCs.wastage_pct, newWastage, '%');
+          logAudit('Markup Margin', oldCs.margin_pct, newMargin, '%');
+          logAudit('Labour Rate', oldCs.labour_rate_per_sqm, newLabour, ' ₹/sqm');
+          logAudit('GST Rate', oldCs.gst_pct, newGst, '%');
+          logAudit('Sqft/Sqm Factor', oldCs.sqft_per_sqm, newSqftPerSqm);
+
           db.costingSettings = db.costingSettings || CostingEngine.getDefaultCostingSettings();
           Object.assign(db.costingSettings, {
-            aluminium_rate_per_kg: num(cst.alRate) || 500,
-            wastage_pct: num(cst.wastagePct) || 5,
-            margin_pct: num(cst.marginPct) || 35,
-            gst_pct: num(cst.gstPct) || 18,
-            labour_rate_per_sqm: num(cst.labourRate) || 500,
-            sqft_per_sqm: num(cst.sqftPerSqm) || 10.764,
+            aluminium_rate_per_kg: newAlRate,
+            wastage_pct: newWastage,
+            margin_pct: newMargin,
+            gst_pct: newGst,
+            labour_rate_per_sqm: newLabour,
+            sqft_per_sqm: newSqftPerSqm,
             ft_to_m: 0.3048,
             last_changed_by: (me && me.name) ? me.name : 'User',
             last_changed_at: new Date().toISOString()
@@ -8286,8 +8647,9 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
     <div>${s.isoStandard ? esc(s.isoStandard) : ''}</div>
   </div>` : '')}</td></tr></tfoot></table>`;
     }
-    function renderDocQr(q) {
-      const cv = document.getElementById('upiQrCanvas');
+    function renderDocQr(q, targetEl) {
+      const root = targetEl || document;
+      const cv = root.querySelector ? (root.querySelector('#upiQrCanvas') || document.getElementById('upiQrCanvas')) : document.getElementById('upiQrCanvas');
       const b = (db && db.settings && db.settings.bank) || {};
       if (cv && b.upiId && typeof QRCode !== 'undefined') {
         const uri = `upi://pay?pa=${encodeURIComponent(b.upiId)}&pn=${encodeURIComponent((db.settings && db.settings.company) || 'Company')}&cu=INR&tn=${encodeURIComponent((q.no || 'Quote') + ' Payment')}`;
