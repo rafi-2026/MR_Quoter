@@ -69,6 +69,8 @@
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- SheetJS for XLSX export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Framer Motion Web Engine for smooth animations -->
   <script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.js"></script>
   <style>
@@ -3797,6 +3799,18 @@
       const fy = fyOf(today()), wonFy = qs.filter(q => q.status === 'won' && fyOf(q.date) === fy);
       const won = cnt(['won']), lost = cnt(['lost']);
       const rate = won + lost ? Math.round(won / (won + lost) * 100) + '%' : '-';
+      // Phase 4 KPI additions ─────────────────────────────────────────────
+      const thisMonth = today().slice(0, 7);
+      const monthQs = qs.filter(q => (q.date || '').startsWith(thisMonth));
+      const monthTotal = monthQs.reduce((a, q) => a + quoteTotal(q), 0);
+      let _totalArea = 0, _totalPrice = 0;
+      qs.filter(q => ['approved', 'sent', 'won'].includes(q.status)).forEach(q => {
+        (q.lines || []).filter(l => l.type === 'size').forEach(l => {
+          const k = lineCalc(l, q); _totalArea += (k.totalArea || 0); _totalPrice += (k.amt || 0);
+        });
+      });
+      const avgRateSqft = _totalArea > 0 ? Math.round(_totalPrice / _totalArea) : 0;
+      // ────────────────────────────────────────────────────────────────────
       const order = ['draft', 'pending', 'approved', 'sent', 'won', 'lost', 'rejected'];
       const mx = Math.max(1, ...order.map(s => sum([s])));
       const stale = qs.filter(q => q.status === 'sent' && q.sentAt && (Date.now() - q.sentAt) > 7 * 864e5);
@@ -3807,7 +3821,12 @@
    <div class="kpi"><small>Awaiting approval</small><b>${cnt(['pending'])}</b><span>${rs(sum(['pending']), 0)}</span></div>
    <div class="kpi"><small>Open (approved + sent)</small><b>${rs(sum(['approved', 'sent']), 0)}</b><span>${cnt(['approved', 'sent'])} quotes</span></div>
    <div class="kpi"><small>Won in FY ${fy}</small><b>${rs(wonFy.reduce((a, q) => a + quoteTotal(q), 0), 0)}</b><span>${wonFy.length} quotes</span></div>
-   <div class="kpi"><small>Win rate</small><b>${rate}</b><span>${won} won, ${lost} lost</span></div></div>
+   <div class="kpi"><small>Win rate</small><b>${rate}</b><span>${won} won, ${lost} lost</span></div>
+   <div class="kpi" style="border-top:2px solid var(--glass)"><small>Quotes this month</small><b>${monthQs.length}</b><span>${rs(monthTotal, 0)} total</span></div>
+   <div class="kpi" style="border-top:2px solid var(--glass)"><small>Total quoted value</small><b>${rs(sum(['draft','pending','approved','sent','won']), 0)}</b><span>${qs.length} quotes</span></div>
+   <div class="kpi" style="border-top:2px solid var(--glass)"><small>Approved / sent value</small><b>${rs(sum(['approved','sent','won']), 0)}</b><span>${cnt(['approved','sent','won'])} quotes</span></div>
+   <div class="kpi" style="border-top:2px solid var(--glass)"><small>Avg rate / sq ft</small><b>${avgRateSqft > 0 ? rs(avgRateSqft, 0) : '—'}</b><span>Approved + sent</span></div>
+  </div>
   ${isMaster() && (db.companies || []).length ? `
   <div class="card" style="margin-bottom:18px;padding:12px 16px">
     <div class="card-h" style="margin-bottom:10px">
@@ -4043,23 +4062,135 @@
         noFooter: true,
         body: `<div class="grid g2" style="margin:12px 0;gap:12px">
       <button class="btn pri" data-act="dlRealPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📄 Download Official PDF Document</button>
+      <button class="btn pri" data-act="dlXlsx" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600;background:#16a34a;border-color:#16a34a">📊 Download Excel (XLSX)</button>
       <button class="btn" data-act="dlHtml" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📥 Download Quote File (.html)</button>
       <button class="btn" data-act="dlPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">🖨️ Print / Save as PDF Window</button>
-      <button class="btn" data-act="dlCsv" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📊 Export Excel / CSV File</button>
+      <button class="btn" data-act="dlCsv" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📋 Export CSV File</button>
       <button class="btn" data-act="dlJson" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📦 Backup JSON Data File</button>
     </div>
-    <div class="mute sm" style="text-align:center;margin-top:6px">Tip: "Download Official PDF Document" saves the exact customer-ready PDF directly to your device.</div>`
+    <div class="mute sm" style="text-align:center;margin-top:6px">Tip: PDF and XLSX are the official customer-ready formats. Excel includes a separate BOM Breakdown sheet.</div>`
       });
     };
     ACT.dlRealPdf = async b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) await downloadQuotePdf(q); };
     ACT.dlHtml = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) downloadQuoteHtml(q); };
     ACT.dlPdf = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) previewQuote(q); };
+    // ── XLSX Export (SheetJS) ────────────────────────────────────────────────
+    function buildQuoteXlsx(q) {
+      if (typeof XLSX === 'undefined') { toast('Excel library loading, please try again.', 'bad'); return null; }
+      const s = db.settings, t = calcTotals(q), c = q.cust || {}, unit = q.dimUnit || 'ft';
+      const wb = XLSX.utils.book_new();
+      // ── Sheet 1: Quotation ───────────────────────────────────────────────
+      const rows = [];
+      rows.push([s.company || 'QUOTATION', '', '', '', '', '', 'Ref:', q.no]);
+      rows.push([s.tagline || '', '', '', '', '', '', 'Date:', q.date]);
+      rows.push([[s.address1, s.address2, s.city, s.state].filter(Boolean).join(', '), '', '', '', '', '', 'Valid Until:', addDays(q.date, num(q.validity) || 30)]);
+      if (s.gstin)  rows.push(['GSTIN: ' + s.gstin, '', '', '', '', '', q.rev ? 'Revision:' : '', q.rev ? 'Rev ' + q.rev : '']);
+      rows.push(['Phone: ' + (s.phone || s.mobile || ''), '', '', '', '', '', '', '']);
+      rows.push([]);
+      rows.push(['QUOTATION FOR:', '', '', '', '', 'PROJECT:', '', '']);
+      rows.push([c.name || '', '', '', '', '', q.project || '', '', '']);
+      if (c.contact) rows.push(['Attn: ' + c.contact, '', '', '', '', '', '', '']);
+      if (c.site)    rows.push(['Site: ' + c.site,    '', '', '', '', '', '', '']);
+      if (c.phone)   rows.push(['Ph: ' + c.phone,     '', '', '', '', '', '', '']);
+      if (c.gstin)   rows.push(['GSTIN: ' + c.gstin,  '', '', '', '', '', '', '']);
+      rows.push([]);
+      rows.push(['#', 'Description', 'Specification', 'Size', 'Unit', 'Qty', 'Rate/Sqft (₹)', 'Amount (₹)']);
+      let n = 0;
+      q.lines.forEach(l => {
+        if (l.type === 'section') { rows.push([l.title || 'Section', '', '', '', '', '', '', '']); return; }
+        n++;
+        const k = lineCalc(l, q);
+        const sizeStr = l.w && l.h ? `${num(l.w)} x ${num(l.h)} ${unit}` : '';
+        rows.push([n, l.name || '', l.spec || l.desc || '', sizeStr, l.unit || (l.type === 'size' ? 'nos' : ''), num(l.qty), k.rate || l.rate || 0, k.amt || 0]);
+      });
+      rows.push([]);
+      rows.push(['', '', '', '', '', '', 'Subtotal (₹)', t.sub]);
+      if (t.dAmt)   rows.push(['', '', '', '', '', '', 'Discount (₹)', -t.dAmt]);
+      if (t.extras) rows.push(['', '', '', '', '', '', 'Extra Charges (₹)', t.extras]);
+      rows.push(['', '', '', '', '', '', 'Taxable Value (₹)', t.taxable]);
+      if (q.gst) rows.push(['', '', '', '', '', '', `GST (${q.gstRate || 18}%) (₹)`, t.gstAmt]);
+      rows.push(['', '', '', '', '', '', 'GRAND TOTAL (₹)', t.grand]);
+      rows.push([]);
+      if ((q.pay || []).some(p => p.label || p.pct)) {
+        rows.push(['Payment Schedule', '', '', '', '', '', '', '']);
+        (q.pay || []).filter(p => p.label || p.pct).forEach(p => {
+          rows.push(['', p.label || '', '', '', '', p.pct + '%', '', Math.round(t.grand * (parseFloat(p.pct) || 0) / 100)]);
+        });
+        rows.push([]);
+      }
+      const bk = s.bank || {};
+      if (bk.acNo || bk.bank) {
+        rows.push(['Bank Details', '', '', '', '', '', '', '']);
+        if (bk.acName)  rows.push(['', 'Account Name:', bk.acName,  '', '', '', '', '']);
+        if (bk.bank)    rows.push(['', 'Bank:', bk.bank,            '', '', '', '', '']);
+        if (bk.acNo)    rows.push(['', 'A/C No:', bk.acNo,          '', '', '', '', '']);
+        if (bk.ifsc)    rows.push(['', 'IFSC:', bk.ifsc,            '', '', '', '', '']);
+        if (bk.branch)  rows.push(['', 'Branch:', bk.branch,        '', '', '', '', '']);
+        rows.push([]);
+      }
+      if (q.terms) {
+        rows.push(['Terms and Conditions', '', '', '', '', '', '', '']);
+        q.terms.split('\n').filter(x => x.trim()).forEach((tm, i) => rows.push([(i + 1) + '.', tm.trim(), '', '', '', '', '', '']));
+        rows.push([]);
+      }
+      rows.push(['Prepared by: ' + (q.preparedByName || ''), '', '', '', 'Authorised by: ' + (q.authorisedBy || s.authorisedDefault || ''), '', '', '']);
+      rows.push(['', '', '', '', q.authorisedTitle || s.authorisedTitleDefault || 'Authorised Signatory', '', '', '']);
+      rows.push(['For ' + (s.company || ''), '', '', '', '', '', '', '']);
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{wch:6},{wch:32},{wch:28},{wch:16},{wch:7},{wch:6},{wch:15},{wch:16}];
+      XLSX.utils.book_append_sheet(wb, ws, 'Quotation');
+      // ── Sheet 2: BOM / Cost Breakdown ────────────────────────────────────
+      const bomRows = [['Quote No:', q.no, '', 'Date:', q.date, '', ''], []];
+      bomRows.push(['Item', 'BOM Line', 'Kind', 'Length/Qty', 'Unit Price (₹)', 'Line Total (₹)', '']);
+      n = 0;
+      q.lines.forEach(l => {
+        if (l.type !== 'size') return;
+        n++;
+        const k = lineCalc(l, q);
+        const bom = (k.cost_breakdown && k.cost_breakdown.lines) || [];
+        const label = `${n}. ${l.name || ''} (${num(l.w)}x${num(l.h)} ${unit})`;
+        if (bom.length) {
+          bom.forEach((bl, bi) => {
+            bomRows.push([bi === 0 ? label : '', bl.desc || '', bl.kind || '', bl.totalMetres != null ? bl.totalMetres : (bl.nos || ''), bl.unitPrice || '', bl.lineTotal || '', '']);
+          });
+          bomRows.push(['', 'Subtotal', '', '', '', k.cost_breakdown.subtotal || '', '']);
+          bomRows.push(['', 'Wastage', '', '', '', k.cost_breakdown.wastage || '', '']);
+          bomRows.push(['', 'Total Cost', '', '', '', k.cost_breakdown.totalCost || '', '']);
+          if (canViewMargin()) bomRows.push(['', 'Margin', '', '', '', k.cost_breakdown.margin || '', '']);
+          bomRows.push(['', 'Price Ex-Tax  Rate: ₹' + (k.rate || 0) + '/sqft', '', '', '', k.cost_breakdown.priceExTax || '', '']);
+          bomRows.push([]);
+        } else {
+          bomRows.push([label, '(No BOM breakdown)', '', '', '', '', '']);
+        }
+      });
+      const wsBom = XLSX.utils.aoa_to_sheet(bomRows);
+      wsBom['!cols'] = [{wch:34},{wch:28},{wch:12},{wch:12},{wch:15},{wch:15},{wch:4}];
+      XLSX.utils.book_append_sheet(wb, wsBom, 'BOM Breakdown');
+      return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    }
+
+    ACT.dlXlsx = b => {
+      closeModal();
+      const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
+      try {
+        const xlsxData = buildQuoteXlsx(q);
+        if (!xlsxData) return;
+        const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.xlsx`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        toast('✅ Excel XLSX downloaded!');
+      } catch(e) { console.error('XLSX export error:', e); toast('Excel export failed: ' + e.message, 'bad'); }
+    };
+
     ACT.dlCsv = b => {
       closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       const rows = [['Item #', 'Type', 'Tag/Mark', 'Location', 'Item Name', 'Specification', 'Width', 'Height', 'Qty', 'Rate', 'Amount']];
       let n = 0;
       q.lines.forEach(l => {
-        if (l.type === 'section') { rows.push(['---', l.title, '', '', '', '', '', '', '', '', '']); return }
+        if (l.type === 'section') { rows.push(['---', l.title, '', '', '', '', '', '', '', '', '']); return; }
         n++; const k = lineCalc(l, q);
         rows.push([n, l.type, l.tag || '', l.loc || '', l.name || '', l.spec || l.desc || '', l.w || '', l.h || '', l.qty, k.rate || l.rate, k.amt]);
       });
@@ -7485,6 +7616,9 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
       reopen() { setStatus('sent', 'Reopened') },
       revise() {
         confirmBox('Create a new editable revision? This revision stays on record and is marked as replaced.', () => {
+          // Ensure baseNo exists (migration safety for old quotes)
+          if (!Q.baseNo) Q.baseNo = Q.no;
+          if (!Q.groupId) Q.groupId = Q.id;
           const n = JSON.parse(JSON.stringify(Q)), rev = Math.max(...db.quotes.filter(x => x.groupId === Q.groupId).map(x => x.rev)) + 1;
           Object.assign(n, { id: uid(), rev, no: Q.baseNo + '/R' + rev, status: 'draft', createdBy: me.id, createdAt: Date.now(), updatedAt: Date.now(), date: today(), log: [], superseded: false, sentAt: null, reviewNote: '' });
           n.lines = n.lines.map(l => ({ ...l, id: uid() })); logq(n, 'Revision ' + rev + ' created from ' + Q.no);
@@ -7803,6 +7937,7 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
         });
       },
       promptRateOverride(b) {
+        if (!canApprove()) { toast('Rate override requires manager or admin access.', 'bad'); return; }
         const lid = b.dataset.lid;
         const l = Q && Q.lines.find(x => x.id === lid);
         if (!l) return;
@@ -8038,7 +8173,10 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
       Q.status = s;
       Q.updatedAt = Date.now();
       if (['approved', 'sent', 'won'].includes(s)) {
+        // Freeze costing settings snapshot — rates locked at approval time
         Q.costingSettingsSnapshot = JSON.parse(JSON.stringify(db.costingSettings || CostingEngine.getDefaultCostingSettings()));
+        Q.ratesSnapshotAt = Date.now();
+        // Freeze per-line BOM breakdown snapshot so future rate changes don't alter locked quotes
         (Q.lines || []).forEach(l => {
           if (l.type === 'size') {
             const c = lineCalc(l, Q);
