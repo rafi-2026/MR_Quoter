@@ -3008,11 +3008,7 @@
           subtotal += amount;
         }
 
-        const wastagePct = Number(settings.wastage_pct) || 5;
-        const marginPct = Number(settings.margin_pct) || 35;
-        const gstPct = Number(settings.gst_pct) || 18;
-        const sqftPerSqm = Number(settings.sqft_per_sqm) || 10.764;
-
+        // Subtotal calculated from all BOM lines
         const wastage = subtotal * wastagePct / 100;
         const totalCost = subtotal + wastage;
         const margin = Math.round(totalCost * marginPct / 100);
@@ -7378,8 +7374,6 @@
    <div class="card"><h3>Activity</h3><ul class="hist" id="logs"></ul></div></aside></div>`;
       drawCustCard(); drawLines(); drawExtras(); drawPays(); drawActs(); refreshCalc(); drawSide();
       // Load payment tracking
-      loadPayments(q.id);
-    }
       loadPayments(q.id);
     }
     // Payment tracking (supports both Cloud and Local offline mode)
