@@ -75,27 +75,32 @@
   <script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.js"></script>
   <style>
     :root {
-      --ink: #1b2a2f;
-      --ink2: #3f5258;
-      --mute: #6c7f85;
-      --paper: #f3f5f4;
-      --card: #fff;
-      --line: #d7dedc;
-      --line2: #e8edeb;
-      --glass: #2a7880;
-      --glass-d: #1d5a61;
-      --glass-l: #e2f0f0;
-      --bronze: #a46a2a;
-      --bronze-l: #f5e9d8;
-      --ok: #2c7a4b;
-      --ok-l: #dff1e6;
-      --warn: #a96f12;
-      --warn-l: #fbefd3;
-      --bad: #b03a3a;
-      --bad-l: #f8e0e0;
-      --blue: #2b5c9e;
-      --blue-l: #e0eaf7;
-      --r: 6px;
+      --ink: #0f172a;
+      --ink2: #334155;
+      --mute: #64748b;
+      --paper: #f8fafc;
+      --card: #ffffff;
+      --line: #e2e8f0;
+      --line2: #f1f5f9;
+      --pri: #4f46e5;
+      --pri-d: #4338ca;
+      --pri-l: #eef2ff;
+      --glass: #4f46e5;
+      --glass-d: #3730a3;
+      --glass-l: #eef2ff;
+      --bronze: #d97706;
+      --bronze-l: #fffbeb;
+      --ok: #10b981;
+      --ok-l: #ecfdf5;
+      --warn: #f59e0b;
+      --warn-l: #fffbeb;
+      --bad: #ef4444;
+      --bad-l: #fef2f2;
+      --blue: #0284c7;
+      --blue-l: #f0f9ff;
+      --upvc: #7c3aed;
+      --upvc-l: #f5f3ff;
+      --r: 8px;
     }
 
     * {
@@ -178,125 +183,135 @@
     }
 
     .side-nav {
-      background: linear-gradient(160deg, #0d2137 0%, #1a3a52 40%, #0e4a4a 100%);
-      color: #d6e2e4;
+      background: #ffffff;
+      color: #334155;
       display: flex;
       flex-direction: column;
-      padding: 18px 0;
+      padding: 16px 0;
       position: sticky;
       top: 0;
       height: 100vh;
-      box-shadow: 3px 0 15px rgba(0,0,0,.3)
+      border-right: 1px solid #e2e8f0;
+      box-shadow: 2px 0 12px rgba(15, 23, 42, 0.03);
     }
 
     .brand {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       align-items: center;
-      padding: 0 18px 18px;
-      border-bottom: 1px solid rgba(255, 255, 255, .15)
+      padding: 0 18px 16px;
+      border-bottom: 1px solid #f1f5f9;
     }
 
     .mono {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #f4a04a, #e07020);
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
       color: #fff;
       display: grid;
       place-items: center;
       font-family: "IBM Plex Sans Condensed", sans-serif;
       font-weight: 700;
-      font-size: 1.2rem;
+      font-size: 1.25rem;
       flex: none;
       overflow: hidden;
-      box-shadow: 0 2px 8px rgba(244,160,74,.4)
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.28);
     }
 
     .mono img {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      background: #fff
+      background: #fff;
     }
 
     .brand b {
       display: block;
-      color: #fff;
-      font-size: 1rem;
+      color: #0f172a;
+      font-size: 1.05rem;
+      font-weight: 700;
       line-height: 1.2;
-      letter-spacing: .02em
+      letter-spacing: -.01em;
     }
 
     .brand span {
-      font-size: .75rem;
-      color: #a8c8ce
+      font-size: .78rem;
+      color: #64748b;
     }
 
     .nav {
-      padding: 12px 8px;
-      flex: 1
+      padding: 14px 10px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .nav a {
       display: flex;
       align-items: center;
-      padding: .55rem .85rem;
-      border-radius: 7px;
-      color: #b8d4d8;
+      gap: 10px;
+      padding: .62rem .95rem;
+      border-radius: 9px;
+      color: #475569;
       text-decoration: none;
-      margin-bottom: 3px;
+      font-weight: 500;
+      font-size: .92rem;
+      transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
       border-left: 3px solid transparent;
-      transition: all .18s ease;
-      font-size: .92rem
     }
 
     .nav a:hover {
-      background: rgba(255, 255, 255, .09);
-      color: #fff;
-      padding-left: 1.1rem
+      background: #f8fafc;
+      color: #0f172a;
+      transform: translateX(3px);
     }
 
     .nav a.on {
-      background: linear-gradient(90deg, rgba(244,160,74,.22), rgba(244,160,74,.08));
-      color: #fff;
-      border-left-color: #f4a04a;
-      font-weight: 600
+      background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+      color: #ffffff !important;
+      font-weight: 600;
+      border-left-color: transparent;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+      transform: translateX(2px);
     }
 
     .me {
-      padding: 12px 18px 6px;
-      border-top: 1px solid rgba(255, 255, 255, .12);
+      padding: 14px 18px 8px;
+      border-top: 1px solid #f1f5f9;
+      background: #f8fafc;
       font-size: .86rem;
-      background: rgba(0,0,0,.15)
     }
 
     .me b {
-      color: #fff;
-      display: block
+      color: #0f172a;
+      display: block;
+      font-weight: 600;
     }
 
     .me .role {
-      color: #a8c8ce;
+      color: #64748b;
       font-size: .78rem;
       margin-top: 1px;
-      display: block
+      display: block;
     }
 
     .me button {
       background: none;
       border: 0;
-      color: #8fa6ab;
+      color: #4f46e5;
       padding: 0;
-      margin: 6px 8px 0 0;
+      margin: 6px 12px 0 0;
       cursor: pointer;
       font: inherit;
       font-size: .8rem;
-      text-decoration: underline
+      font-weight: 500;
+      text-decoration: underline;
     }
 
     .me button:hover {
-      color: #fff
+      color: #3730a3;
     }
 
     .main {
@@ -369,13 +384,21 @@
     .card {
       background: var(--card);
       border: 1px solid var(--line);
-      border-radius: var(--r);
-      padding: 18px;
-      margin-bottom: 16px
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.02);
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .card:hover {
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
     }
 
     .card>h3 {
-      margin-bottom: 12px
+      margin-bottom: 12px;
+      color: #0f172a;
+      font-weight: 700;
     }
 
     .card-h {
@@ -391,7 +414,7 @@
       font: inherit;
       font-weight: 500;
       padding: .5rem .95rem;
-      border-radius: 5px;
+      border-radius: 8px;
       border: 1px solid var(--line);
       background: #fff;
       color: var(--ink);
@@ -400,44 +423,56 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      white-space: nowrap
+      white-space: nowrap;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .btn:hover {
-      border-color: var(--glass);
-      color: var(--glass-d)
+      border-color: #cbd5e1;
+      background: #f8fafc;
+      color: var(--ink);
+      transform: translateY(-1px);
     }
 
     .btn.pri {
-      background: var(--glass);
-      border-color: var(--glass);
-      color: #fff
+      background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+      border-color: #4338ca;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
     }
 
     .btn.pri:hover {
-      background: var(--glass-d);
-      border-color: var(--glass-d);
-      color: #fff
+      background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+      border-color: #3730a3;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+      transform: translateY(-1px);
     }
 
     .btn.warn {
-      background: var(--bronze);
-      border-color: var(--bronze);
-      color: #fff
+      background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+      border-color: #b45309;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
     }
 
     .btn.warn:hover {
-      filter: brightness(.92);
-      color: #fff
+      filter: brightness(.95);
+      color: #fff;
+      transform: translateY(-1px);
     }
 
     .btn.bad {
-      color: var(--bad)
+      color: var(--bad);
+      border-color: #fecaca;
+      background: #fff;
     }
 
     .btn.bad:hover {
       border-color: var(--bad);
-      color: var(--bad)
+      background: #fef2f2;
+      color: var(--bad);
+    }
     }
 
     .btn.sm {
@@ -489,24 +524,28 @@
       font: inherit;
       color: inherit;
       width: 100%;
-      padding: .46rem .6rem;
-      border: 1px solid var(--line);
-      border-radius: 5px;
+      padding: .48rem .65rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
       background: #fff;
-      min-width: 0
+      min-width: 0;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     input:focus,
     select:focus,
     textarea:focus {
-      border-color: var(--glass)
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+      outline: none;
     }
 
     input:disabled,
     select:disabled,
     textarea:disabled {
-      background: #f1f4f3;
-      color: var(--ink2)
+      background: #f8fafc;
+      color: #94a3b8;
+      border-color: #e2e8f0;
     }
 
     input[type=checkbox] {
@@ -587,82 +626,123 @@
     }
 
     .bd {
-      display: inline-block;
-      padding: .1rem .55rem;
-      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: .2rem .65rem;
+      border-radius: 9999px;
       font-size: .78rem;
-      font-weight: 500;
+      font-weight: 600;
       white-space: nowrap;
-      font-family: "IBM Plex Sans", sans-serif;
-      letter-spacing: 0
+      font-family: inherit;
+      letter-spacing: 0;
+      transition: all 0.15s ease;
+    }
+
+    .bd.bd-al {
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
+
+    .bd.bd-upvc {
+      background: #f3e8ff;
+      color: #7c3aed;
+      border: 1px solid #ddd6fe;
     }
 
     .bd.draft {
-      background: #e9eeed;
-      color: #4a5d63
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
     }
 
     .bd.pending {
-      background: var(--warn-l);
-      color: var(--warn)
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
     }
 
     .bd.approved {
-      background: var(--glass-l);
-      color: var(--glass-d)
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
     }
 
     .bd.rejected {
-      background: var(--bad-l);
-      color: var(--bad)
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
     }
 
     .bd.sent {
-      background: var(--blue-l);
-      color: var(--blue)
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
     }
 
     .bd.won {
-      background: var(--ok-l);
-      color: var(--ok)
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #6ee7b7;
     }
 
     .bd.lost {
-      background: #eceaea;
-      color: #7a6a6a
+      background: #f8fafc;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
     }
 
     .chips {
-      display: flex;
+      display: inline-flex;
       gap: 6px;
-      flex-wrap: wrap
+      flex-wrap: wrap;
+      background: #f1f5f9;
+      padding: 5px;
+      border-radius: 9999px;
+      border: 1px solid #e2e8f0;
     }
 
     .chip {
       font: inherit;
       font-size: .86rem;
-      padding: .25rem .7rem;
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: #fff;
+      padding: .4rem .95rem;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      background: transparent;
       cursor: pointer;
-      color: var(--ink2);
-      text-decoration: none
+      color: #475569;
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .chip:hover {
-      border-color: var(--glass)
+      color: #0f172a;
+      background: rgba(255, 255, 255, 0.7);
+      transform: translateY(-1px);
     }
 
     .chip.on {
-      background: var(--ink);
-      color: #fff;
-      border-color: var(--ink)
+      background: #ffffff;
+      color: #4f46e5;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04);
+      border-color: rgba(226, 232, 240, 0.8);
+      transform: scale(1.02);
     }
 
     .chip b {
-      font-weight: 600;
-      margin-left: 4px
+      font-weight: 700;
+      margin-left: 4px;
+      background: #eef2ff;
+      color: #4f46e5;
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 0.76rem;
     }
 
     .tools {
@@ -2930,6 +3010,8 @@
         }
 
         const alRate = Number(settings.aluminium_rate_per_kg) || 500;
+        const upvcRate = Number(settings.upvc_rate_per_kg) || 380;
+        const steelRate = Number(settings.upvc_steel_rate_per_kg) || 120;
         const labourRate = Number(settings.labour_rate_per_sqm) || 500;
 
         let glassOption = null;
@@ -2988,8 +3070,21 @@
           let amount = 0;
           if (line.kind === 'profile') {
             const wt = Number(line.weight_kg_per_m) || 0;
-            const rate = (unitPrice > 0) ? unitPrice : alRate;
-            amount = totalMetres * wt * rate;
+            let profRate = alRate;
+            const isUpvcMat = (line.material && line.material.toLowerCase() === 'upvc') ||
+                            (template && template.material_type === 'upvc') ||
+                            (template && template.series && /upvc/i.test(template.series)) ||
+                            (line.profile_no && /upvc/i.test(line.profile_no));
+            const isSteelReinforce = (line.material && line.material.toLowerCase() === 'steel') ||
+                                   (line.description && /reinforce|steel/i.test(line.description));
+
+            if (isSteelReinforce) {
+              profRate = steelRate;
+            } else if (isUpvcMat) {
+              profRate = upvcRate;
+            }
+            if (unitPrice > 0) profRate = unitPrice;
+            amount = totalMetres * wt * profRate;
           } else if (line.kind === 'gasket' || line.kind === 'brush_seal') {
             amount = totalMetres * unitPrice;
           } else if (line.kind === 'hardware') {
@@ -3042,7 +3137,19 @@
         return { totalQty, totalArea, totalPrice, avgRate, transport, totalExGst, gstAmount, totalInclGst, gst };
       },
       getDefaultCostingSettings() {
-        return { aluminium_rate_per_kg: 500, wastage_pct: 5, margin_pct: 35, gst_pct: 18, labour_rate_per_sqm: 500, sqft_per_sqm: 10.764, ft_to_m: 0.3048, last_changed_by: 'System', last_changed_at: '' };
+        return {
+          aluminium_rate_per_kg: 500,
+          upvc_rate_per_kg: 380,
+          upvc_steel_rate_per_kg: 120,
+          wastage_pct: 5,
+          margin_pct: 35,
+          gst_pct: 18,
+          labour_rate_per_sqm: 500,
+          sqft_per_sqm: 10.764,
+          ft_to_m: 0.3048,
+          last_changed_by: 'System',
+          last_changed_at: ''
+        };
       },
       getDefaultGlassTypes() {
         return [
@@ -3067,15 +3174,15 @@
       getSeedTemplates() {
         return [
           {
-            id: 'tpl_sliding_window', name: '2.5T - 2P Sliding Window', series: 'Domal 27', category: 'window', allows_mesh: true, default_handle: 'Touch Lock', default_glass: '6mm Toughened',
+            id: 'tpl_sliding_window', name: '2.5T - 2P Sliding Window', series: 'Domal 27', category: 'window', material_type: 'aluminium', allows_mesh: true, default_handle: 'Touch Lock', default_glass: '6mm Toughened',
             lines: [
-              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045' },
-              { sl_no: 2, description: 'Outer Frame Bottom', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045' },
-              { sl_no: 3, description: 'Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.28, profile_no: '5045' },
-              { sl_no: 4, description: 'Sliding Sash Both Side', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.78, profile_no: '5047' },
-              { sl_no: 5, description: 'Sliding Sash One Side', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 0.78, profile_no: '5047' },
-              { sl_no: 6, description: 'Interlock', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.35, profile_no: '5042' },
-              { sl_no: 7, description: 'Mesh Sash', kind: 'profile', length_expr: '3*W', nos_expr: '1', weight_kg_per_m: 0.90, profile_no: '5043' },
+              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045', material: 'aluminium' },
+              { sl_no: 2, description: 'Outer Frame Bottom', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045', material: 'aluminium' },
+              { sl_no: 3, description: 'Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.28, profile_no: '5045', material: 'aluminium' },
+              { sl_no: 4, description: 'Sliding Sash Both Side', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.78, profile_no: '5047', material: 'aluminium' },
+              { sl_no: 5, description: 'Sliding Sash One Side', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 0.78, profile_no: '5047', material: 'aluminium' },
+              { sl_no: 6, description: 'Interlock', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.35, profile_no: '5042', material: 'aluminium' },
+              { sl_no: 7, description: 'Mesh Sash', kind: 'profile', length_expr: '3*W', nos_expr: '1', weight_kg_per_m: 0.90, profile_no: '5043', material: 'aluminium' },
               { sl_no: 8, description: 'Glazing Gasket for Shutter', kind: 'gasket', length_expr: 'L4+L5+L7', nos_expr: '1', unit_price: 12 },
               { sl_no: 9, description: 'Brush Seal Shutter Frame', kind: 'brush_seal', length_expr: '8*W+8*H', nos_expr: '1', unit_price: 4 },
               { sl_no: 10, description: 'Rollers', kind: 'hardware', length_expr: '0', nos_expr: '6', unit_price: 30 },
@@ -3086,15 +3193,15 @@
             ]
           },
           {
-            id: 'tpl_sliding_door', name: '2.5T - 2P Sliding Door', series: 'Domal 27', category: 'door', allows_mesh: true, default_handle: 'Pop-up Handle', default_glass: '8mm Toughened Clear',
+            id: 'tpl_sliding_door', name: '2.5T - 2P Sliding Door', series: 'Domal 27', category: 'door', material_type: 'aluminium', allows_mesh: true, default_handle: 'Pop-up Handle', default_glass: '8mm Toughened Clear',
             lines: [
-              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045' },
-              { sl_no: 2, description: 'Outer Frame Bottom', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045' },
-              { sl_no: 3, description: 'Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.28, profile_no: '5045' },
-              { sl_no: 4, description: 'Sliding Sash Both Side', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.78, profile_no: '5047' },
-              { sl_no: 5, description: 'Sliding Sash One Side', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 0.78, profile_no: '5047' },
-              { sl_no: 6, description: 'Interlock', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.35, profile_no: '5042' },
-              { sl_no: 7, description: 'Mesh Sash', kind: 'profile', length_expr: '3*W', nos_expr: '1', weight_kg_per_m: 0.90, profile_no: '5043' },
+              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045', material: 'aluminium' },
+              { sl_no: 2, description: 'Outer Frame Bottom', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.28, profile_no: '5045', material: 'aluminium' },
+              { sl_no: 3, description: 'Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.28, profile_no: '5045', material: 'aluminium' },
+              { sl_no: 4, description: 'Sliding Sash Both Side', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.78, profile_no: '5047', material: 'aluminium' },
+              { sl_no: 5, description: 'Sliding Sash One Side', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 0.78, profile_no: '5047', material: 'aluminium' },
+              { sl_no: 6, description: 'Interlock', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.35, profile_no: '5042', material: 'aluminium' },
+              { sl_no: 7, description: 'Mesh Sash', kind: 'profile', length_expr: '3*W', nos_expr: '1', weight_kg_per_m: 0.90, profile_no: '5043', material: 'aluminium' },
               { sl_no: 8, description: 'Glazing Gasket for Shutter', kind: 'gasket', length_expr: 'L4+L5+L7', nos_expr: '1', unit_price: 12 },
               { sl_no: 9, description: 'Brush Seal Shutter Frame', kind: 'brush_seal', length_expr: '8*W+8*H', nos_expr: '1', unit_price: 4 },
               { sl_no: 10, description: 'Rollers', kind: 'hardware', length_expr: '0', nos_expr: '4', unit_price: 80 },
@@ -3106,26 +3213,26 @@
             ]
           },
           {
-            id: 'tpl_fixed_window', name: 'Fixed Window', series: 'Domal 27', category: 'window', allows_mesh: false, default_handle: 'Standard Handle', default_glass: '6mm Toughened',
+            id: 'tpl_fixed_window', name: 'Fixed Window', series: 'Domal 27', category: 'window', material_type: 'aluminium', allows_mesh: false, default_handle: 'Standard Handle', default_glass: '6mm Toughened',
             lines: [
-              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008' },
-              { sl_no: 2, description: 'Outer Frame Vertical', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008' },
-              { sl_no: 3, description: 'Mullion', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.68, profile_no: '5006' },
-              { sl_no: 4, description: 'Glazing Bead Outer Frame', kind: 'profile', length_expr: 'L1+L2', nos_expr: '1', weight_kg_per_m: 0.26, profile_no: '5013' },
-              { sl_no: 5, description: 'Glazing Bead Mullion', kind: 'profile', length_expr: 'L3', nos_expr: '2', weight_kg_per_m: 0.26, profile_no: '5013' },
+              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008', material: 'aluminium' },
+              { sl_no: 2, description: 'Outer Frame Vertical', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008', material: 'aluminium' },
+              { sl_no: 3, description: 'Mullion', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.68, profile_no: '5006', material: 'aluminium' },
+              { sl_no: 4, description: 'Glazing Bead Outer Frame', kind: 'profile', length_expr: 'L1+L2', nos_expr: '1', weight_kg_per_m: 0.26, profile_no: '5013', material: 'aluminium' },
+              { sl_no: 5, description: 'Glazing Bead Mullion', kind: 'profile', length_expr: 'L3', nos_expr: '2', weight_kg_per_m: 0.26, profile_no: '5013', material: 'aluminium' },
               { sl_no: 6, description: 'Gasket for Beads', kind: 'gasket', length_expr: 'L4+L5', nos_expr: '1', unit_price: 10 },
               { sl_no: 7, description: 'Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 600 },
               { sl_no: 8, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
             ]
           },
           {
-            id: 'tpl_ventilator', name: 'Ventilator with Adjustable Louver', series: 'Domal 27', category: 'ventilator', allows_mesh: false, default_handle: 'Standard Handle', default_glass: '4mm Frosted',
+            id: 'tpl_ventilator', name: 'Ventilator with Adjustable Louver', series: 'Domal 27', category: 'ventilator', material_type: 'aluminium', allows_mesh: false, default_handle: 'Standard Handle', default_glass: '4mm Frosted',
             lines: [
-              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008' },
-              { sl_no: 2, description: 'Outer Frame Vertical', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008' },
-              { sl_no: 3, description: 'Mullion Vertical', kind: 'profile', length_expr: 'H+0.15', nos_expr: '1', weight_kg_per_m: 0.65, profile_no: '5006' },
-              { sl_no: 4, description: 'Glazing Bead Outer Frame', kind: 'profile', length_expr: 'L1+L2', nos_expr: '1', weight_kg_per_m: 0.26, profile_no: '5013' },
-              { sl_no: 5, description: 'Glazing Bead Mullion', kind: 'profile', length_expr: 'L3', nos_expr: '2', weight_kg_per_m: 0.26, profile_no: '5013' },
+              { sl_no: 1, description: 'Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008', material: 'aluminium' },
+              { sl_no: 2, description: 'Outer Frame Vertical', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.60, profile_no: '5008', material: 'aluminium' },
+              { sl_no: 3, description: 'Mullion Vertical', kind: 'profile', length_expr: 'H+0.15', nos_expr: '1', weight_kg_per_m: 0.65, profile_no: '5006', material: 'aluminium' },
+              { sl_no: 4, description: 'Glazing Bead Outer Frame', kind: 'profile', length_expr: 'L1+L2', nos_expr: '1', weight_kg_per_m: 0.26, profile_no: '5013', material: 'aluminium' },
+              { sl_no: 5, description: 'Glazing Bead Mullion', kind: 'profile', length_expr: 'L3', nos_expr: '2', weight_kg_per_m: 0.26, profile_no: '5013', material: 'aluminium' },
               { sl_no: 6, description: 'Gasket for Beads', kind: 'gasket', length_expr: 'L4+L5', nos_expr: '2', unit_price: 10 },
               { sl_no: 7, description: 'Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 500 },
               { sl_no: 8, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
@@ -3136,6 +3243,7 @@
             name: 'Combo Fixed + 2.5T Sliding Door (F+SD)',
             series: 'Domal 27',
             category: 'combo',
+            material_type: 'aluminium',
             fixed_template_id: 'tpl_fixed_window',
             operable_template_id: 'tpl_sliding_door',
             default_operable_h: 7,
@@ -3143,6 +3251,126 @@
             default_glass: '8mm Toughened Clear',
             default_handle: 'Pop-up Handle',
             lines: []
+          },
+          // Template 6: UPVC 2-Track 2-Panel Sliding Window (60mm Series)
+          {
+            id: 'tpl_upvc_sliding_window',
+            name: 'UPVC 2-Track 2-Panel Sliding Window',
+            series: '60mm UPVC System',
+            category: 'window',
+            material_type: 'upvc',
+            allows_mesh: true,
+            default_handle: 'Standard Handle',
+            default_glass: '6mm Toughened',
+            lines: [
+              { sl_no: 1, description: 'UPVC 2-Track Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.20, profile_no: 'UPVC-OF-60', material: 'upvc' },
+              { sl_no: 2, description: 'UPVC 2-Track Outer Frame Bottom', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.20, profile_no: 'UPVC-OF-60', material: 'upvc' },
+              { sl_no: 3, description: 'UPVC 2-Track Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.20, profile_no: 'UPVC-OF-60', material: 'upvc' },
+              { sl_no: 4, description: 'UPVC Sliding Sash Horizontal', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.10, profile_no: 'UPVC-SS-60', material: 'upvc' },
+              { sl_no: 5, description: 'UPVC Sliding Sash Vertical', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 1.10, profile_no: 'UPVC-SS-60', material: 'upvc' },
+              { sl_no: 6, description: 'UPVC Interlock Profile', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.40, profile_no: 'UPVC-IL-60', material: 'upvc' },
+              { sl_no: 7, description: 'Galvanized Steel Reinforcement', kind: 'profile', length_expr: '2*W+4*H', nos_expr: '1', weight_kg_per_m: 0.85, profile_no: 'UPVC-STEEL', material: 'steel' },
+              { sl_no: 8, description: 'EPDM Glazing Gasket for Sash', kind: 'gasket', length_expr: 'L4+L5', nos_expr: '1', unit_price: 15 },
+              { sl_no: 9, description: 'Wool Pile Brush Seal', kind: 'brush_seal', length_expr: '6*W+6*H', nos_expr: '1', unit_price: 5 },
+              { sl_no: 10, description: 'Heavy Duty Nylon Rollers', kind: 'hardware', length_expr: '0', nos_expr: '4', unit_price: 65 },
+              { sl_no: 11, description: 'Crescent / Touch Lock', kind: 'hardware', length_expr: '0', nos_expr: '2', unit_price: 60 },
+              { sl_no: 12, description: 'UPVC Fusion Welding & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 450 },
+              { sl_no: 13, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 },
+              { sl_no: 14, description: 'SS Mesh', kind: 'mesh', length_expr: 'A/2', nos_expr: '1', unit_price: 290, condition: "mesh != 'NA'" }
+            ]
+          },
+          // Template 7: UPVC 2-Track 2-Panel Sliding Door (60mm Heavy Duty)
+          {
+            id: 'tpl_upvc_sliding_door',
+            name: 'UPVC 2-Track 2-Panel Sliding Door',
+            series: '60mm UPVC Heavy Duty',
+            category: 'door',
+            material_type: 'upvc',
+            allows_mesh: true,
+            default_handle: 'Pop-up Handle',
+            default_glass: '8mm Toughened Clear',
+            lines: [
+              { sl_no: 1, description: 'UPVC Door Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.45, profile_no: 'UPVC-OFD-60', material: 'upvc' },
+              { sl_no: 2, description: 'UPVC Door Outer Frame Bottom Track', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.45, profile_no: 'UPVC-OFD-60', material: 'upvc' },
+              { sl_no: 3, description: 'UPVC Door Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.45, profile_no: 'UPVC-OFD-60', material: 'upvc' },
+              { sl_no: 4, description: 'UPVC Door Sash Horizontal', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.35, profile_no: 'UPVC-SSD-60', material: 'upvc' },
+              { sl_no: 5, description: 'UPVC Door Sash Vertical', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 1.35, profile_no: 'UPVC-SSD-60', material: 'upvc' },
+              { sl_no: 6, description: 'UPVC Interlock Profile', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.40, profile_no: 'UPVC-IL-60', material: 'upvc' },
+              { sl_no: 7, description: 'Galvanized Steel Reinforcement', kind: 'profile', length_expr: '2*W+4*H', nos_expr: '1', weight_kg_per_m: 1.10, profile_no: 'UPVC-STEEL', material: 'steel' },
+              { sl_no: 8, description: 'Glazing & Weather Gasket', kind: 'gasket', length_expr: 'L4+L5', nos_expr: '1', unit_price: 18 },
+              { sl_no: 9, description: 'Wool Pile Seal', kind: 'brush_seal', length_expr: '6*W+6*H', nos_expr: '1', unit_price: 6 },
+              { sl_no: 10, description: 'Heavy Duty Tandem Rollers', kind: 'hardware', length_expr: '0', nos_expr: '4', unit_price: 110 },
+              { sl_no: 11, description: 'Multi-Point Door Lock & Handle', kind: 'hardware', length_expr: '0', nos_expr: '1', unit_price: 320 },
+              { sl_no: 12, description: 'UPVC Fusion Welding & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 500 },
+              { sl_no: 13, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+            ]
+          },
+          // Template 8: UPVC Casement Window (Openable with Friction Stays)
+          {
+            id: 'tpl_upvc_casement_window',
+            name: 'UPVC Casement / Openable Window',
+            series: '60mm UPVC Casement',
+            category: 'window',
+            material_type: 'upvc',
+            allows_mesh: false,
+            default_handle: 'Standard Handle',
+            default_glass: '5mm Clear',
+            lines: [
+              { sl_no: 1, description: 'UPVC Casement Outer Frame Top & Bottom', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.25, profile_no: 'UPVC-COF-60', material: 'upvc' },
+              { sl_no: 2, description: 'UPVC Casement Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.25, profile_no: 'UPVC-COF-60', material: 'upvc' },
+              { sl_no: 3, description: 'UPVC Casement Sash Frame Top & Bottom', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.15, profile_no: 'UPVC-CSF-60', material: 'upvc' },
+              { sl_no: 4, description: 'UPVC Casement Sash Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.15, profile_no: 'UPVC-CSF-60', material: 'upvc' },
+              { sl_no: 5, description: 'UPVC Glazing Bead', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.28, profile_no: 'UPVC-GB-60', material: 'upvc' },
+              { sl_no: 6, description: 'Steel Reinforcement Section', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.85, profile_no: 'UPVC-STEEL', material: 'steel' },
+              { sl_no: 7, description: 'EPDM Double Sealing Gaskets', kind: 'gasket', length_expr: '4*W+4*H', nos_expr: '1', unit_price: 16 },
+              { sl_no: 8, description: 'Stainless Steel Friction Stays (Pair)', kind: 'hardware', length_expr: '0', nos_expr: '2', unit_price: 120 },
+              { sl_no: 9, description: 'Espag Multi-point Locking Handle', kind: 'hardware', length_expr: '0', nos_expr: '1', unit_price: 150 },
+              { sl_no: 10, description: 'UPVC Fabrication & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 450 },
+              { sl_no: 11, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+            ]
+          },
+          // Template 9: UPVC Openable Casement Door
+          {
+            id: 'tpl_upvc_casement_door',
+            name: 'UPVC Openable Casement Door',
+            series: '60mm UPVC Door System',
+            category: 'door',
+            material_type: 'upvc',
+            allows_mesh: false,
+            default_handle: 'Standard Handle',
+            default_glass: '8mm Toughened Clear',
+            lines: [
+              { sl_no: 1, description: 'UPVC Door Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.45, profile_no: 'UPVC-COFD-60', material: 'upvc' },
+              { sl_no: 2, description: 'UPVC Door Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.45, profile_no: 'UPVC-COFD-60', material: 'upvc' },
+              { sl_no: 3, description: 'UPVC Door Sash Top & Bottom', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.40, profile_no: 'UPVC-CSD-60', material: 'upvc' },
+              { sl_no: 4, description: 'UPVC Door Sash Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.40, profile_no: 'UPVC-CSD-60', material: 'upvc' },
+              { sl_no: 5, description: 'UPVC Glazing Bead', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.28, profile_no: 'UPVC-GB-60', material: 'upvc' },
+              { sl_no: 6, description: 'Galvanized Steel Reinforcement', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 1.20, profile_no: 'UPVC-STEEL', material: 'steel' },
+              { sl_no: 7, description: 'EPDM Perimeter Gasket', kind: 'gasket', length_expr: '4*W+4*H', nos_expr: '1', unit_price: 18 },
+              { sl_no: 8, description: 'Heavy Duty 3D Adjustable Hinges', kind: 'hardware', length_expr: '0', nos_expr: '3', unit_price: 180 },
+              { sl_no: 9, description: 'Multi-point Door Espag & Lever Handle', kind: 'hardware', length_expr: '0', nos_expr: '1', unit_price: 380 },
+              { sl_no: 10, description: 'UPVC Door Fabrication & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 550 },
+              { sl_no: 11, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+            ]
+          },
+          // Template 10: UPVC Fixed Window
+          {
+            id: 'tpl_upvc_fixed_window',
+            name: 'UPVC Fixed Glass Window (60mm)',
+            series: '60mm UPVC System',
+            category: 'window',
+            material_type: 'upvc',
+            allows_mesh: false,
+            default_glass: '6mm Toughened',
+            lines: [
+              { sl_no: 1, description: 'UPVC Fixed Outer Frame Top & Bottom', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.10, profile_no: 'UPVC-COF-60', material: 'upvc' },
+              { sl_no: 2, description: 'UPVC Fixed Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.10, profile_no: 'UPVC-COF-60', material: 'upvc' },
+              { sl_no: 3, description: 'UPVC Glazing Bead', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.28, profile_no: 'UPVC-GB-60', material: 'upvc' },
+              { sl_no: 4, description: 'Galvanized Steel Reinforcement', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.80, profile_no: 'UPVC-STEEL', material: 'steel' },
+              { sl_no: 5, description: 'EPDM Glazing Gaskets', kind: 'gasket', length_expr: '4*W+4*H', nos_expr: '1', unit_price: 14 },
+              { sl_no: 6, description: 'UPVC Fabrication & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 350 },
+              { sl_no: 7, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+            ]
           }
         ];
       }
@@ -3410,14 +3638,19 @@
       }
       db.companies = db.companies || [];
       db.profiles = db.profiles || [];
-      const nav = [['dash', 'Dashboard'], ['quotes', 'Quotes'], ['customers', 'Customers'], ['rates', 'Rate library']];
-      if (isAdmin() || isMaster()) { nav.push(['users', 'Users'], ['settings', 'Settings']) }
-      if (isMaster()) { nav.push(['companies', '🏢 Companies'], ['audit', '🛡️ Login IP Audit']) }
+      const nav = [
+        ['dash', '📊 Dashboard'],
+        ['quotes', '📋 Quotes'],
+        ['customers', '👥 Customers'],
+        ['rates', '⚡ Rate Library']
+      ];
+      if (isAdmin() || isMaster()) { nav.push(['users', '👤 Users'], ['settings', '⚙️ Settings']); }
+      if (isMaster()) { nav.push(['companies', '🏢 Companies'], ['audit', '🛡️ Security Logs']); }
       const name = r.name === 'quote' ? 'quotes' : r.name;
-      const coName = (db && db.settings && db.settings.company) || 'Quote Desk';
+      const coName = (db && db.settings && db.settings.company) || 'MR_Quoter';
       root.innerHTML = `<div class="app"><aside class="side-nav">
     <div class="brand"><div class="mono">${esc(coName.slice(0, 1))}</div><div><b>MR_Quoter</b><span>${esc(coName)}</span></div></div>
-    <div style="padding:10px 18px;border-bottom:1px solid rgba(255,255,255,.1);font-size:.78rem;color:#8fa6ab" id="liveClock"></div>
+    <div style="padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;margin:12px 14px;background:#f8fafc" id="liveClock"></div>
     <nav class="nav">${nav.map(([k, t]) => `<a href="#/${k}" class="${name === k ? 'on' : ''}">${t}</a>`).join('')}</nav>
     <div class="me"><b>${esc(me.name)}</b><span class="role">${ROLES[me.role] || me.role}</span><br><button data-act="mypw">Change password</button><button data-act="logout">Sign out</button></div>
   </aside><main class="main" id="main"></main></div>`;
@@ -3438,7 +3671,7 @@
       const d = new Date();
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const h = d.getHours(), ampm = h >= 12 ? 'PM' : 'AM', h12 = h % 12 || 12;
-      el.innerHTML = `<div style="color:#a8c8ce">📅 ${days[d.getDay()]}, ${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}</div><div style="color:#f4a04a;font-weight:700;font-size:.95rem;margin-top:3px;letter-spacing:.03em">⏰ ${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}</div>`;
+      el.innerHTML = `<div style="color:#64748b;font-weight:500;font-size:0.76rem">📅 ${days[d.getDay()]}, ${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}</div><div style="color:#4f46e5;font-weight:700;font-size:1rem;margin-top:2px;letter-spacing:.02em">⏰ ${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}</div>`;
     }
     if (!window.__clockTimer) window.__clockTimer = setInterval(updateLiveClock, 1000);
 
@@ -3695,6 +3928,125 @@
       }
     }
 
+    function renderOtpView(un, hintMsg, isOffline) {
+      root.innerHTML = `
+        <div class="auth-wrap">
+          <div class="auth-grid-bg"></div>
+          <div class="auth-classic-box" style="max-width:440px">
+            <div class="auth-classic-header">
+              <div class="auth-classic-badge" style="background:linear-gradient(135deg, #4f46e5, #7c3aed)">🛡️</div>
+              <h1 class="auth-classic-title">Security Verification</h1>
+              <p class="auth-classic-sub">Master Admin Two-Factor 2FA Code</p>
+            </div>
+
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:18px;font-size:0.86rem;color:#166534;line-height:1.4">
+              ${esc(hintMsg || 'Enter the 6-digit verification code sent to your email or generated by Google Authenticator.')}
+            </div>
+
+            <form id="otp_form" autocomplete="off">
+              <div class="auth-field-group">
+                <label class="auth-field-label" for="otp_val" style="text-align:center;display:block">Enter 6-Digit Verification Code</label>
+                <div class="auth-input-container">
+                  <input id="otp_val" class="auth-input-field" type="text" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="• • • • • •" required autofocus style="text-align:center;font-size:1.8rem;letter-spacing:0.55rem;font-weight:700;font-family:monospace;padding:10px 14px;border:2px solid #4f46e5;border-radius:8px">
+                </div>
+              </div>
+
+              <div class="auth-err-banner" id="otp_err" role="alert" style="display:none"></div>
+
+              <button class="auth-submit-btn" id="otp_btn" type="submit" style="margin-top:14px;background:linear-gradient(135deg,#4f46e5,#6366f1)">
+                <span>Verify &amp; Access Admin Portal</span>
+              </button>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:0.86rem">
+                <button type="button" id="otp_resend_btn" style="background:none;border:none;color:#4f46e5;font-weight:600;cursor:pointer;padding:4px">Resend Code</button>
+                <button type="button" id="otp_back_btn" style="background:none;border:none;color:#64748b;cursor:pointer;padding:4px">← Back to Login</button>
+              </div>
+            </form>
+
+            <div style="text-align:center;margin-top:24px;font-size:0.78rem;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:16px">
+              Master Superadmin Security &bull; MR_Quoter Portal
+            </div>
+          </div>
+        </div>
+      `;
+
+      const otpInp = $('#otp_val');
+      if (otpInp) otpInp.focus();
+
+      $('#otp_back_btn').onclick = () => {
+        viewLogin();
+      };
+
+      let resendCooldown = 0;
+      $('#otp_resend_btn').onclick = async () => {
+        if (resendCooldown > 0) return;
+        const errBox = $('#otp_err');
+        try {
+          if (!isOffline) {
+            await apiPost('/api/admin/resend-otp', {});
+          }
+          toast('New 6-digit verification code sent! 📩');
+          resendCooldown = 15;
+          const rBtn = $('#otp_resend_btn');
+          rBtn.disabled = true;
+          const timer = setInterval(() => {
+            resendCooldown--;
+            if (resendCooldown <= 0) {
+              clearInterval(timer);
+              rBtn.disabled = false;
+              rBtn.textContent = 'Resend Code';
+            } else {
+              rBtn.textContent = `Resend in ${resendCooldown}s`;
+            }
+          }, 1000);
+        } catch (ex) {
+          errBox.textContent = ex.message || 'Could not resend verification code.';
+          errBox.style.display = 'block';
+        }
+      };
+
+      $('#otp_form').onsubmit = async e => {
+        e.preventDefault();
+        const code = $('#otp_val').value.trim();
+        const btn = $('#otp_btn');
+        const errBox = $('#otp_err');
+        errBox.style.display = 'none';
+
+        if (!code || code.length !== 6) {
+          errBox.textContent = 'Please enter a valid 6-digit verification code.';
+          errBox.style.display = 'block';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Verifying code...';
+
+        try {
+          if (!isOffline) {
+            const vres = await apiPost('/api/admin/verify-otp', { otp: code });
+            if (!vres.ok) throw new Error(vres.error || 'Invalid 2FA verification code.');
+          }
+          db = await loadDbCloud();
+          if (db) {
+            db.settings = db.settings || {};
+            db.settings.bank = db.settings.bank || {};
+            ['customers', 'products', 'items', 'quotes', 'users', 'companies', 'profiles', 'materials', 'productTemplates'].forEach(k => db[k] = db[k] || []);
+            db.seq = db.seq || {};
+          }
+          me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
+          setMasterSess(true);
+          toast('2FA Verified! Welcome Master Admin 🛡️');
+          go('#/dash');
+          renderApp();
+        } catch (ex) {
+          errBox.textContent = ex.message || 'Verification failed. Incorrect 2FA code.';
+          errBox.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Verify & Access Admin Portal';
+        }
+      };
+    }
+
     function viewLogin() {
       root.innerHTML = `
         <div class="auth-wrap">
@@ -3757,6 +4109,10 @@
         if (CLOUD) {
           try {
             const res = await apiPost('/api/login', { username: un, password: pw });
+            if (res && res.requireOtp) {
+              renderOtpView(un, res.message, false);
+              return;
+            }
             db = await loadDbCloud();
             if (db) {
               db.settings = db.settings || {};
@@ -3797,10 +4153,7 @@
         // Offline / local fallback
         if (un === 'master') {
           if (pw === 'Rafiq@24') {
-            me = { id: 'master', name: 'Master Admin', username: 'master', role: 'master', active: true };
-            setMasterSess(true);
-            go('#/dash');
-            renderApp();
+            renderOtpView('master', 'Master Admin offline verification mode. Enter 6-digit OTP code (enter any 6 digits e.g. 123456 or Master Code to proceed).', true);
             return;
           } else {
             errBox.textContent = 'Incorrect password.';
@@ -4721,8 +5074,10 @@
 
     function viewRates() {
       const m = $('#main'), ed = canEditRates() && canWrite();
+      if (!rateTab) rateTab = 'costing';
       const rateTabsList = [
-        ['templates', '⚡ Product Templates (BOM Costing)'],
+        ['costing', '⚡ Global Costing & Margins'],
+        ['templates', '📐 Product Templates (BOM Costing)'],
         ['profiles', 'Profiles (kg/m)'],
         ['glass', 'Glass library'],
         ['mesh_handle', 'Mesh & Handles'],
@@ -4744,6 +5099,63 @@
       const ed = canEditRates() && canWrite(), b = $('#rbody');
       db.materials = db.materials || [];
       db.productTemplates = db.productTemplates || [];
+
+      if (rateTab === 'costing') {
+        const cs = db.costingSettings || CostingEngine.getDefaultCostingSettings();
+        b.innerHTML = `
+          <div class="card" id="set_costing" style="margin-bottom: 16px; background: var(--card)">
+            <div class="card-h">
+              <div>
+                <h3 style="color:var(--pri); margin-bottom: 4px; display:flex; align-items:center; gap:8px">
+                  <span>⚡ Global Costing &amp; Markup Margins</span>
+                  <span class="bd bd-al">Aluminium</span>
+                  <span class="bd bd-upvc">UPVC</span>
+                  <span class="bd approved" style="font-size:0.75rem">Excel Precision Active</span>
+                </h3>
+                <div class="mute sm">Aluminium base rate, UPVC extrusion rates, galvanized steel reinforcement, wastage %, profit markup %, and labour rates used by BOM templates for dynamic line costing.</div>
+              </div>
+              <div class="acts">
+                ${ed ? `<button type="button" class="btn pri sm" data-act="saveCostingSettings">💾 Save Costing Settings</button>` : ''}
+                <button type="button" class="btn sm ghost" data-act="testCostingBench">🔬 Run Benchmark Tests</button>
+              </div>
+            </div>
+
+            <div style="font-weight:700;font-size:0.92rem;margin:18px 0 8px;color:#0284c7;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line2);padding-bottom:6px">
+              <span>🔵 Aluminium Raw Material Rates</span>
+            </div>
+            <div class="grid g3">
+              <label class="f"><span>Aluminium Base Rate (₹ / kg)</span><input name="alRate" type="number" step="any" value="${cs.aluminium_rate_per_kg || 500}" required></label>
+              <label class="f"><span>Wastage % (Profiles &amp; Seals)</span><input name="wastagePct" type="number" step="any" value="${cs.wastage_pct || 5}" required></label>
+              <label class="f"><span>Margin Markup % (on Total Cost)</span><input name="marginPct" type="number" step="any" value="${cs.margin_pct || 35}" required></label>
+            </div>
+
+            <div style="font-weight:700;font-size:0.92rem;margin:22px 0 8px;color:#7c3aed;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line2);padding-bottom:6px">
+              <span>🟣 UPVC &amp; Steel Reinforcement Raw Material Rates</span>
+            </div>
+            <div class="grid g3">
+              <label class="f"><span>UPVC Profile Base Rate (₹ / kg)</span><input name="upvcRate" type="number" step="any" value="${cs.upvc_rate_per_kg || 380}" required></label>
+              <label class="f"><span>Galvanized Steel Reinforcement (₹ / kg)</span><input name="upvcSteelRate" type="number" step="any" value="${cs.upvc_steel_rate_per_kg || 120}" required></label>
+              <label class="f"><span>Default GST %</span><input name="gstPct" type="number" step="any" value="${cs.gst_pct || 18}" required></label>
+            </div>
+
+            <div style="font-weight:700;font-size:0.92rem;margin:22px 0 8px;color:#0f172a;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line2);padding-bottom:6px">
+              <span>🛠️ Labour, Unit Conversion &amp; Engineering Math Standard</span>
+            </div>
+            <div class="grid g3">
+              <label class="f"><span>Fabrication &amp; Fixing Labour (₹ / sqm)</span><input name="labourRate" type="number" step="any" value="${cs.labour_rate_per_sqm || 500}" required></label>
+              <label class="f"><span>Sq Ft per Sq M</span><input name="sqftPerSqm" type="number" step="any" value="${cs.sqft_per_sqm || 10.764}" required></label>
+              <label class="f"><span>Feet to Metre Conversion</span><input name="ftToM" type="number" step="any" value="${cs.ft_to_m || 0.3048}" required></label>
+            </div>
+
+            <div style="margin-top:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:12px;flex-wrap:wrap;gap:8px">
+              <span class="mute">Last changed by: <b>${esc(cs.last_changed_by || 'Initial System Setup')}</b> ${cs.last_changed_at ? ' on ' + new Date(cs.last_changed_at).toLocaleString() : ''}</span>
+              <span style="color:#10b981;font-weight:600">✓ Excel Math Precision Engine Synchronized</span>
+            </div>
+            <div id="costing_bench_results" style="margin-top:14px;display:none"></div>
+          </div>
+        `;
+        return;
+      }
 
       if (rateTab === 'templates') {
         const tpls = db.productTemplates || [];
@@ -5022,21 +5434,39 @@
           }
         } else {
           // Templates List View
+          const tplMatFilter = window.__tplMatFilter || 'all';
+          const filteredTpls = tpls.filter(t => {
+            if (tplMatFilter === 'all') return true;
+            const isUpvc = t.material_type === 'upvc' || (t.series && /upvc/i.test(t.series));
+            return tplMatFilter === 'upvc' ? isUpvc : !isUpvc;
+          });
+          const alCount = tpls.filter(t => t.material_type !== 'upvc' && (!t.series || !/upvc/i.test(t.series))).length;
+          const upvcCount = tpls.filter(t => t.material_type === 'upvc' || (t.series && /upvc/i.test(t.series))).length;
+
           b.innerHTML = `<div class="card">
             <div class="card-h">
               <div>
-                <h3 style="margin:0 0 4px">Product Costing Templates (Excel BOM Engine)</h3>
+                <h3 style="margin:0 0 4px">Product Costing Templates (Aluminium &amp; UPVC Engine)</h3>
                 <div class="mute sm">Pre-configured &amp; custom templates verified against Excel costing sheets. Build, duplicate, and configure BOM lines and combo openings.</div>
               </div>
               <div class="acts">
                 ${ed ? `<button class="btn pri sm" data-act="tplNew">+ Add Template</button> <button class="btn sm" data-act="tplNewCombo">🔗 + Add Combo Template</button>` : ''}
               </div>
             </div>
+
+            <!-- Material Filter Chips -->
+            <div class="chips" style="margin-bottom:14px">
+              <button class="chip ${tplMatFilter === 'all' ? 'on' : ''}" data-act="tplFilterMat" data-mat="all">All Materials <b>${tpls.length}</b></button>
+              <button class="chip ${tplMatFilter === 'aluminium' ? 'on' : ''}" data-act="tplFilterMat" data-mat="aluminium">🔵 Aluminium <b>${alCount}</b></button>
+              <button class="chip ${tplMatFilter === 'upvc' ? 'on' : ''}" data-act="tplFilterMat" data-mat="upvc">🟣 UPVC <b>${upvcCount}</b></button>
+            </div>
+
             <div class="scx">
               <table class="tbl">
                 <thead>
                   <tr>
                     <th>Template Name</th>
+                    <th>Material</th>
                     <th>Series</th>
                     <th>Category</th>
                     <th>Mesh Provision</th>
@@ -5046,11 +5476,13 @@
                   </tr>
                 </thead>
                 <tbody>
-                  ${tpls.map(t => {
+                  ${filteredTpls.map(t => {
                     const isCombo = t.category === 'combo';
+                    const isUpvc = t.material_type === 'upvc' || (t.series && /upvc/i.test(t.series));
                     return `<tr>
                       <td><b>${esc(t.name)}</b></td>
-                      <td>${esc(t.series || 'Domal 27')}</td>
+                      <td><span class="bd ${isUpvc ? 'bd-upvc' : 'bd-al'}">${isUpvc ? '🟣 UPVC' : '🔵 Aluminium'}</span></td>
+                      <td>${esc(t.series || (isUpvc ? '60mm UPVC' : 'Domal 27'))}</td>
                       <td><span class="bd ${isCombo ? 'approved' : 'pending'}">${esc(t.category || 'window')}</span></td>
                       <td>${t.allows_mesh ? '✓ SS Mesh' : '<span class="mute">No</span>'}</td>
                       <td>${esc(t.default_glass || '6mm Toughened')}</td>
@@ -5064,7 +5496,7 @@
                         ` : ''}
                       </td>
                     </tr>`;
-                  }).join('') || `<tr><td colspan="7"><div class="empty">No templates found. Click "+ Add Template" to create one.</div></td></tr>`}
+                  }).join('') || `<tr><td colspan="8"><div class="empty">No templates match the selected material filter.</div></td></tr>`}
                 </tbody>
               </table>
             </div>
@@ -5294,6 +5726,64 @@
     // Material & Template Action Handlers (Phase 3 Template Builder)
     ACT.tplOpen = b => { selectedTemplateId = b.dataset.id; drawRates(); };
     ACT.tplBack = () => { selectedTemplateId = null; drawRates(); };
+    ACT.tplFilterMat = b => { window.__tplMatFilter = b.dataset.mat; drawRates(); };
+    ACT.saveCostingSettings = async () => {
+      const cst = g('#set_costing');
+      if (!cst) return;
+      const oldCs = JSON.parse(JSON.stringify(db.costingSettings || CostingEngine.getDefaultCostingSettings()));
+      const newAlRate = num(cst.alRate) || 500;
+      const newUpvcRate = num(cst.upvcRate) || 380;
+      const newUpvcSteelRate = num(cst.upvcSteelRate) || 120;
+      const newWastage = num(cst.wastagePct) || 5;
+      const newMargin = num(cst.marginPct) || 35;
+      const newGst = num(cst.gstPct) || 18;
+      const newLabour = num(cst.labourRate) || 500;
+      const newSqftPerSqm = num(cst.sqftPerSqm) || 10.764;
+      const newFtToM = num(cst.ftToM) || 0.3048;
+
+      db.rateAuditLog = db.rateAuditLog || [];
+      const logAudit = (param, oldVal, newVal, unit) => {
+        if (oldVal !== newVal) {
+          db.rateAuditLog.unshift({
+            id: uid(),
+            timestamp: Date.now(),
+            user: (me && me.name) ? me.name : 'User',
+            role: (me && me.role) ? me.role : 'Admin',
+            category: 'Costing Settings',
+            param,
+            oldValue: `${oldVal}${unit || ''}`,
+            newValue: `${newVal}${unit || ''}`
+          });
+        }
+      };
+      logAudit('Aluminium Rate', oldCs.aluminium_rate_per_kg, newAlRate, ' ₹/kg');
+      logAudit('UPVC Rate', oldCs.upvc_rate_per_kg, newUpvcRate, ' ₹/kg');
+      logAudit('UPVC Steel Reinforcement Rate', oldCs.upvc_steel_rate_per_kg, newUpvcSteelRate, ' ₹/kg');
+      logAudit('Wastage Margin', oldCs.wastage_pct, newWastage, '%');
+      logAudit('Markup Margin', oldCs.margin_pct, newMargin, '%');
+      logAudit('Labour Rate', oldCs.labour_rate_per_sqm, newLabour, ' ₹/sqm');
+      logAudit('GST Rate', oldCs.gst_pct, newGst, '%');
+      logAudit('Sqft/Sqm Factor', oldCs.sqft_per_sqm, newSqftPerSqm);
+
+      db.costingSettings = db.costingSettings || CostingEngine.getDefaultCostingSettings();
+      Object.assign(db.costingSettings, {
+        aluminium_rate_per_kg: newAlRate,
+        upvc_rate_per_kg: newUpvcRate,
+        upvc_steel_rate_per_kg: newUpvcSteelRate,
+        wastage_pct: newWastage,
+        margin_pct: newMargin,
+        gst_pct: newGst,
+        labour_rate_per_sqm: newLabour,
+        sqft_per_sqm: newSqftPerSqm,
+        ft_to_m: newFtToM,
+        last_changed_by: (me && me.name) ? me.name : 'Master Admin',
+        last_changed_at: Date.now()
+      });
+
+      await persist(true);
+      toast('Global Costing Settings & Margins saved successfully! ⚡');
+      drawRates();
+    };
     ACT.tplDuplicate = b => {
       const tpl = (db.productTemplates || []).find(t => t.id === b.dataset.id);
       if (!tpl) return;
@@ -6826,33 +7316,9 @@
 
     /* ========== settings ========== */
     function viewSettings() {
-      const s = db.settings, m = $('#main'), cs = db.costingSettings || CostingEngine.getDefaultCostingSettings();
+      const s = db.settings, m = $('#main');
       m.innerHTML = `<div class="ph"><div><h1>Settings</h1><div class="mute sm">Configure your company identity, address, contact details, ISO certifications, and cloud storage.</div></div><div class="acts"><button class="btn pri" data-act="saveSettings">Save settings</button></div></div>
   <div class="two"><div>
-
-  <!-- 0. Excel Costing Engine & Markup Settings (Spec Section 5) -->
-  <div class="card" id="set_costing" style="border: 2px solid var(--pri); margin-bottom: 16px; background: var(--card)">
-    <div class="card-h">
-      <div>
-        <h3 style="color:var(--pri); margin-bottom: 2px">⚡ Costing Settings (Excel-Style Auto Costing Engine)</h3>
-        <div class="mute sm">Aluminium rate, wastage %, markup margin %, and labour rates used by BOM templates for dynamic line costing.</div>
-      </div>
-      <button type="button" class="btn sm ghost" data-act="testCostingBench">Run Benchmark Tests</button>
-    </div>
-    <div class="grid g3">
-      <label class="f"><span>Aluminium Base Rate (${'₹'} / kg)</span><input name="alRate" type="number" step="any" value="${cs.aluminium_rate_per_kg || 500}" required></label>
-      <label class="f"><span>Wastage % (Profiles &amp; Seals)</span><input name="wastagePct" type="number" step="any" value="${cs.wastage_pct || 5}" required></label>
-      <label class="f"><span>Margin Markup % (on Total Cost)</span><input name="marginPct" type="number" step="any" value="${cs.margin_pct || 35}" required></label>
-      <label class="f"><span>Default GST %</span><input name="gstPct" type="number" step="any" value="${cs.gst_pct || 18}" required></label>
-      <label class="f"><span>Fabrication &amp; Fixing Labour (${'₹'} / sqm)</span><input name="labourRate" type="number" step="any" value="${cs.labour_rate_per_sqm || 500}" required></label>
-      <label class="f"><span>Sq Ft per Sq M</span><input name="sqftPerSqm" type="number" step="any" value="${cs.sqft_per_sqm || 10.764}" required></label>
-    </div>
-    <div style="margin-top:12px;padding:8px 12px;background:var(--bg);border-radius:4px;display:flex;justify-content:space-between;align-items:center;font-size:12px">
-      <span class="mute">Last changed by: <b>${esc(cs.last_changed_by || 'Initial System Setup')}</b> ${cs.last_changed_at ? ' on ' + new Date(cs.last_changed_at).toLocaleString() : ''}</span>
-      <span style="color:var(--pri);font-weight:600">✓ Excel Math Precision Active</span>
-    </div>
-    <div id="costing_bench_results" style="margin-top:12px;display:none"></div>
-  </div>
 
   <!-- 1. Company Profile & Logo -->
   <div class="card" id="set1">
@@ -7523,7 +7989,17 @@
       const curMesh = l.mesh !== undefined ? l.mesh : (allowsMesh ? 'SS Mesh' : 'NA');
       const curHandle = l.handle || (currentTpl && currentTpl.default_handle) || 'Standard Handle';
 
-      const tplOpts = allTemplates.map(t => `<option value="${t.id}" ${(currentTpl && (currentTpl.id === t.id || currentTpl.template_key === t.id)) ? 'selected' : ''}>${esc(t.name)} (${esc(t.series || 'Domal 27')})</option>`).join('');
+      const alTpls = allTemplates.filter(t => t.material_type !== 'upvc' && (!t.series || !/upvc/i.test(t.series)));
+      const upvcTpls = allTemplates.filter(t => t.material_type === 'upvc' || (t.series && /upvc/i.test(t.series)));
+      const tplOpt = t => `<option value="${t.id}" ${(currentTpl && (currentTpl.id === t.id || currentTpl.template_key === t.id)) ? 'selected' : ''}>${esc(t.name)} (${esc(t.series || (t.material_type === 'upvc' ? '60mm UPVC' : 'Domal 27'))})</option>`;
+      const tplOpts = `
+        <optgroup label="── 🔵 Aluminium Windows &amp; Doors ──">
+          ${alTpls.map(tplOpt).join('')}
+        </optgroup>
+        <optgroup label="── 🟣 UPVC Windows &amp; Doors ──">
+          ${upvcTpls.map(tplOpt).join('')}
+        </optgroup>
+      `;
       const gOpts = glassList.map(g => `<option value="${esc(g.id || g.name)}" ${(curGlass === g.id || curGlass === g.name) ? 'selected' : ''}>${esc(g.name)} (₹${g.rate || g.rate_per_sqm}/sqm)</option>`).join('');
       const hOpts = handleList.map(h => `<option value="${esc(h.name)}" ${curHandle === h.name ? 'selected' : ''}>${esc(h.name)}${h.price ? ' (+₹' + h.price + ')' : ''}</option>`).join('');
 
@@ -7774,8 +8250,9 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
         if (tpl) {
           l.template_id = tpl.id;
           l.name = tpl.name;
-          l.spec = (tpl.series || 'Domal 27') + ' Series Aluminium Powder Coated';
-          l.glyph = tpl.category === 'door' ? 'door' : 'slider';
+          const isUpvc = tpl.material_type === 'upvc' || (tpl.series && /upvc/i.test(tpl.series));
+          l.spec = isUpvc ? ((tpl.series || '60mm UPVC System') + ' Multi-Chamber UPVC Profile with Steel Reinforcement') : ((tpl.series || 'Domal 27') + ' Series Aluminium Powder Coated');
+          l.glyph = tpl.category === 'door' ? 'door' : (tpl.category === 'ventilator' ? 'vent' : 'slider');
           if (tpl.default_glass) l.glass_id = tpl.default_glass;
           if (tpl.allows_mesh !== false) l.mesh = 'SS Mesh';
           else l.mesh = 'NA';
@@ -7818,43 +8295,91 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
     function picker(kind) {
       const tpls = (db && db.productTemplates && db.productTemplates.length) ? db.productTemplates : CostingEngine.getSeedTemplates();
       const list = kind === 'size' ? db.products : db.items;
+      let curMatFilter = 'all';
+
       const el = modal({
-        title: kind === 'size' ? 'Add window, door or facade' : 'Add BOQ item',
+        title: kind === 'size' ? 'Add Window, Door or Opening (Aluminium & UPVC)' : 'Add BOQ item',
         noFooter: true,
         wide: true,
         body: `<input type="search" id="pkq" placeholder="Search templates or products...">
           <div class="pk">
             <button data-pk="blank">${kind === 'size' ? 'Blank window / manual entry' : 'Blank BOQ item'}</button>
-            ${kind === 'size' ? `<div style="font-weight:700;margin:12px 0 6px;color:var(--pri)">⚡ Excel Auto-Costing Templates:</div>
-            <div style="display:grid;gap:6px;margin-bottom:12px">
-              ${tpls.map(t => `<button data-pktpl="${t.id}">${glyph(t.category === 'door' ? 'door' : 'slider', 28)}<span><b>${esc(t.name)}</b><small>${esc(t.series || 'Domal 27')} Series &bull; Auto-costing BOM</small></span></button>`).join('')}
+            ${kind === 'size' ? `
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:14px 0 6px">
+              <span style="font-weight:700;color:var(--pri)">⚡ Excel Auto-Costing Templates:</span>
+              <div class="chips" id="pk_mat_chips" style="margin:0">
+                <button type="button" class="chip on" data-pkmat="all">All (${tpls.length})</button>
+                <button type="button" class="chip" data-pkmat="aluminium">🔵 Aluminium</button>
+                <button type="button" class="chip" data-pkmat="upvc">🟣 UPVC</button>
+              </div>
             </div>
+            <div id="pktpls" style="display:grid;gap:6px;margin-bottom:12px"></div>
             <div style="font-weight:700;margin:10px 0 6px">Standard Catalogue Products:</div>` : ''}
             <div id="pkl" style="display:grid;gap:6px"></div>
           </div>`
       });
+
+      const drawTpls = () => {
+        const t = ($('#pkq', el) && $('#pkq', el).value.trim().toLowerCase()) || '';
+        const pktplsEl = $('#pktpls', el);
+        if (!pktplsEl) return;
+        const matchingTpls = tpls.filter(tpl => {
+          const isUpvc = tpl.material_type === 'upvc' || (tpl.series && /upvc/i.test(tpl.series));
+          if (curMatFilter === 'aluminium' && isUpvc) return false;
+          if (curMatFilter === 'upvc' && !isUpvc) return false;
+          if (t) {
+            const str = (tpl.name + ' ' + (tpl.series || '') + ' ' + (tpl.category || '')).toLowerCase();
+            return str.includes(t);
+          }
+          return true;
+        });
+
+        pktplsEl.innerHTML = matchingTpls.map(t => {
+          const isUpvc = t.material_type === 'upvc' || (t.series && /upvc/i.test(t.series));
+          return `<button data-pktpl="${t.id}" style="display:flex;align-items:center;text-align:left;gap:12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer">
+            ${glyph(t.category === 'door' ? 'door' : (t.category === 'ventilator' ? 'vent' : 'slider'), 28)}
+            <span style="flex:1">
+              <b style="color:#0f172a">${esc(t.name)}</b>
+              <span class="bd ${isUpvc ? 'bd-upvc' : 'bd-al'}" style="margin-left:6px">${isUpvc ? '🟣 UPVC' : '🔵 Aluminium'}</span>
+              <br><small style="color:#64748b">${esc(t.series || (isUpvc ? '60mm UPVC' : 'Domal 27'))} &bull; Auto-costing BOM (${(t.lines || []).length || 'Combo'} lines)</small>
+            </span>
+          </button>`;
+        }).join('') || '<div class="mute sm" style="padding:10px;text-align:center">No templates match the filter.</div>';
+      };
+
       const draw = () => {
+        drawTpls();
         const t = $('#pkq', el).value.trim().toLowerCase();
         $('#pkl', el).innerHTML = list.filter(p => !t || (p.name || p.desc).toLowerCase().includes(t) || (p.category || '').toLowerCase().includes(t)).map(p => kind === 'size' ? `<button data-pk="${p.id}">${glyph(p.glyph, 30)}<span><b>${esc(p.name)}</b><small>${rs(p.rate)} per sq ft</small></span></button>` : `<button data-pk="${p.id}"><span><b>${esc(p.desc)}</b><small>${esc(p.category)}, ${rs(p.rate)} per ${esc(p.unit)}</small></span></button>`).join('') || '<div class="mute">Nothing matches.</div>';
       };
       draw();
       $('#pkq', el).oninput = draw;
+
       el.addEventListener('click', e => {
+        const matBtn = e.target.closest('[data-pkmat]');
+        if (matBtn) {
+          curMatFilter = matBtn.dataset.pkmat;
+          el.querySelectorAll('[data-pkmat]').forEach(b => b.classList.toggle('on', b === matBtn));
+          drawTpls();
+          return;
+        }
+
         const tplBtn = e.target.closest('[data-pktpl]');
         if (tplBtn) {
           const tplId = tplBtn.dataset.pktpl;
           const tpl = tpls.find(x => x.id === tplId || x.template_key === tplId);
           closeModal();
           if (tpl) {
+            const isUpvc = tpl.material_type === 'upvc' || (tpl.series && /upvc/i.test(tpl.series));
             addLine({
               id: uid(),
               type: 'size',
               template_id: tpl.id,
               name: tpl.name,
-              spec: (tpl.series || 'Domal 27') + ' Series Aluminium Powder Coated',
-              glyph: tpl.category === 'door' ? 'door' : 'slider',
-              w: 10,
-              h: 6,
+              spec: isUpvc ? ((tpl.series || '60mm UPVC System') + ' Multi-Chamber UPVC Profile with Steel Reinforcement') : ((tpl.series || 'Domal 27') + ' Series Aluminium Powder Coated'),
+              glyph: tpl.category === 'door' ? 'door' : (tpl.category === 'ventilator' ? 'vent' : 'slider'),
+              w: tpl.category === 'door' ? 8 : (tpl.category === 'ventilator' ? 3.5 : 10),
+              h: tpl.category === 'door' ? 8 : (tpl.category === 'ventilator' ? 2 : 6),
               qty: 1,
               rate: 0,
               cost: 0,

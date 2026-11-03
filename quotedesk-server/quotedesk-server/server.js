@@ -1280,7 +1280,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
   const clientIp = getClientIp(req);
   const un = (username || '').trim().toLowerCase();
 
-  // 1. MASTER SUPERADMIN LOGIN -> Direct authentication (No OTP required)
+  // 1. MASTER SUPERADMIN LOGIN -> 2FA Verification (Google Authenticator / Email OTP)
   if (un === 'master') {
     if (password !== MASTER_PASSWORD && password !== 'Rafiq@24') {
       recordLoginLog(req, {
@@ -1292,23 +1292,26 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
       return res.status(401).json({ error: 'Incorrect email/username or password.' });
     }
 
-    recordLoginLog(req, {
-      companyId: 'MASTER',
-      companyName: 'Master Platform Admin',
-      userId: 'master',
-      username: 'master',
-      role: 'master',
-      status: 'SUCCESS'
+    // Generate 6-digit OTP code for Master Admin verification
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await setPendingOtp({
+      otp: String(otp).trim(),
+      expires: Date.now() + 10 * 60 * 1000,
+      attempts: 0,
+      lastSent: Date.now()
     });
 
-    const token = createSession('master');
-    res.cookie('qdsession', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 });
+    console.log(`🔑 [Security OTP] Master Admin 2FA Code: ${otp}`);
+
+    // Send email OTP alert in background
+    sendAdminOtpEmail(ADMIN_EMAILS, otp, clientIp).catch(err => {
+      console.warn('[OTP Email Error]:', err.message);
+    });
+
     return res.json({
       ok: true,
-      userId: 'master',
-      companyId: 'master',
-      role: 'master',
-      name: 'Master Superadmin'
+      requireOtp: true,
+      message: 'Master Admin authentication required. Please enter your 6-digit 2FA verification code sent to your email or Google Authenticator app.'
     });
   }
 

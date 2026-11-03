@@ -151,6 +151,8 @@ function calculateItem(template, templateLines, widthFt, heightFt, options, sett
   }
 
   var alRate    = Number(settings.aluminium_rate_per_kg) || 500;
+  var upvcRate  = Number(settings.upvc_rate_per_kg) || 380;
+  var steelRate = Number(settings.upvc_steel_rate_per_kg) || 120;
   var labourRate = Number(settings.labour_rate_per_sqm) || 500;
 
   // Glass rate lookup
@@ -219,7 +221,21 @@ function calculateItem(template, templateLines, widthFt, heightFt, options, sett
     var kind = line.kind;
     if (kind === 'profile') {
       var w = Number(line.weight_kg_per_m) || 0;
-      amount = totalMetres * w * alRate;
+      var profRate = alRate;
+      var isUpvcMat = (line.material && line.material.toLowerCase() === 'upvc') ||
+                      (template && template.material_type === 'upvc') ||
+                      (template && template.series && /upvc/i.test(template.series)) ||
+                      (line.profile_no && /upvc/i.test(line.profile_no));
+      var isSteelReinforce = (line.material && line.material.toLowerCase() === 'steel') ||
+                             (line.description && /reinforce|steel/i.test(line.description));
+
+      if (isSteelReinforce) {
+        profRate = steelRate;
+      } else if (isUpvcMat) {
+        profRate = upvcRate;
+      }
+      if (Number(line.unit_price) > 0) profRate = Number(line.unit_price);
+      amount = totalMetres * w * profRate;
     } else if (kind === 'gasket' || kind === 'brush_seal') {
       // length_expr evaluates to total metres (may reference L-vars), nos multiplies
       amount = totalMetres * unitPrice;
@@ -298,7 +314,17 @@ function quoteTotals(items, transportCharges, gstPct) {
 }
 
 function getDefaultCostingSettings() {
-  return { aluminium_rate_per_kg: 500, wastage_pct: 5, margin_pct: 35, gst_pct: 18, labour_rate_per_sqm: 500, sqft_per_sqm: 10.764, ft_to_m: 0.3048 };
+  return {
+    aluminium_rate_per_kg: 500,
+    upvc_rate_per_kg: 380,
+    upvc_steel_rate_per_kg: 120,
+    wastage_pct: 5,
+    margin_pct: 35,
+    gst_pct: 18,
+    labour_rate_per_sqm: 500,
+    sqft_per_sqm: 10.764,
+    ft_to_m: 0.3048
+  };
 }
 
 function getDefaultGlassTypes() {
@@ -415,6 +441,7 @@ function getSeedTemplates() {
       name: 'Combo Fixed + 2.5T Sliding Door (F+SD)',
       series: 'Domal 27',
       category: 'combo',
+      material_type: 'aluminium',
       fixed_template_id: 'tpl_fixed_window',
       operable_template_id: 'tpl_sliding_door',
       default_operable_h: 7,
@@ -422,6 +449,126 @@ function getSeedTemplates() {
       default_glass: '8mm Toughened Clear',
       default_handle: 'Pop-up Handle',
       lines: []
+    },
+    // Template 6: UPVC 2-Track 2-Panel Sliding Window (60mm Series)
+    {
+      id: 'tpl_upvc_sliding_window',
+      name: 'UPVC 2-Track 2-Panel Sliding Window',
+      series: '60mm UPVC System',
+      category: 'window',
+      material_type: 'upvc',
+      allows_mesh: true,
+      default_handle: 'Standard Handle',
+      default_glass: '6mm Toughened',
+      lines: [
+        { sl_no: 1, description: 'UPVC 2-Track Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.20, profile_no: 'UPVC-OF-60', material: 'upvc' },
+        { sl_no: 2, description: 'UPVC 2-Track Outer Frame Bottom', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.20, profile_no: 'UPVC-OF-60', material: 'upvc' },
+        { sl_no: 3, description: 'UPVC 2-Track Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.20, profile_no: 'UPVC-OF-60', material: 'upvc' },
+        { sl_no: 4, description: 'UPVC Sliding Sash Horizontal', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.10, profile_no: 'UPVC-SS-60', material: 'upvc' },
+        { sl_no: 5, description: 'UPVC Sliding Sash Vertical', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 1.10, profile_no: 'UPVC-SS-60', material: 'upvc' },
+        { sl_no: 6, description: 'UPVC Interlock Profile', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.40, profile_no: 'UPVC-IL-60', material: 'upvc' },
+        { sl_no: 7, description: 'Galvanized Steel Reinforcement', kind: 'profile', length_expr: '2*W+4*H', nos_expr: '1', weight_kg_per_m: 0.85, profile_no: 'UPVC-STEEL', material: 'steel' },
+        { sl_no: 8, description: 'EPDM Glazing Gasket for Sash', kind: 'gasket', length_expr: 'L4+L5', nos_expr: '1', unit_price: 15 },
+        { sl_no: 9, description: 'Wool Pile Brush Seal', kind: 'brush_seal', length_expr: '6*W+6*H', nos_expr: '1', unit_price: 5 },
+        { sl_no: 10, description: 'Heavy Duty Nylon Rollers', kind: 'hardware', length_expr: '0', nos_expr: '4', unit_price: 65 },
+        { sl_no: 11, description: 'Crescent / Touch Lock', kind: 'hardware', length_expr: '0', nos_expr: '2', unit_price: 60 },
+        { sl_no: 12, description: 'UPVC Fusion Welding & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 450 },
+        { sl_no: 13, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 },
+        { sl_no: 14, description: 'SS Mesh', kind: 'mesh', length_expr: 'A/2', nos_expr: '1', unit_price: 290, condition: "mesh != 'NA'" }
+      ]
+    },
+    // Template 7: UPVC 2-Track 2-Panel Sliding Door (60mm Heavy Duty)
+    {
+      id: 'tpl_upvc_sliding_door',
+      name: 'UPVC 2-Track 2-Panel Sliding Door',
+      series: '60mm UPVC Heavy Duty',
+      category: 'door',
+      material_type: 'upvc',
+      allows_mesh: true,
+      default_handle: 'Pop-up Handle',
+      default_glass: '8mm Toughened Clear',
+      lines: [
+        { sl_no: 1, description: 'UPVC Door Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.45, profile_no: 'UPVC-OFD-60', material: 'upvc' },
+        { sl_no: 2, description: 'UPVC Door Outer Frame Bottom Track', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.45, profile_no: 'UPVC-OFD-60', material: 'upvc' },
+        { sl_no: 3, description: 'UPVC Door Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.45, profile_no: 'UPVC-OFD-60', material: 'upvc' },
+        { sl_no: 4, description: 'UPVC Door Sash Horizontal', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.35, profile_no: 'UPVC-SSD-60', material: 'upvc' },
+        { sl_no: 5, description: 'UPVC Door Sash Vertical', kind: 'profile', length_expr: 'H', nos_expr: '4', weight_kg_per_m: 1.35, profile_no: 'UPVC-SSD-60', material: 'upvc' },
+        { sl_no: 6, description: 'UPVC Interlock Profile', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 0.40, profile_no: 'UPVC-IL-60', material: 'upvc' },
+        { sl_no: 7, description: 'Galvanized Steel Reinforcement', kind: 'profile', length_expr: '2*W+4*H', nos_expr: '1', weight_kg_per_m: 1.10, profile_no: 'UPVC-STEEL', material: 'steel' },
+        { sl_no: 8, description: 'Glazing & Weather Gasket', kind: 'gasket', length_expr: 'L4+L5', nos_expr: '1', unit_price: 18 },
+        { sl_no: 9, description: 'Wool Pile Seal', kind: 'brush_seal', length_expr: '6*W+6*H', nos_expr: '1', unit_price: 6 },
+        { sl_no: 10, description: 'Heavy Duty Tandem Rollers', kind: 'hardware', length_expr: '0', nos_expr: '4', unit_price: 110 },
+        { sl_no: 11, description: 'Multi-Point Door Lock & Handle', kind: 'hardware', length_expr: '0', nos_expr: '1', unit_price: 320 },
+        { sl_no: 12, description: 'UPVC Fusion Welding & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 500 },
+        { sl_no: 13, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+      ]
+    },
+    // Template 8: UPVC Casement Window (Openable with Friction Stays)
+    {
+      id: 'tpl_upvc_casement_window',
+      name: 'UPVC Casement / Openable Window',
+      series: '60mm UPVC Casement',
+      category: 'window',
+      material_type: 'upvc',
+      allows_mesh: false,
+      default_handle: 'Standard Handle',
+      default_glass: '5mm Clear',
+      lines: [
+        { sl_no: 1, description: 'UPVC Casement Outer Frame Top & Bottom', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.25, profile_no: 'UPVC-COF-60', material: 'upvc' },
+        { sl_no: 2, description: 'UPVC Casement Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.25, profile_no: 'UPVC-COF-60', material: 'upvc' },
+        { sl_no: 3, description: 'UPVC Casement Sash Frame Top & Bottom', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.15, profile_no: 'UPVC-CSF-60', material: 'upvc' },
+        { sl_no: 4, description: 'UPVC Casement Sash Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.15, profile_no: 'UPVC-CSF-60', material: 'upvc' },
+        { sl_no: 5, description: 'UPVC Glazing Bead', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.28, profile_no: 'UPVC-GB-60', material: 'upvc' },
+        { sl_no: 6, description: 'Steel Reinforcement Section', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.85, profile_no: 'UPVC-STEEL', material: 'steel' },
+        { sl_no: 7, description: 'EPDM Double Sealing Gaskets', kind: 'gasket', length_expr: '4*W+4*H', nos_expr: '1', unit_price: 16 },
+        { sl_no: 8, description: 'Stainless Steel Friction Stays (Pair)', kind: 'hardware', length_expr: '0', nos_expr: '2', unit_price: 120 },
+        { sl_no: 9, description: 'Espag Multi-point Locking Handle', kind: 'hardware', length_expr: '0', nos_expr: '1', unit_price: 150 },
+        { sl_no: 10, description: 'UPVC Fabrication & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 450 },
+        { sl_no: 11, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+      ]
+    },
+    // Template 9: UPVC Openable Casement Door
+    {
+      id: 'tpl_upvc_casement_door',
+      name: 'UPVC Openable Casement Door',
+      series: '60mm UPVC Door System',
+      category: 'door',
+      material_type: 'upvc',
+      allows_mesh: false,
+      default_handle: 'Standard Handle',
+      default_glass: '8mm Toughened Clear',
+      lines: [
+        { sl_no: 1, description: 'UPVC Door Outer Frame Top', kind: 'profile', length_expr: 'W', nos_expr: '1', weight_kg_per_m: 1.45, profile_no: 'UPVC-COFD-60', material: 'upvc' },
+        { sl_no: 2, description: 'UPVC Door Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.45, profile_no: 'UPVC-COFD-60', material: 'upvc' },
+        { sl_no: 3, description: 'UPVC Door Sash Top & Bottom', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.40, profile_no: 'UPVC-CSD-60', material: 'upvc' },
+        { sl_no: 4, description: 'UPVC Door Sash Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.40, profile_no: 'UPVC-CSD-60', material: 'upvc' },
+        { sl_no: 5, description: 'UPVC Glazing Bead', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.28, profile_no: 'UPVC-GB-60', material: 'upvc' },
+        { sl_no: 6, description: 'Galvanized Steel Reinforcement', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 1.20, profile_no: 'UPVC-STEEL', material: 'steel' },
+        { sl_no: 7, description: 'EPDM Perimeter Gasket', kind: 'gasket', length_expr: '4*W+4*H', nos_expr: '1', unit_price: 18 },
+        { sl_no: 8, description: 'Heavy Duty 3D Adjustable Hinges', kind: 'hardware', length_expr: '0', nos_expr: '3', unit_price: 180 },
+        { sl_no: 9, description: 'Multi-point Door Espag & Lever Handle', kind: 'hardware', length_expr: '0', nos_expr: '1', unit_price: 380 },
+        { sl_no: 10, description: 'UPVC Door Fabrication & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 550 },
+        { sl_no: 11, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+      ]
+    },
+    // Template 10: UPVC Fixed Window
+    {
+      id: 'tpl_upvc_fixed_window',
+      name: 'UPVC Fixed Glass Window (60mm)',
+      series: '60mm UPVC System',
+      category: 'window',
+      material_type: 'upvc',
+      allows_mesh: false,
+      default_glass: '6mm Toughened',
+      lines: [
+        { sl_no: 1, description: 'UPVC Fixed Outer Frame Top & Bottom', kind: 'profile', length_expr: 'W', nos_expr: '2', weight_kg_per_m: 1.10, profile_no: 'UPVC-COF-60', material: 'upvc' },
+        { sl_no: 2, description: 'UPVC Fixed Outer Frame Verticals', kind: 'profile', length_expr: 'H', nos_expr: '2', weight_kg_per_m: 1.10, profile_no: 'UPVC-COF-60', material: 'upvc' },
+        { sl_no: 3, description: 'UPVC Glazing Bead', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.28, profile_no: 'UPVC-GB-60', material: 'upvc' },
+        { sl_no: 4, description: 'Galvanized Steel Reinforcement', kind: 'profile', length_expr: '2*W+2*H', nos_expr: '1', weight_kg_per_m: 0.80, profile_no: 'UPVC-STEEL', material: 'steel' },
+        { sl_no: 5, description: 'EPDM Glazing Gaskets', kind: 'gasket', length_expr: '4*W+4*H', nos_expr: '1', unit_price: 14 },
+        { sl_no: 6, description: 'UPVC Fabrication & Labour', kind: 'labour', length_expr: 'A', nos_expr: '1', unit_price: 350 },
+        { sl_no: 7, description: 'Glass', kind: 'glass', length_expr: 'A', nos_expr: '1', unit_price: 0 }
+      ]
     }
   ];
 }
@@ -474,14 +621,24 @@ function runTests() {
 
 function getDefaultMaterials() {
   return [
-    // Profiles
-    { category: 'profile', code: '5045', name: 'Outer Frame Top / Bottom / Verticals (Domal 27)', unit: 'kg/m', weight_kg_per_m: 1.28, rate: 500, active: true },
-    { category: 'profile', code: '5047', name: 'Sliding Sash (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.78, rate: 500, active: true },
-    { category: 'profile', code: '5042', name: 'Interlock (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.35, rate: 500, active: true },
-    { category: 'profile', code: '5043', name: 'Mesh Sash (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.90, rate: 500, active: true },
-    { category: 'profile', code: '5008', name: 'Outer Frame Top / Vertical (Fixed Window)', unit: 'kg/m', weight_kg_per_m: 0.60, rate: 500, active: true },
-    { category: 'profile', code: '5006', name: 'Mullion (Fixed Window / Vent)', unit: 'kg/m', weight_kg_per_m: 0.68, rate: 500, active: true },
-    { category: 'profile', code: '5013', name: 'Glazing Bead (Fixed Window)', unit: 'kg/m', weight_kg_per_m: 0.26, rate: 500, active: true },
+    // Profiles (Aluminium)
+    { category: 'profile', code: '5045', name: 'Outer Frame Top / Bottom / Verticals (Domal 27)', unit: 'kg/m', weight_kg_per_m: 1.28, rate: 500, material: 'aluminium', active: true },
+    { category: 'profile', code: '5047', name: 'Sliding Sash (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.78, rate: 500, material: 'aluminium', active: true },
+    { category: 'profile', code: '5042', name: 'Interlock (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.35, rate: 500, material: 'aluminium', active: true },
+    { category: 'profile', code: '5043', name: 'Mesh Sash (Domal 27)', unit: 'kg/m', weight_kg_per_m: 0.90, rate: 500, material: 'aluminium', active: true },
+    { category: 'profile', code: '5008', name: 'Outer Frame Top / Vertical (Fixed Window)', unit: 'kg/m', weight_kg_per_m: 0.60, rate: 500, material: 'aluminium', active: true },
+    { category: 'profile', code: '5006', name: 'Mullion (Fixed Window / Vent)', unit: 'kg/m', weight_kg_per_m: 0.68, rate: 500, material: 'aluminium', active: true },
+    { category: 'profile', code: '5013', name: 'Glazing Bead (Fixed Window)', unit: 'kg/m', weight_kg_per_m: 0.26, rate: 500, material: 'aluminium', active: true },
+
+    // Profiles (UPVC & Steel Reinforcement)
+    { category: 'profile', code: 'UPVC-OF-60', name: 'UPVC 60mm 2-Track Outer Frame', unit: 'kg/m', weight_kg_per_m: 1.20, rate: 380, material: 'upvc', active: true },
+    { category: 'profile', code: 'UPVC-SS-60', name: 'UPVC 60mm Sliding Sash Profile', unit: 'kg/m', weight_kg_per_m: 1.10, rate: 380, material: 'upvc', active: true },
+    { category: 'profile', code: 'UPVC-IL-60', name: 'UPVC Interlock Profile', unit: 'kg/m', weight_kg_per_m: 0.40, rate: 380, material: 'upvc', active: true },
+    { category: 'profile', code: 'UPVC-OFD-60', name: 'UPVC 60mm Door Outer Frame', unit: 'kg/m', weight_kg_per_m: 1.45, rate: 380, material: 'upvc', active: true },
+    { category: 'profile', code: 'UPVC-SSD-60', name: 'UPVC 60mm Door Sash Profile', unit: 'kg/m', weight_kg_per_m: 1.35, rate: 380, material: 'upvc', active: true },
+    { category: 'profile', code: 'UPVC-COF-60', name: 'UPVC Casement Outer Frame 60mm', unit: 'kg/m', weight_kg_per_m: 1.25, rate: 380, material: 'upvc', active: true },
+    { category: 'profile', code: 'UPVC-CSF-60', name: 'UPVC Casement Sash 60mm', unit: 'kg/m', weight_kg_per_m: 1.15, rate: 380, material: 'upvc', active: true },
+    { category: 'profile', code: 'UPVC-STEEL', name: 'UPVC Galvanized Steel Reinforcement', unit: 'kg/m', weight_kg_per_m: 0.85, rate: 120, material: 'steel', active: true },
 
     // Glass
     { category: 'glass', code: 'G-5C', name: '5mm Clear', unit: 'sqm', weight_kg_per_m: 0, rate: 600, active: true },
