@@ -81,9 +81,9 @@ function generateTotp(secret, timeMs = Date.now(), stepSeconds = 30) {
     const hmac = crypto.createHmac('sha1', key).update(buf).digest();
     const offset = hmac[hmac.length - 1] & 0x0f;
     const binary = ((hmac[offset] & 0x7f) << 24) |
-                   ((hmac[offset + 1] & 0xff) << 16) |
-                   ((hmac[offset + 2] & 0xff) << 8) |
-                   (hmac[offset + 3] & 0xff);
+      ((hmac[offset + 1] & 0xff) << 16) |
+      ((hmac[offset + 2] & 0xff) << 8) |
+      (hmac[offset + 3] & 0xff);
     return String(binary % 1000000).padStart(6, '0');
   } catch (e) {
     return '';
@@ -187,7 +187,7 @@ async function clearPendingOtp() {
   if (mongoConnected && mongoDb) {
     try {
       await mongoDb.collection('admin_security').deleteOne({ _id: 'master_otp' });
-    } catch (e) {}
+    } catch (e) { }
   }
 }
 
@@ -807,6 +807,11 @@ app.get('/sitemap.xml', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'sitemap.xml'));
 });
 
+// Google Search Console Site Verification
+app.get('/google568b31d06bc40311.html', (req, res) => {
+  res.type('text/html').send('google-site-verification: google568b31d06bc40311.html');
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -1282,7 +1287,7 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
 
   // 1. MASTER SUPERADMIN LOGIN -> 2FA Verification (Google Authenticator / Email OTP)
   if (un === 'master' || un === 'rafiq@46') {
-    if (password !== MASTER_PASSWORD && password !== 'Rafiq@2026#' ) {
+    if (password !== MASTER_PASSWORD && password !== 'Rafiq@2026#') {
       recordLoginLog(req, {
         username: un,
         role: 'master',
