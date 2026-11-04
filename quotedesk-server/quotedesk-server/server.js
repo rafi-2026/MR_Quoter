@@ -1,5 +1,6 @@
 'use strict';
 const express = require('express');
+const { generateQuotationPdf } = require('./server-pdf.js');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
@@ -2016,7 +2017,116 @@ function esc(str) {
   return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Send quotation email with PDF attachment
+
+// ── Server-Side PDF Generation & Download Endpoints ────────────────────────
+async function handlePdfDownload(quote, settings, req, res) {
+  if (!quote) return res.status(404).send('Quotation not found.');
+  try {
+    const host = BASE_URL || (req.get('host')?.includes('localhost') ? `${req.protocol}://${req.get('host')}` : `https://${req.get('host')}`);
+    const publicUrl = quote.shareToken ? `${host}/q/${quote.shareToken}` : '';
+    const pdfBuffer = await generateQuotationPdf(quote, settings || {}, publicUrl);
+    const safeFilename = `Quotation_${(quote.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('[PDF Download Error]:', err);
+    res.status(500).send('Error generating official PDF document: ' + err.message);
+  }
+}
+
+app.get('/api/quotes/:id/pdf', async (req, res) => {
+  const data = getDb();
+  if (!data || !data.quotes) return res.status(404).json({ error: 'No data' });
+  const quote = data.quotes.find(q => q.id === req.params.id);
+  if (!quote) return res.status(404).json({ error: 'Quotation not found' });
+  await handlePdfDownload(quote, data.settings, req, res);
+});
+
+// Spec alias: /api/quotations/:id/pdf
+app.get('/api/quotations/:id/pdf', async (req, res) => {
+  const data = getDb();
+  if (!data || !data.quotes) return res.status(404).json({ error: 'No data' });
+  const quote = data.quotes.find(q => q.id === req.params.id);
+  if (!quote) return res.status(404).json({ error: 'Quotation not found' });
+  await handlePdfDownload(quote, data.settings, req, res);
+});
+
+// Public PDF download for customers viewing /q/:token (no login required)
+app.get('/q/:token/pdf', async (req, res) => {
+  const data = getDb();
+  if (!data || !data.quotes) return res.status(404).send('No data');
+  const quote = data.quotes.find(q => q.shareToken === req.params.token);
+  if (!quote) return res.status(404).send('Invalid or expired quotation link.');
+  await handlePdfDownload(quote, data.settings, req, res);
+});
+
+// Server-Side Email Dispatch with Attached Official PDF
+app.post('/api/quotes/:id/email', auth, async (req, res) => {
+  const { recipientEmail, subject, message } = req.body || {};
+  if (!recipientEmail) return res.status(400).json({ error: 'Recipient email is required.' });
+
+  const data = getDb();
+  const q = (data && data.quotes || []).find(x => x.id === req.params.id);
+  if (!q) return res.status(404).json({ error: 'Quotation not found.' });
+
+  const company = (data && data.settings && data.settings.company) || 'MR_Quoter';
+  const transporter = getTransporter();
+
+  if (!transporter) {
+    return res.status(500).json({ error: 'Email service is not configured with SMTP credentials.' });
+  }
+
+  // Ensure shareToken exists
+  if (!q.shareToken) {
+    q.shareToken = crypto.randomBytes(16).toString('hex');
+    saveDb(data);
+  }
+
+  const host = BASE_URL || (req.get('host')?.includes('localhost') ? `${req.protocol}://${req.get('host')}` : `https://${req.get('host')}`);
+  const publicLink = `${host}/q/${q.shareToken}`;
+  const safeFilename = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+
+  try {
+    const pdfBuffer = await generateQuotationPdf(q, data.settings || {}, publicLink);
+
+    await transporter.sendMail({
+      from: `"${company}" <${SMTP_USER}>`,
+      to: recipientEmail,
+      subject: subject || `Quotation ${q.no || ''} from ${company}`,
+      html: `
+        <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:10px;background:#ffffff">
+          <h2 style="color:#1e3a8a;margin-top:0">${esc(company)}</h2>
+          <div style="color:#334155;font-size:15px;line-height:1.6;white-space:pre-line;margin-bottom:20px">${esc(message || '')}</div>
+          <div style="background:#f8fafc;padding:16px 20px;border-radius:8px;border:1px solid #cbd5e1;margin:20px 0">
+            <div style="font-weight:700;color:#0f172a;font-size:15px;margin-bottom:4px">📄 ${safeFilename}</div>
+            <div style="color:#64748b;font-size:13px;margin-bottom:12px">Official quotation document attached.</div>
+            <a href="${publicLink}" style="display:inline-block;background:#1e3a8a;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px">🔗 View &amp; Accept Quotation Online &rarr;</a>
+          </div>
+          <p style="color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0;padding-top:14px;margin-bottom:0">
+            Sent via MR_Quoter Platform.
+          </p>
+        </div>
+      `,
+      attachments: [
+        {
+          filename: safeFilename,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }
+      ]
+    });
+
+    res.json({ ok: true, message: `Quotation PDF sent successfully to ${recipientEmail}!` });
+  } catch (err) {
+    console.error('[Email Send Error]:', err);
+    res.status(500).json({ error: 'Failed to send email: ' + err.message });
+  }
+});
+
+// Legacy endpoint fallback
 app.post('/api/quotes/:id/email-pdf', auth, async (req, res) => {
   const { recipientEmail, subject, message, pdfBase64 } = req.body || {};
   if (!recipientEmail) return res.status(400).json({ error: 'Recipient email is required.' });
@@ -2077,24 +2187,34 @@ app.post('/api/quotes/:id/share', auth, (req, res) => {
   if (!data || !data.quotes) return res.status(404).json({ error: 'No data' });
   const quote = data.quotes.find(q => q.id === req.params.id);
   if (!quote) return res.status(404).json({ error: 'Quote not found' });
-  if (!['approved', 'sent', 'won'].includes(quote.status))
-    return res.status(400).json({ error: 'Quote must be approved first before sharing.' });
 
-  // Generate or reuse token
+  // Generate or reuse token (allow sharing for any status)
   if (!quote.shareToken) quote.shareToken = crypto.randomBytes(16).toString('hex');
-  if (!quote.sentAt) quote.sentAt = Date.now();
+  if (!quote.sentAt && ['approved', 'sent', 'won'].includes(quote.status)) quote.sentAt = Date.now();
   if (quote.status === 'approved') quote.status = 'sent';
 
   saveDb(data);
 
-  const host = BASE_URL || `${req.protocol}://${req.get('host')}`;
+  const host = BASE_URL || (req.get('host')?.includes('localhost') ? `${req.protocol}://${req.get('host')}` : `https://${req.get('host')}`);
   const url = `${host}/q/${quote.shareToken}`;
   const phone = String(quote.cust && quote.cust.phone || '').replace(/\D/g, '');
   const customerName = (quote.cust && quote.cust.contact) || (quote.cust && quote.cust.name) || 'Sir/Madam';
-  const companyName = (data.settings && data.settings.company) || 'Us';
-  const msg = `Dear ${customerName},\n\nPlease find our Quotation *${quote.no}* at the link below:\n${url}\n\nYou can view the full quotation and formally accept it online.\n\nRegards,\n${companyName}`;
+  const companyName = (data.settings && data.settings.company) || 'MR_Quoter';
+
+  // Compute total for message
+  let totalNum = 0;
+  try {
+    let sub = 0;
+    (quote.lines || []).forEach(l => {
+      const q = parseFloat(l.qty) || 1, r = parseFloat(l.rate) || 0;
+      sub += (q * r);
+    });
+    totalNum = Math.round(sub * (quote.gst ? 1.18 : 1));
+  } catch (e) {}
+
+  const msg = `Dear ${customerName},\n\nPlease find our Quotation *${quote.no}* (${totalNum ? 'Total: ₹ ' + totalNum.toLocaleString('en-IN') : ''}) from *${companyName}*:\n🔗 ${url}\n\nYou can view details, download the official PDF, and formally accept it online.\n\nThank you!`;
   const waPhone = phone.length === 10 ? '91' + phone : phone;
-  const whatsapp = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
+  const whatsapp = waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
 
   res.json({
     url,
@@ -2319,8 +2439,9 @@ app.get('/q/:token', (req, res) => {
         <h2 style="margin:0;font-size:1.15rem;color:#0f172a">${s.company || 'Quotation'}</h2>
         <small style="color:#64748b">Ref: <b>${q.no}</b> &bull; Viewed ${q.viewCount} time${q.viewCount !== 1 ? 's' : ''}</small>
       </div>
-      <div style="display:flex;gap:10px">
-        <button onclick="window.print()" style="background:#0284c7;color:#fff;border:0;padding:9px 18px;border-radius:6px;font-weight:600;cursor:pointer;font-size:0.9rem;display:flex;align-items:center;gap:6px">🖨️ Print / Save PDF</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="/q/${req.params.token}/pdf" style="background:#1e3a8a;color:#fff;text-decoration:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(30,64,175,0.25)">📄 Download Official PDF</a>
+        <button onclick="window.print()" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:9px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:0.9rem;display:flex;align-items:center;gap:6px">🖨️ Print</button>
       </div>
     </div>
 

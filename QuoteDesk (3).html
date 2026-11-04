@@ -4885,6 +4885,7 @@
         body: `<div class="grid g2" style="margin:12px 0;gap:12px">
       <button class="btn pri" data-act="dlRealPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📄 Download Official PDF Document</button>
       <button class="btn pri" data-act="dlXlsx" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600;background:#16a34a;border-color:#16a34a">📊 Download Excel (XLSX)</button>
+      <button class="btn" data-act="mobileShare" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📱 Mobile / Native Share</button>
       <button class="btn" data-act="dlHtml" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📥 Download Quote File (.html)</button>
       <button class="btn" data-act="dlPdf" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">🖨️ Print / Save as PDF Window</button>
       <button class="btn" data-act="dlCsv" data-id="${q.id}" style="justify-content:center;padding:14px;font-size:0.92rem">📋 Export CSV File</button>
@@ -4893,9 +4894,57 @@
     <div class="mute sm" style="text-align:center;margin-top:6px">Tip: PDF and XLSX are the official customer-ready formats. Excel includes a separate BOM Breakdown sheet.</div>`
       });
     };
-    ACT.dlRealPdf = async b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) await downloadQuotePdf(q); };
+    ACT.dlRealPdf = async b => {
+      closeModal();
+      const q = db.quotes.find(x => x.id === b.dataset.id);
+      if (!q) return;
+      if (CLOUD) {
+        // Server-side PDF — reliable, works on all devices
+        toast('⏳ Generating PDF on server...');
+        try {
+          const safeName = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+          const a = document.createElement('a');
+          a.href = `/api/quotes/${q.id}/pdf`;
+          a.download = safeName;
+          a.target = '_blank';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          toast('✅ PDF download started!');
+        } catch (err) {
+          toast('PDF download failed: ' + err.message, 'bad');
+        }
+      } else {
+        await downloadQuotePdf(q);
+      }
+    };
     ACT.dlHtml = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) downloadQuoteHtml(q); };
     ACT.dlPdf = b => { closeModal(); const q = db.quotes.find(x => x.id === b.dataset.id); if (q) previewQuote(q); };
+    // Mobile native share
+    ACT.mobileShare = async b => {
+      closeModal();
+      const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
+      let shareUrl = window.location.origin + '/api/quotes/' + q.id + '/pdf';
+      if (CLOUD) {
+        try {
+          const d = await apiPost('/api/quotes/' + q.id + '/share', {});
+          if (d && d.url) shareUrl = d.url;
+        } catch (e) {}
+      }
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: `Quotation ${q.no}`, text: `Quotation ${q.no} from ${db.settings.company || ''}`, url: shareUrl });
+          return;
+        } catch (e) { if (e.name === 'AbortError') return; }
+      }
+      // Fallback: copy link
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl).catch(() => {});
+        toast('📋 Link copied to clipboard!');
+      } else {
+        toast('Share: ' + shareUrl);
+      }
+    };
     // ── XLSX Export (SheetJS) ────────────────────────────────────────────────
     function buildQuoteXlsx(q) {
       if (typeof XLSX === 'undefined') { toast('Excel library loading, please try again.', 'bad'); return null; }
@@ -5086,32 +5135,19 @@
         if (!to) { toast('Please enter a recipient email address.', 'bad'); return; }
         const btn = $('#btn_send_smtp');
         btn.disabled = true;
-        btn.textContent = '⏳ Generating PDF & Sending...';
+        btn.textContent = '⏳ Sending...';
         try {
-          const blob = await generateQuotePdfBlob(q);
-          const reader = new FileReader();
-          reader.readAsDataURL(blob);
-          reader.onloadend = async () => {
-            const base64data = reader.result;
-            try {
-              const res = await apiPost('/api/quotes/' + q.id + '/email-pdf', {
-                recipientEmail: to,
-                subject: $('#mail_sub').value.trim() || defSub,
-                message: $('#mail_body').value.trim() || defMsg,
-                pdfBase64: base64data
-              });
-              closeModal();
-              toast('✅ ' + (res.message || 'Quotation PDF sent successfully!'));
-            } catch (err) {
-              btn.disabled = false;
-              btn.textContent = '📤 Send Email with Attached PDF';
-              toast('Failed to send email: ' + err.message, 'bad');
-            }
-          };
-        } catch (e) {
+          const res = await apiPost('/api/quotes/' + q.id + '/email', {
+            recipientEmail: to,
+            subject: $('#mail_sub').value.trim() || defSub,
+            message: $('#mail_body').value.trim() || defMsg
+          });
+          closeModal();
+          toast('✅ ' + (res.message || 'Quotation PDF sent successfully!'));
+        } catch (err) {
           btn.disabled = false;
           btn.textContent = '📤 Send Email with Attached PDF';
-          toast('Could not generate PDF: ' + e.message, 'bad');
+          toast('Failed to send email: ' + err.message, 'bad');
         }
       };
 
@@ -5129,68 +5165,52 @@
 
     ACT.shareWhatsapp = async b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
-      toast('📄 Preparing PDF for WhatsApp...');
-      let blob = null;
-      try {
-        blob = await generateQuotePdfBlob(q);
-      } catch (e) {
-        console.warn('Could not generate PDF blob:', e);
-      }
+      const t = calcTotals(q);
 
-      const safeName = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
-
-      // 1. If Web Share API supports file sharing (Mobile devices & Windows 11 Edge/Chrome):
-      if (blob && navigator.canShare) {
-        try {
-          const pdfFile = new File([blob], safeName, { type: 'application/pdf' });
-          if (navigator.canShare({ files: [pdfFile] })) {
-            await navigator.share({
-              files: [pdfFile],
-              title: `Quotation ${q.no}`,
-              text: `Quotation ${q.no} from ${db.settings.company || 'Us'}`
-            });
-            toast('✅ PDF shared to WhatsApp!');
-            return;
-          }
-        } catch (err) {
-          if (err.name === 'AbortError') return;
-        }
-      }
-
-      // 2. Desktop WhatsApp Web fallback:
-      // Download the PDF file directly to their Downloads folder
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = safeName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-      }
-
-      // Get share link if in cloud mode
-      let linkUrl = '';
-      if (CLOUD && ['approved', 'sent', 'won'].includes(q.status)) {
+      if (CLOUD) {
+        // Get share link first (synchronous before any async gap)
+        toast('⏳ Getting share link...');
+        let linkUrl = '';
+        let waLink = '';
         try {
           const d = await apiPost('/api/quotes/' + q.id + '/share', {});
           if (d && d.url) linkUrl = d.url;
-        } catch (e) {}
-      }
+          if (d && d.whatsapp) waLink = d.whatsapp;
+        } catch (e) {
+          console.warn('Share link failed:', e);
+        }
 
-      const t = calcTotals(q);
-      const msg = encodeURIComponent(`*QUOTATION: ${q.no}*\n*Company:* ${db.settings.company}\n*Customer:* ${q.cust.name || '-'}\n*Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}\n\n📄 *Official PDF Quotation generated and downloaded.*\n${linkUrl ? '🔗 *View & Download PDF Online:* ' + linkUrl + '\n\n' : ''}Please find the attached quotation PDF document.`);
-      const phone = (q.cust.phone || '').replace(/\D/g, '');
-      const waUrl = phone ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
-      window.open(waUrl, '_blank');
-      toast('📄 PDF downloaded! Drag & drop it into the WhatsApp chat.');
+        const phone = (q.cust.phone || '').replace(/\D/g, '');
+        const msg = encodeURIComponent(
+          `*QUOTATION: ${q.no}*\n*Company:* ${db.settings.company}\n*Customer:* ${q.cust.name || '-'}\n*Total:* ₹${inr(t.grand, 0)}\n*Valid Until:* ${fmtDate(addDays(q.date, q.validity || 30))}\n\n${linkUrl ? '🔗 *View & Download PDF:* ' + linkUrl + '\n\n' : ''}Please review the attached quotation.`
+        );
+        const finalUrl = waLink || (phone
+          ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${msg}`
+          : `https://api.whatsapp.com/send?text=${msg}`);
+        window.open(finalUrl, '_blank');
+        toast(linkUrl ? '✅ WhatsApp opened with quotation link!' : '📱 WhatsApp opened — share the link manually.');
+      } else {
+        // Local mode: download PDF + open WhatsApp
+        let blob = null;
+        try { blob = await generateQuotePdfBlob(q); } catch (e) {}
+        const safeName = `Quotation_${(q.no || 'quote').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url; a.download = safeName;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+        }
+        const phone = (q.cust.phone || '').replace(/\D/g, '');
+        const msg = encodeURIComponent(`*QUOTATION: ${q.no}*\n*Company:* ${db.settings.company}\n*Customer:* ${q.cust.name || '-'}\n*Total:* ₹${inr(t.grand, 0)}`);
+        const waUrl = phone ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${msg}` : `https://api.whatsapp.com/send?text=${msg}`;
+        window.open(waUrl, '_blank');
+        toast('📄 PDF downloaded! Drag & drop it into the WhatsApp chat.');
+      }
     };
     // Share link (copy shareable client link)
     ACT.shareLink = b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       if (!CLOUD) { toast('Share links require cloud mode.', 'bad'); return; }
-      if (!['approved', 'sent', 'won'].includes(q.status)) { toast('Approve the quote first.', 'bad'); return; }
       apiPost('/api/quotes/' + q.id + '/share', {}).then(d => {
         if (d.error) { toast(d.error, 'bad'); return; }
         if (!q.shareToken) { q.shareToken = d.token; }
