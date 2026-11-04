@@ -108,8 +108,17 @@
       box-sizing: border-box
     }
 
+    html, body {
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+      -webkit-text-size-adjust: 100%;
+    }
+
     html {
-      font-size: 15px
+      font-size: 15px;
     }
 
     body {
@@ -118,7 +127,12 @@
       color: var(--ink);
       font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
       line-height: 1.45;
-      -webkit-font-smoothing: antialiased
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body.mob-lock-scroll {
+      overflow: hidden !important;
+      touch-action: none;
     }
 
     h1,
@@ -179,8 +193,22 @@
     /* shell */
     .app {
       display: grid;
-      grid-template-columns: 232px minmax(0, 1fr);
-      min-height: 100vh
+      grid-template-columns: 240px minmax(0, 1fr);
+      min-height: 100vh;
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
+    }
+
+    /* Mobile Header and Drawer Controls (Hidden on Desktop) */
+    .mob-header {
+      display: none;
+    }
+    .mob-drawer-backdrop {
+      display: none;
+    }
+    .mob-drawer-close {
+      display: none;
     }
 
     .side-nav {
@@ -188,12 +216,20 @@
       color: #334155;
       display: flex;
       flex-direction: column;
-      padding: 16px 0;
       position: sticky;
       top: 0;
       height: 100vh;
       border-right: 1px solid #e2e8f0;
       box-shadow: 2px 0 12px rgba(15, 23, 42, 0.03);
+      z-index: 40;
+    }
+
+    .side-nav-inner {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+      padding: 16px 0;
     }
 
     .brand {
@@ -335,49 +371,337 @@
       flex-wrap: wrap
     }
 
-    @media(max-width:860px) {
+    /* ========================================================
+       MOBILE & TABLET RESPONSIVE ARCHITECTURE (max-width: 860px)
+       ======================================================== */
+    @media (max-width: 860px) {
       .app {
-        grid-template-columns: 1fr
+        display: block !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
       }
 
-      .side-nav {
-        position: static;
-        height: auto;
-        flex-direction: row;
-        flex-wrap: wrap;
-        padding: 10px 12px;
-        gap: 6px
+      /* Sticky Mobile Top Header */
+      .mob-header {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        padding: 0 14px;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+        z-index: 1000;
+        width: 100%;
+        max-width: 100vw;
+        box-sizing: border-box;
       }
 
-      .brand {
-        border: 0;
-        padding: 0 12px 0 0
-      }
-
-      .nav {
+      .mob-brand {
         display: flex;
-        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .mob-menu-btn {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 4px;
+        width: 38px;
+        height: 38px;
+        padding: 6px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        cursor: pointer;
+        color: #334155;
+        transition: all 0.15s ease;
+      }
+
+      .mob-menu-btn:active {
+        background: #e2e8f0;
+        transform: scale(0.95);
+      }
+
+      .mob-menu-btn span {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: #334155;
+        border-radius: 2px;
+      }
+
+      .mono.sm {
+        width: 34px;
+        height: 34px;
+        font-size: 1rem;
+        border-radius: 8px;
+      }
+
+      .mob-brand-text {
+        line-height: 1.2;
+      }
+
+      .mob-brand-text b {
+        font-size: 0.96rem;
+        color: #0f172a;
+        display: block;
+      }
+
+      .mob-sub {
+        font-size: 0.72rem;
+        color: #64748b;
+        display: block;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mob-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .mob-clock-pill {
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: #4f46e5;
+        background: #f5f3ff;
+        border: 1px solid #ddd6fe;
+        padding: 4px 9px;
+        border-radius: 20px;
+        white-space: nowrap;
+      }
+
+      /* Slide-out Off-Canvas Drawer */
+      .side-nav {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 290px !important;
+        max-width: 86vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        background: #ffffff !important;
+        z-index: 10000 !important;
+        transform: translateX(-105%) !important;
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        box-shadow: 6px 0 28px rgba(15, 23, 42, 0.2) !important;
+        border-right: 1px solid #cbd5e1 !important;
+      }
+
+      .side-nav.open {
+        transform: translateX(0) !important;
+      }
+
+      /* Mobile Drawer Backdrop */
+      .mob-drawer-backdrop {
+        display: block !important;
+        position: fixed !important;
+        inset: 0 !important;
+        background: rgba(15, 23, 42, 0.55) !important;
+        backdrop-filter: blur(2px) !important;
+        -webkit-backdrop-filter: blur(2px) !important;
+        z-index: 9999 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transition: opacity 0.25s ease !important;
+      }
+
+      .mob-drawer-backdrop.open {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      .mob-drawer-close {
+        display: grid !important;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        font-size: 1.35rem;
+        color: #64748b;
+        cursor: pointer;
+        margin-left: auto;
+        line-height: 1;
         padding: 0;
-        flex: 1
       }
 
-      .nav a {
-        border-left: 0;
-        border-bottom: 3px solid transparent;
-        border-radius: 0
+      .mob-drawer-close:active {
+        background: #e2e8f0;
+        color: #0f172a;
       }
 
-      .nav a.on {
-        border-bottom-color: var(--bronze)
+      .side-nav .brand {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px;
       }
 
-      .me {
-        border: 0;
-        padding: 0
+      .side-nav .nav a {
+        padding: 0.72rem 1rem !important;
+        font-size: 0.95rem !important;
+        border-radius: 9px !important;
+        margin-bottom: 2px !important;
       }
 
+      /* Main Content on Mobile */
       .main {
-        padding: 18px 14px 50px
+        padding: 16px 12px 60px !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+      }
+
+      /* KPI Cards on Mobile (2 equal columns taking 100% width) */
+      .kpis {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-bottom: 14px !important;
+      }
+
+      .kpi {
+        padding: 12px 10px !important;
+        border-radius: 8px !important;
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+      }
+
+      .kpi small {
+        font-size: 0.74rem !important;
+        line-height: 1.2 !important;
+      }
+
+      .kpi b {
+        font-size: 1.35rem !important;
+        margin-top: 4px !important;
+      }
+
+      .kpi span {
+        font-size: 0.74rem !important;
+      }
+
+      /* Two Column layouts stack on Mobile */
+      .two {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+      }
+
+      /* Tables on Mobile */
+      .scx {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        display: block !important;
+        border-radius: 8px !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #fff;
+        margin-bottom: 8px;
+      }
+
+      .tbl {
+        min-width: 580px !important;
+      }
+
+      .tbl th, .tbl td {
+        padding: 8px 10px !important;
+        font-size: 0.82rem !important;
+      }
+
+      /* Cards on Mobile */
+      .card {
+        padding: 14px 12px !important;
+        margin-bottom: 12px !important;
+        border-radius: 10px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      .card-h {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      /* Form inputs on Mobile - prevent iOS auto-zoom */
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+
+      .btn {
+        min-height: 38px;
+        padding: 0.45rem 0.85rem;
+      }
+    }
+
+    
+    /* Fluid Grid & Container Containment */
+    .two, .two > div {
+      min-width: 0 !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    .card {
+      min-width: 0 !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    /* Swipeable Toolbars & Chips on Mobile */
+    @media (max-width: 860px) {
+      .tools input[type=search] {
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+      .tools select {
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+      .chips {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        padding-bottom: 8px !important;
+        -webkit-overflow-scrolling: touch !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .chip {
+        flex: none !important;
+        white-space: nowrap !important;
+      }
+      .acts {
+        width: 100% !important;
+        flex-wrap: wrap !important;
+      }
+      .acts .btn {
+        flex: 1 1 auto !important;
+        text-align: center !important;
+        justify-content: center !important;
+      }
+      /* Rate Library tabs touch scroll */
+      .rate-tab-wrap {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
       }
     }
 
@@ -3649,12 +3973,50 @@
       if (isMaster()) { nav.push(['companies', '🏢 Companies'], ['audit', '🛡️ Security Logs']); }
       const name = r.name === 'quote' ? 'quotes' : r.name;
       const coName = (db && db.settings && db.settings.company) || 'MR_Quoter';
-      root.innerHTML = `<div class="app"><aside class="side-nav">
-    <div class="brand"><div class="mono">${esc(coName.slice(0, 1))}</div><div><b>MR_Quoter</b><span>${esc(coName)}</span></div></div>
-    <div style="padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;margin:12px 14px;background:#f8fafc" id="liveClock"></div>
-    <nav class="nav">${nav.map(([k, t]) => `<a href="#/${k}" class="${name === k ? 'on' : ''}">${t}</a>`).join('')}</nav>
-    <div class="me"><b>${esc(me.name)}</b><span class="role">${ROLES[me.role] || me.role}</span><br><button data-act="mypw">Change password</button><button data-act="logout">Sign out</button></div>
-  </aside><main class="main" id="main"></main></div>`;
+      root.innerHTML = `<div class="app">
+        <!-- Sticky Mobile Top Bar -->
+        <header class="mob-header">
+          <div class="mob-brand">
+            <button class="mob-menu-btn" id="mobMenuBtn" aria-label="Open menu" type="button">
+              <span></span><span></span><span></span>
+            </button>
+            <div class="mono sm">${esc(coName.slice(0, 1))}</div>
+            <div class="mob-brand-text">
+              <b>MR_Quoter</b>
+              <span class="mob-sub">${esc(coName)}</span>
+            </div>
+          </div>
+          <div class="mob-right">
+            <div class="mob-clock-pill" id="mobClock"></div>
+          </div>
+        </header>
+
+        <!-- Mobile Drawer Backdrop Overlay -->
+        <div class="mob-drawer-backdrop" id="mobBackdrop"></div>
+
+        <aside class="side-nav" id="sideNav">
+          <div class="side-nav-inner">
+            <div class="brand">
+              <div class="mono">${esc(coName.slice(0, 1))}</div>
+              <div style="flex:1"><b>MR_Quoter</b><span>${esc(coName)}</span></div>
+              <button class="mob-drawer-close" id="mobDrawerClose" type="button" aria-label="Close menu">&times;</button>
+            </div>
+            <div style="padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;margin:12px 14px;background:#f8fafc" id="liveClock"></div>
+            <nav class="nav" id="mainNav">${nav.map(([k, t]) => `<a href="#/${k}" class="${name === k ? 'on' : ''}">${t}</a>`).join('')}</nav>
+            <div class="me">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <div style="width:32px;height:32px;border-radius:50%;background:#4f46e5;color:#fff;display:grid;place-items:center;font-weight:700;font-size:0.85rem">${esc((me.name || 'U').slice(0, 1).toUpperCase())}</div>
+                <div style="line-height:1.2"><b>${esc(me.name)}</b><span class="role">${ROLES[me.role] || me.role}</span></div>
+              </div>
+              <div style="display:flex;gap:12px">
+                <button data-act="mypw">Change password</button>
+                <button data-act="logout">Sign out</button>
+              </div>
+            </div>
+          </div>
+        </aside>
+        <main class="main" id="main"></main>
+      </div>`;
       updateLiveClock();
       const v = { dash: viewDash, quotes: viewQuotes, quote: viewQuote, customers: viewCustomers, rates: viewRates, users: viewUsers, settings: viewSettings, companies: viewCompanies, audit: viewAudit }[r.name];
       if ((r.name === 'users' || r.name === 'settings') && !isAdmin() && !isMaster()) { go('#/dash'); return }
@@ -3668,20 +4030,57 @@
     }
 
     function updateLiveClock() {
-      const el = $('#liveClock'); if (!el) return;
+      const el = $('#liveClock');
+      const mobEl = $('#mobClock');
       const d = new Date();
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const h = d.getHours(), ampm = h >= 12 ? 'PM' : 'AM', h12 = h % 12 || 12;
-      el.innerHTML = `<div style="color:#64748b;font-weight:500;font-size:0.76rem">📅 ${days[d.getDay()]}, ${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}</div><div style="color:#4f46e5;font-weight:700;font-size:1rem;margin-top:2px;letter-spacing:.02em">⏰ ${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}</div>`;
+      const fullTime = `${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}`;
+      const shortTime = `${pad(h12)}:${pad(d.getMinutes())} ${ampm}`;
+      if (el) {
+        el.innerHTML = `<div style="color:#64748b;font-weight:500;font-size:0.76rem">📅 ${days[d.getDay()]}, ${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}</div><div style="color:#4f46e5;font-weight:700;font-size:1rem;margin-top:2px;letter-spacing:.02em">⏰ ${fullTime}</div>`;
+      }
+      if (mobEl) {
+        mobEl.textContent = `⏰ ${shortTime}`;
+      }
+    }
+
+    function toggleMobDrawer(open) {
+      const navEl = $('#sideNav');
+      const backdrop = $('#mobBackdrop');
+      if (!navEl || !backdrop) return;
+      const shouldOpen = open !== undefined ? open : !navEl.classList.contains('open');
+      if (shouldOpen) {
+        navEl.classList.add('open');
+        backdrop.classList.add('open');
+        document.body.classList.add('mob-lock-scroll');
+      } else {
+        navEl.classList.remove('open');
+        backdrop.classList.remove('open');
+        document.body.classList.remove('mob-lock-scroll');
+      }
     }
     if (!window.__clockTimer) window.__clockTimer = setInterval(updateLiveClock, 1000);
 
     document.addEventListener('click', e => {
+      if (e.target.closest('#mobMenuBtn')) {
+        e.preventDefault();
+        toggleMobDrawer(true);
+        return;
+      }
+      if (e.target.closest('#mobDrawerClose') || e.target.closest('#mobBackdrop')) {
+        e.preventDefault();
+        toggleMobDrawer(false);
+        return;
+      }
+      if (e.target.closest('#mainNav a') || e.target.closest('.me button')) {
+        toggleMobDrawer(false);
+      }
       const b = e.target.closest('button, .btn, .nav a');
       if (b && window.FM && window.FM.tapScale) {
         window.FM.tapScale(b);
       }
-    }, { passive: true });
+    }, { passive: false });
 
     /* ========== setup + login ========== */
     const authArt = `<svg viewBox="0 0 420 300" aria-hidden="true"><g fill="none" stroke="#7fb4b9" stroke-width="2"><rect x="30" y="30" width="360" height="240" rx="3"/><line x1="210" y1="30" x2="210" y2="270"/><line x1="30" y1="150" x2="390" y2="150"/><rect x="48" y="48" width="144" height="84" fill="#2a7880" fill-opacity=".25"/><rect x="228" y="48" width="144" height="84" fill="#2a7880" fill-opacity=".12"/><rect x="48" y="168" width="144" height="84" fill="#2a7880" fill-opacity=".12"/><rect x="228" y="168" width="144" height="84" fill="#a46a2a" fill-opacity=".3"/></g></svg>`;
@@ -7669,10 +8068,10 @@
       el.style.display = 'block';
       el.innerHTML = `<div class="card" style="padding:12px;background:var(--bg);margin-top:10px">
         <div style="font-weight:600;margin-bottom:6px">Section 9 Benchmark Results (Settings: Al ₹${cs.aluminium_rate_per_kg}/kg, Wastage ${cs.wastage_pct}%, Margin ${cs.margin_pct}%)</div>
-        <table class="tbl sm">
+        <div class="scx"><table class="tbl sm">
           <thead><tr><th>Test Case</th><th>Size</th><th>Expected Price</th><th>Calculated Price</th><th>Expected Rate</th><th>Calculated Rate</th><th>Status</th></tr></thead>
           <tbody>${rows}</tbody>
-        </table>
+        </table></div>
       </div>`;
     };
     ACT.setPresetTheme = b => {
