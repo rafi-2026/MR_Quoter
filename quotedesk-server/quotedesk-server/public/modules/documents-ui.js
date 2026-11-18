@@ -548,6 +548,9 @@
               ${d.sourceDocId ? `
                 <button class="btn" id="btnCheckDeliveries" style="justify-content:center;padding:10px">📦 Track Partial Deliveries</button>
               ` : ''}
+              <button class="btn" id="btnMeasurementSheet" style="justify-content:center;padding:10px;background:#f0fdf4;color:#166534;border-color:#bbf7d0">📐 Measurement Sheet (M-Sheet)</button>
+              <button class="btn" id="btnVariationStatement" style="justify-content:center;padding:10px;background:#fefce8;color:#854d0e;border-color:#fef08a">📊 Variation Statement</button>
+              <button class="btn" id="btnRaBillCalc" style="justify-content:center;padding:10px;background:#faf5ff;color:#6b21a8;border-color:#e9d5ff">📑 RA Bill / Progress Summary</button>
               ${!d.superseded ? `
                 <button class="btn" id="btnDocRevise" style="justify-content:center;padding:10px;color:#0284c7">🔄 Create Revision (R+1)</button>
               ` : ''}
@@ -613,6 +616,15 @@
 
     const btnDeliv = $('#btnCheckDeliveries');
     if (btnDeliv) btnDeliv.onclick = () => openPendingDeliveriesModal(d);
+
+    const btnM = $('#btnMeasurementSheet');
+    if (btnM) btnM.onclick = () => openMeasurementSheetModal(d);
+
+    const btnV = $('#btnVariationStatement');
+    if (btnV) btnV.onclick = () => openVariationStatementModal(d);
+
+    const btnRA = $('#btnRaBillCalc');
+    if (btnRA) btnRA.onclick = () => openRaBillModal(d);
   }
 
   function renderDetailActs(d, isLocked) {
@@ -1225,6 +1237,466 @@
           </div>
         </div>
       `;
+    } catch (e) {
+      $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  /**
+   * Modal: Site Measurement Sheet (M-Sheet)
+   */
+  async function openMeasurementSheetModal(d) {
+    modal({
+      title: '📐 Site Measurement Sheet (M-Sheet)',
+      wide: true,
+      body: `<div class="mute" style="padding:20px;text-align:center">Loading site measurement data...</div>`
+    });
+
+    try {
+      const sheet = await apiGet(`/api/documents/${d.id}/measurement`);
+      sheet.rows = sheet.rows || [];
+
+      function renderSheetModal() {
+        const bodyEl = $('.modal-body');
+        if (!bodyEl) return;
+
+        bodyEl.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+            <div class="card" style="background:#f8fafc;padding:12px">
+              <div class="grid g4" style="gap:10px;font-size:0.85rem">
+                <div><b>Sheet Ref:</b> ${esc(sheet.sheetNo || 'M-' + d.no)}</div>
+                <div><b>Date:</b> ${esc(sheet.date || d.date)}</div>
+                <div><b>Status:</b> <span class="bd" style="background:#e0f2fe;color:#0369a1">${esc(sheet.status || 'Verified')}</span></div>
+                <div><b>Document:</b> ${esc(d.no)}</div>
+              </div>
+              <div class="grid g3" style="gap:10px;margin-top:10px">
+                <label class="f">
+                  <span class="sm">Prepared By (Site Engineer)</span>
+                  <input type="text" id="ms_prepBy" value="${esc(sheet.preparedBy || 'Site Engineer')}">
+                </label>
+                <label class="f">
+                  <span class="sm">Checked By (Project Manager)</span>
+                  <input type="text" id="ms_chkBy" value="${esc(sheet.checkedBy || 'Project Manager')}">
+                </label>
+                <label class="f">
+                  <span class="sm">Client Representative</span>
+                  <input type="text" id="ms_clientRep" value="${esc(sheet.clientRep || 'Client Rep Sign')}">
+                </label>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <h4 style="margin:0">Detailed Measurement Entries (L &times; B &times; H)</h4>
+              <button class="btn sm pri" id="btnAddMsRow">+ Add Measurement Row</button>
+            </div>
+
+            <div class="scx" style="max-height:280px">
+              <table class="tbl sm">
+                <thead>
+                  <tr>
+                    <th>Item Description</th>
+                    <th>Location / Ref</th>
+                    <th class="r">Nos</th>
+                    <th class="r">L</th>
+                    <th class="r">B</th>
+                    <th class="r">H</th>
+                    <th class="r">Ded.</th>
+                    <th class="r">Qty</th>
+                    <th>UOM</th>
+                    <th>Remarks</th>
+                    <th class="r"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${sheet.rows.map((r, i) => {
+                    const nos = Number(r.nos) || 1;
+                    const l = Number(r.length) || 0;
+                    const b = Number(r.breadth) || (r.height ? 1 : 0);
+                    const h = Number(r.height) || 1;
+                    const ded = Number(r.deduction) || 0;
+                    let raw = (l > 0 && b > 0) ? (nos * l * b * (r.height ? h : 1)) : (l > 0 ? nos * l : nos);
+                    const qty = Math.max(0, raw - ded);
+
+                    return `
+                      <tr data-msidx="${i}">
+                        <td><input type="text" class="ms_desc" value="${esc(r.itemDesc || '')}" style="width:130px;font-size:0.8rem"></td>
+                        <td><input type="text" class="ms_loc" value="${esc(r.location || '')}" style="width:110px;font-size:0.8rem"></td>
+                        <td><input type="number" class="ms_nos r" value="${nos}" style="width:50px;font-size:0.8rem"></td>
+                        <td><input type="number" step="0.01" class="ms_l r" value="${l}" style="width:60px;font-size:0.8rem"></td>
+                        <td><input type="number" step="0.01" class="ms_b r" value="${b}" style="width:60px;font-size:0.8rem"></td>
+                        <td><input type="number" step="0.01" class="ms_h r" value="${h}" style="width:60px;font-size:0.8rem"></td>
+                        <td><input type="number" step="0.01" class="ms_ded r" value="${ded}" style="width:60px;font-size:0.8rem;color:#dc2626"></td>
+                        <td class="r" style="font-weight:700">${qty.toFixed(2)}</td>
+                        <td><input type="text" class="ms_uom" value="${esc(r.uom || 'sqft')}" style="width:55px;font-size:0.8rem"></td>
+                        <td><input type="text" class="ms_rem" value="${esc(r.remarks || '')}" style="width:100px;font-size:0.8rem"></td>
+                        <td class="r"><button class="btn sm del btnDelMsRow" data-delidx="${i}">✕</button></td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:8px">
+              <button class="btn" id="btnDownloadMsPdf" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd">
+                📄 Download Official Measurement Annexure PDF
+              </button>
+              <div style="display:flex;gap:8px">
+                <button class="btn ghost" onclick="closeModal()">Close</button>
+                <button class="btn pri" id="btnSaveMsSheet">💾 Save Measurement Sheet</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        $('#btnAddMsRow').onclick = () => {
+          syncSheetRowsFromDom();
+          sheet.rows.push({
+            itemDesc: d.lines && d.lines[0] ? d.lines[0].name : 'Site Work',
+            location: 'Site Location',
+            nos: 1,
+            length: 10,
+            breadth: 10,
+            height: 1,
+            deduction: 0,
+            uom: 'sqft',
+            remarks: ''
+          });
+          renderSheetModal();
+        };
+
+        $$('.btnDelMsRow', bodyEl).forEach(b => {
+          b.onclick = () => {
+            syncSheetRowsFromDom();
+            const idx = parseInt(b.dataset.delidx, 10);
+            sheet.rows.splice(idx, 1);
+            renderSheetModal();
+          };
+        });
+
+        $('#btnDownloadMsPdf').onclick = () => {
+          window.open(`/api/documents/${d.id}/measurement/pdf`, '_blank');
+        };
+
+        $('#btnSaveMsSheet').onclick = async () => {
+          syncSheetRowsFromDom();
+          try {
+            await apiPost(`/api/documents/${d.id}/measurement`, sheet);
+            toast('✅ Site Measurement Sheet saved successfully!');
+            closeModal();
+          } catch (e) {
+            toast(e.message, 'bad');
+          }
+        };
+      }
+
+      function syncSheetRowsFromDom() {
+        const bodyEl = $('.modal-body');
+        if (!bodyEl) return;
+        sheet.preparedBy = $('#ms_prepBy') ? $('#ms_prepBy').value.trim() : sheet.preparedBy;
+        sheet.checkedBy = $('#ms_chkBy') ? $('#ms_chkBy').value.trim() : sheet.checkedBy;
+        sheet.clientRep = $('#ms_clientRep') ? $('#ms_clientRep').value.trim() : sheet.clientRep;
+
+        const trs = $$('tr[data-msidx]', bodyEl);
+        sheet.rows = trs.map(tr => ({
+          itemDesc: $('.ms_desc', tr).value.trim(),
+          location: $('.ms_loc', tr).value.trim(),
+          nos: parseFloat($('.ms_nos', tr).value) || 1,
+          length: parseFloat($('.ms_l', tr).value) || 0,
+          breadth: parseFloat($('.ms_b', tr).value) || 0,
+          height: parseFloat($('.ms_h', tr).value) || 0,
+          deduction: parseFloat($('.ms_ded', tr).value) || 0,
+          uom: $('.ms_uom', tr).value.trim(),
+          remarks: $('.ms_rem', tr).value.trim()
+        }));
+      }
+
+      renderSheetModal();
+    } catch (e) {
+      $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  /**
+   * Modal: Variation Statement (Quoted vs Approved PO vs Actual Measured)
+   */
+  async function openVariationStatementModal(d) {
+    modal({
+      title: '📊 Variation Statement & Control Audit',
+      wide: true,
+      body: `<div class="mute" style="padding:20px;text-align:center">Calculating variance across quoted lines and measurements...</div>`
+    });
+
+    try {
+      const statement = await apiGet(`/api/documents/${d.id}/variation`);
+      const bodyEl = $('.modal-body');
+      if (!bodyEl) return;
+
+      const hasExcess = statement.some(s => s.needsVariationOrder);
+
+      bodyEl.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+          ${hasExcess ? `
+            <div class="card" style="background:#fffbeb;border:1px solid #fef08a;padding:12px">
+              <b style="color:#b45309">⚠️ Statutory Contractor Hard Control Alert:</b>
+              <div class="sm" style="color:#92400e;margin-top:4px">
+                Actual measured quantities exceed the approved PO quantities for one or more items.
+                In accordance with contractor governance, excess billing is blocked until an official <b>Variation Order</b> is approved or a <b>Quotation Revision (R+1)</b> is issued.
+              </div>
+            </div>
+          ` : `
+            <div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0;padding:12px">
+              <b style="color:#15803d">✅ All Quantities Within Approved Scope:</b>
+              <div class="sm" style="color:#166534;margin-top:4px">
+                Actual measured quantities are within or below approved Purchase Order limits. No variation order required.
+              </div>
+            </div>
+          `}
+
+          <div class="scx" style="max-height:360px">
+            <table class="tbl sm">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Item Description</th>
+                  <th>UOM</th>
+                  <th class="r">Rate (₹)</th>
+                  <th class="r">Quoted Qty</th>
+                  <th class="r">Approved PO Qty</th>
+                  <th class="r">Actual Measured</th>
+                  <th class="r">Variance Qty</th>
+                  <th class="r">Variance %</th>
+                  <th class="r">Variance Value</th>
+                  <th>Audit Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${statement.map((s, idx) => `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td><b>${esc(s.description)}</b></td>
+                    <td>${esc(s.uom)}</td>
+                    <td class="r">${rs(s.rate, 0)}</td>
+                    <td class="r">${s.quotedQty}</td>
+                    <td class="r">${s.poQty}</td>
+                    <td class="r" style="font-weight:700">${s.actualMeasuredQty}</td>
+                    <td class="r" style="font-weight:700;color:${s.varianceQty > 0 ? '#dc2626' : (s.varianceQty < 0 ? '#b45309' : '#15803d')}">
+                      ${s.varianceQty > 0 ? '+' + s.varianceQty : s.varianceQty}
+                    </td>
+                    <td class="r" style="color:${s.variancePct > 0 ? '#dc2626' : '#64748b'}">
+                      ${s.variancePct > 0 ? '+' + s.variancePct + '%' : s.variancePct + '%'}
+                    </td>
+                    <td class="r" style="font-weight:700;color:${s.varianceAmount > 0 ? '#dc2626' : '#64748b'}">
+                      ${s.varianceAmount > 0 ? '+' + rs(s.varianceAmount, 0) : rs(s.varianceAmount, 0)}
+                    </td>
+                    <td>
+                      ${s.needsVariationOrder
+                        ? '<span class="bd" style="background:#fee2e2;color:#b91c1c;font-weight:700;font-size:0.75rem">⚠️ Excess (VO Req)</span>'
+                        : (s.isShort
+                          ? '<span class="bd" style="background:#fef3c7;color:#b45309;font-size:0.75rem">Short of Scope</span>'
+                          : '<span class="bd" style="background:#dcfce7;color:#15803d;font-size:0.75rem">✓ Within Scope</span>')}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <div class="mute sm">💡 Tip: Create a revision (R+1) from this document to adjust rates or approved quantities.</div>
+            <button class="btn sm pri" onclick="closeModal()">Close</button>
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  /**
+   * Modal: Contractor Running Account (RA) Bill / Progress Billing
+   */
+  async function openRaBillModal(d) {
+    modal({
+      title: '📑 Contractor Running Account (RA) Bill Breakdown',
+      wide: true,
+      body: `<div class="mute" style="padding:20px;text-align:center">Preparing progress billing calculations...</div>`
+    });
+
+    try {
+      let lines = (d.lines || []).map(l => ({
+        id: l.id,
+        name: l.name || l.desc,
+        unit: l.unit || 'sqft',
+        rate: Number(l.rate) || 0,
+        prevQty: 0,
+        currentQty: Number(l.qty) || 1
+      }));
+
+      let advPct = 10;
+      let retPct = 5;
+      let tdsSec = '194C_CO';
+      let cessPct = 1;
+      let otherDeds = 0;
+
+      async function recalcAndRender() {
+        const bodyEl = $('.modal-body');
+        if (!bodyEl) return;
+
+        const summary = await apiPost(`/api/documents/${d.id}/rabill/calculate`, {
+          lines,
+          advanceRecoveryPct: advPct,
+          retentionPct: retPct,
+          tdsSection: tdsSec,
+          labourCessPct: cessPct,
+          otherDeductions: otherDeds
+        });
+
+        const g = summary.gross;
+        const ded = summary.deductions;
+        const tx = summary.taxes;
+
+        bodyEl.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+            <!-- Progress Billing 3-Column Table -->
+            <h4 style="margin:0">Work Done Breakdown (3-Column Progress Format)</h4>
+            <div class="scx" style="max-height:220px">
+              <table class="tbl sm">
+                <thead>
+                  <tr>
+                    <th>Item Description</th>
+                    <th>UOM</th>
+                    <th class="r">Rate (₹)</th>
+                    <th class="r">Prev Qty</th>
+                    <th class="r">Prev Val (₹)</th>
+                    <th class="r">This Bill Qty</th>
+                    <th class="r">This Bill Val (₹)</th>
+                    <th class="r">Cum. Qty</th>
+                    <th class="r">Cum. Val (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${summary.lines.map((l, i) => `
+                    <tr data-raidx="${i}">
+                      <td><b>${esc(l.description)}</b></td>
+                      <td>${esc(l.uom)}</td>
+                      <td class="r">${rs(l.rate, 0)}</td>
+                      <td class="r"><input type="number" step="0.1" class="ra_prev r" value="${l.previous.qty}" style="width:60px;font-size:0.8rem"></td>
+                      <td class="r">${rs(l.previous.amount, 0)}</td>
+                      <td class="r"><input type="number" step="0.1" class="ra_curr r" value="${l.thisBill.qty}" style="width:60px;font-size:0.8rem"></td>
+                      <td class="r" style="font-weight:700">${rs(l.thisBill.amount, 0)}</td>
+                      <td class="r">${l.cumulative.qty}</td>
+                      <td class="r">${rs(l.cumulative.amount, 0)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Deductions and Controls -->
+            <div class="grid g2" style="gap:14px;margin-top:6px">
+              <div class="card" style="background:#f8fafc;padding:12px">
+                <h4 style="margin:0 0 10px">Contractor Deductions Settings</h4>
+                <div class="grid g2" style="gap:10px">
+                  <label class="f">
+                    <span class="sm">Advance Recovery (%)</span>
+                    <input type="number" id="ra_advPct" value="${advPct}" min="0" max="100" step="1">
+                  </label>
+                  <label class="f">
+                    <span class="sm">Retention Money / SD (%)</span>
+                    <input type="number" id="ra_retPct" value="${retPct}" min="0" max="100" step="1">
+                  </label>
+                  <label class="f">
+                    <span class="sm">TDS Section</span>
+                    <select id="ra_tdsSec">
+                      <option value="194C_CO" ${tdsSec === '194C_CO' ? 'selected' : ''}>194C Company (2%)</option>
+                      <option value="194C_IND" ${tdsSec === '194C_IND' ? 'selected' : ''}>194C Ind/HUF (1%)</option>
+                      <option value="194J" ${tdsSec === '194J' ? 'selected' : ''}>194J Professional (10%)</option>
+                      <option value="none" ${tdsSec === 'none' ? 'selected' : ''}>None (0%)</option>
+                    </select>
+                  </label>
+                  <label class="f">
+                    <span class="sm">Labour Welfare Cess (%)</span>
+                    <input type="number" id="ra_cessPct" value="${cessPct}" min="0" max="5" step="0.5">
+                  </label>
+                  <label class="f" style="grid-column:span 2">
+                    <span class="sm">Other Deductions / Penalties (₹)</span>
+                    <input type="number" id="ra_otherDeds" value="${otherDeds}" min="0">
+                  </label>
+                </div>
+              </div>
+
+              <!-- Net Payable Card -->
+              <div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                  <h4 style="margin:0 0 8px;color:#166534">Bill Summary &amp; Net Payable</h4>
+                  <div style="font-size:0.85rem;line-height:1.7">
+                    <div style="display:flex;justify-content:space-between">
+                      <span>Gross Work Done This Bill:</span>
+                      <b>${rs(g.thisBillAmount, 0)}</b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;color:#b45309">
+                      <span>Less: Advance Recovery (${ded.advanceRecoveryPct}%):</span>
+                      <span>-${rs(ded.advanceAdjustment, 0)}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;color:#b45309">
+                      <span>Less: Retention (${ded.retentionPct}%):</span>
+                      <span>-${rs(ded.retentionAmount, 0)}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;color:#b45309">
+                      <span>Less: TDS u/s ${ded.tdsSection} (${ded.tdsPct}%):</span>
+                      <span>-${rs(ded.tdsAmount, 0)}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;color:#b45309">
+                      <span>Less: Labour Cess (${ded.labourCessPct}%):</span>
+                      <span>-${rs(ded.labourCess, 0)}</span>
+                    </div>
+                    ${ded.otherDeductions ? `
+                      <div style="display:flex;justify-content:space-between;color:#b45309">
+                        <span>Less: Other Deductions:</span>
+                        <span>-${rs(ded.otherDeductions, 0)}</span>
+                      </div>
+                    ` : ''}
+                    <div style="display:flex;justify-content:space-between;color:#1e3a8a">
+                      <span>Add: GST (${tx.gstRate}%):</span>
+                      <span>+${rs(tx.totalTax, 0)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style="margin-top:14px;padding-top:10px;border-top:2px solid #bbf7d0;display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-weight:700;font-size:1.05rem;color:#166534">NET PAYABLE:</span>
+                  <span style="font-weight:900;font-size:1.35rem;color:#166534">${rs(summary.netPayable, 0)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+              <button class="btn sm pri" onclick="closeModal()">Close</button>
+            </div>
+          </div>
+        `;
+
+        // Wire inputs
+        $('#ra_advPct').onchange = () => { advPct = parseFloat($('#ra_advPct').value) || 0; recalcAndRender(); };
+        $('#ra_retPct').onchange = () => { retPct = parseFloat($('#ra_retPct').value) || 0; recalcAndRender(); };
+        $('#ra_tdsSec').onchange = () => { tdsSec = $('#ra_tdsSec').value; recalcAndRender(); };
+        $('#ra_cessPct').onchange = () => { cessPct = parseFloat($('#ra_cessPct').value) || 0; recalcAndRender(); };
+        $('#ra_otherDeds').onchange = () => { otherDeds = parseFloat($('#ra_otherDeds').value) || 0; recalcAndRender(); };
+
+        $$('tr[data-raidx]', bodyEl).forEach(tr => {
+          const idx = parseInt(tr.dataset.raidx, 10);
+          $('.ra_prev', tr).onchange = () => {
+            lines[idx].prevQty = parseFloat($('.ra_prev', tr).value) || 0;
+            recalcAndRender();
+          };
+          $('.ra_curr', tr).onchange = () => {
+            lines[idx].currentQty = parseFloat($('.ra_curr', tr).value) || 0;
+            recalcAndRender();
+          };
+        });
+      }
+
+      await recalcAndRender();
     } catch (e) {
       $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }

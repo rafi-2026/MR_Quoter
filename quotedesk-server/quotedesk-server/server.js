@@ -3047,6 +3047,134 @@ app.get('/api/documents/:id/pending-deliveries', auth, async (req, res) => {
   }
 });
 
+// ── Phase 3: Site Measurement Sheet & RA Bill Endpoints ──────────────────
+const measurementModule = require('./measurement.js');
+const rabillModule = require('./rabill.js');
+
+// 14. Get / Generate Measurement Sheet
+app.get('/api/documents/:id/measurement', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const mSheet = doc.metadata && doc.metadata.measurementSheet ? doc.metadata.measurementSheet : {
+      sheetNo: `M-${doc.no}`,
+      date: doc.date || new Date().toISOString().slice(0, 10),
+      status: 'draft',
+      rows: (doc.lines || []).map(l => ({
+        itemId: l.id,
+        itemDesc: l.name || l.desc,
+        location: 'Ground Floor',
+        nos: 1,
+        length: l.w ? Number(l.w) : 10,
+        breadth: l.h ? Number(l.h) : 5,
+        height: 1,
+        deduction: 0,
+        uom: l.unit || 'sqft',
+        remarks: ''
+      }))
+    };
+    res.json(mSheet);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 15. Save Measurement Sheet
+app.post('/api/documents/:id/measurement', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const ctx = getDocUserCtx(req);
+
+    const sheetData = req.body || {};
+    doc.metadata = doc.metadata || {};
+    doc.metadata.measurementSheet = sheetData;
+
+    doc.log = doc.log || [];
+    doc.log.push({
+      t: Date.now(),
+      u: ctx.name,
+      x: `Updated Site Measurement Sheet (${(sheetData.rows || []).length} entries)`,
+      reason: sheetData.status || 'Verified'
+    });
+
+    const { saveDoc } = require('./documents.js');
+    await saveDoc(doc);
+    res.json({ ok: true, measurementSheet: doc.metadata.measurementSheet });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 16. Download Measurement Sheet PDF Annexure
+app.get('/api/documents/:id/measurement/pdf', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).send('Document not found');
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    const settings = (data.companySettings && data.companySettings[doc.companyId]) || data.settings || {};
+
+    const mSheet = (doc.metadata && doc.metadata.measurementSheet) || {
+      sheetNo: `M-${doc.no}`,
+      date: doc.date,
+      status: 'Verified',
+      rows: (doc.lines || []).map(l => ({
+        itemDesc: l.name,
+        nos: l.qty || 1,
+        length: 10,
+        breadth: 5,
+        uom: l.unit || 'sqft'
+      }))
+    };
+
+    const pdfBuffer = await measurementModule.generateMeasurementSheetPdf(mSheet, doc, settings);
+    const safeFilename = `Measurement_Annexure_${(doc.no || 'doc').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('[Measurement PDF Error]:', err);
+    res.status(500).send('Error generating Measurement Sheet PDF: ' + err.message);
+  }
+});
+
+// 17. Generate Line-by-Line Variation Statement
+app.get('/api/documents/:id/variation', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const mSheet = (doc.metadata && doc.metadata.measurementSheet) || { rows: [] };
+    const measuredAbstract = measurementModule.compileMeasurementAbstract(mSheet.rows || []);
+    const statement = measurementModule.generateVariationStatement(doc.lines || [], measuredAbstract);
+    res.json(statement);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 18. Calculate RA Bill Progress Values
+app.post('/api/documents/:id/rabill/calculate', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const summary = rabillModule.calculateRaBillSummary({
+      lines: req.body.lines || doc.lines || [],
+      advanceRecoveryPct: req.body.advanceRecoveryPct,
+      retentionPct: req.body.retentionPct,
+      tdsSection: req.body.tdsSection,
+      labourCessPct: req.body.labourCessPct,
+      otherDeductions: req.body.otherDeductions,
+      gstRate: doc.gstRate || 18,
+      isInterState: doc.isInterState || false
+    });
+    res.json(summary);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Serve app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

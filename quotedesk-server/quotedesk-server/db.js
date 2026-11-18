@@ -35,6 +35,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 let _client = null;
 let _db = null;
 let _connected = false;
+let _connectFailed = false;
 
 // Fallback in-memory collection map for offline/sandbox testing
 const _localCollections = new Map();
@@ -144,13 +145,13 @@ class LocalCollection {
  */
 async function connectAccounting() {
   if (_connected && _db) return _db;
-  if (!MONGODB_URI) {
+  if (!MONGODB_URI || _connectFailed) {
     return null;
   }
   try {
     if (!_client) {
       _client = new MongoClient(MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000,
+        serverSelectionTimeoutMS: process.env.NODE_ENV === 'test' ? 1000 : 3000,
         socketTimeoutMS: 15000,
       });
     }
@@ -160,6 +161,7 @@ async function connectAccounting() {
     console.log('[db.js] Accounting collections connected to MongoDB Atlas.');
     return _db;
   } catch (err) {
+    _connectFailed = true;
     return null;
   }
 }
