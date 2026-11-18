@@ -3354,6 +3354,64 @@ app.get('/api/reports/gst', auth, async (req, res) => {
   }
 });
 
+// ─── Phase 5: Bank Statement Upload & Suspense Engine ───────────────────
+const bankModule = require('./bank.js');
+
+// 30. Upload & Auto-Process Bank Statement
+app.post('/api/bank/upload', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    const { rawCsv, bankAccountId = 'led_bank_default' } = req.body || {};
+    const result = await bankModule.processBankStatement({
+      companyId: ctx.companyId,
+      bankAccountId,
+      rawCsv,
+      customers: data.customers || [],
+      vendors: data.vendors || [],
+      user: ctx
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 31. Get Suspense Items & Notification Metrics
+app.get('/api/bank/suspense', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const summary = await bankModule.getSuspenseSummary(ctx.companyId);
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 32. Resolve Suspense Transaction
+app.post('/api/bank/suspense/:id/resolve', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await bankModule.resolveSuspenseTransaction(req.params.id, req.body || {}, ctx);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 33. Get Learned Rules
+app.get('/api/bank/rules', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const { getCollection } = require('./db.js');
+    const col = await getCollection('bank_rules');
+    const rules = await col.find({ companyId: ctx.companyId });
+    res.json(rules);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Serve app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

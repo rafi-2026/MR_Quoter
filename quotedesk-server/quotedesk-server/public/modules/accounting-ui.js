@@ -52,6 +52,10 @@
       <div style="display:flex;gap:6px;margin:12px 0 16px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;overflow-x:auto">
         <button class="btn sm ${activeTab === 'vouchers' ? 'pri' : 'ghost'}" data-acctab="vouchers">📋 Vouchers</button>
         <button class="btn sm ${activeTab === 'ledgers' ? 'pri' : 'ghost'}" data-acctab="ledgers">📒 Ledgers</button>
+        <button class="btn sm ${activeTab === 'bank' ? 'pri' : 'ghost'}" data-acctab="bank">🏦 Bank Statements</button>
+        <button class="btn sm ${activeTab === 'suspense' ? 'pri' : 'ghost'}" data-acctab="suspense" id="tabBtnSuspense">
+          🔔 Suspense <span id="suspenseBadge" class="bd" style="background:#fee2e2;color:#b91c1c;font-size:0.75rem;display:none;margin-left:4px">0</span>
+        </button>
         <button class="btn sm ${activeTab === 'daybook' ? 'pri' : 'ghost'}" data-acctab="daybook">📅 Day Book</button>
         <button class="btn sm ${activeTab === 'trialbalance' ? 'pri' : 'ghost'}" data-acctab="trialbalance">⚖️ Trial Balance</button>
         <button class="btn sm ${activeTab === 'pnl' ? 'pri' : 'ghost'}" data-acctab="pnl">📈 Profit &amp; Loss</button>
@@ -79,8 +83,14 @@
 
     try {
       cachedAccounts = await apiGet('/api/accounts');
+      const suspSummary = await apiGet('/api/bank/suspense');
+      const badge = $('#suspenseBadge');
+      if (badge && suspSummary.count > 0) {
+        badge.innerText = suspSummary.count;
+        badge.style.display = 'inline';
+      }
     } catch (e) {
-      console.warn('Failed to fetch accounts:', e);
+      console.warn('Failed to fetch accounts/suspense:', e);
     }
 
     renderActiveTab();
@@ -92,6 +102,8 @@
 
     if (activeTab === 'vouchers') renderVouchersTab(area);
     else if (activeTab === 'ledgers') renderLedgersTab(area);
+    else if (activeTab === 'bank') renderBankTab(area);
+    else if (activeTab === 'suspense') renderSuspenseTab(area);
     else if (activeTab === 'daybook') renderDayBookTab(area);
     else if (activeTab === 'trialbalance') renderTrialBalanceTab(area);
     else if (activeTab === 'pnl') renderPnlTab(area);
@@ -220,6 +232,239 @@
 
     $$('.btnOpenStmt', area).forEach(b => {
       b.onclick = () => openLedgerStatementModal(b.dataset.lid);
+    });
+  }
+
+  // 2B. Bank Statements Tab
+  async function renderBankTab(area) {
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card" style="padding:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <h4 style="margin:0 0 4px">🏦 Bank Statement Import &amp; Auto-Reconciliation</h4>
+            <div class="mute sm">Upload statements in CSV, TSV or Excel format for automated party matching and double-entry posting.</div>
+          </div>
+          <button class="btn pri sm" id="btnUploadBankCsv">📥 Upload Statement (CSV / TSV)</button>
+        </div>
+
+        <div class="card" style="background:#f8fafc;padding:16px">
+          <h4 style="margin:0 0 8px">⚡ Intelligent Auto-Entry &amp; Duplicate Protection Rules</h4>
+          <ul class="mute sm" style="margin:0;padding-left:18px;line-height:1.6">
+            <li><b>Automatic Party Identification:</b> Client credits are automatically matched to Customers (Receipt Voucher), and supplier debits are matched to Vendors (Payment Voucher).</li>
+            <li><b>100% SHA-256 Duplicate Protection:</b> Statements can be uploaded repeatedly with zero fear of double entries. Previously uploaded rows are skipped automatically.</li>
+            <li><b>Audit-Grade Suspense Routing:</b> Any unmatched, ambiguous, or unallocated deposit/withdrawal is safely routed to the Suspense Account with a mandatory reason.</li>
+          </ul>
+        </div>
+      </div>
+    `;
+
+    $('#btnUploadBankCsv').onclick = openUploadBankModal;
+  }
+
+  function openUploadBankModal() {
+    modal({
+      title: '📥 Upload Bank Statement (CSV / TSV)',
+      wide: true,
+      body: `
+        <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+          <div class="grid g2" style="gap:10px">
+            <label class="f">
+              <span class="sm">Target Bank Account Ledger</span>
+              <select id="bu_bankAccount">
+                <option value="led_bank_default">Primary Bank Account (Current A/c)</option>
+                <option value="led_cash">Cash in Hand</option>
+              </select>
+            </label>
+            <label class="f">
+              <span class="sm">Choose CSV File</span>
+              <input type="file" id="bu_file" accept=".csv,.txt,.tsv" style="padding:4px">
+            </label>
+          </div>
+
+          <label class="f">
+            <span class="sm">Or Paste Statement Text (CSV / Tabular Copy from Netbanking)</span>
+            <textarea id="bu_rawText" rows="6" placeholder="Date,Narration,Chq/Ref,Withdrawal,Deposit,Balance..." style="font-family:monospace;font-size:0.8rem"></textarea>
+          </label>
+
+          <div id="bu_previewArea"></div>
+        </div>
+      `,
+      okText: '⚡ Process & Auto-Post',
+      onOk: async () => {
+        const rawCsv = $('#bu_rawText').value.trim();
+        const bankAccountId = $('#bu_bankAccount').value;
+
+        if (!rawCsv) {
+          toast('Please choose a CSV file or paste statement text.', 'bad');
+          return false;
+        }
+
+        try {
+          const res = await apiPost('/api/bank/upload', { rawCsv, bankAccountId });
+          toast(`✅ Processed: ${res.postedCount} posted, ${res.duplicateCount} duplicates skipped, ${res.suspenseCount} in Suspense.`);
+          closeModal();
+          viewAccounting();
+        } catch (e) {
+          toast(e.message, 'bad');
+          return false;
+        }
+      }
+    });
+
+    const fileInp = $('#bu_file');
+    if (fileInp) {
+      fileInp.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          $('#bu_rawText').value = evt.target.result;
+        };
+        reader.readAsText(file);
+      };
+    }
+  }
+
+  // 2C. Suspense Items Clearance Tab
+  async function renderSuspenseTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading unallocated suspense items...</div>`;
+
+    try {
+      const summary = await apiGet('/api/bank/suspense');
+      const items = summary.items || [];
+
+      if (!items.length) {
+        area.innerHTML = `
+          <div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0;padding:24px;text-align:center">
+            <h3 style="color:#15803d;margin:0 0 6px">✅ All Suspense Items Cleared!</h3>
+            <p class="mute sm" style="margin:0">Zero unallocated bank transactions. Your bank ledger is 100% reconciled with party accounts.</p>
+          </div>
+        `;
+        return;
+      }
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card" style="background:#fffbeb;border:1px solid #fef08a;padding:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <b style="color:#b45309">⚠️ Action Required: ${summary.count} Transactions in Suspense Account</b>
+              <div class="sm" style="color:#92400e;margin-top:2px">
+                Total Unresolved Value: <b>${rs(summary.totalAmount)}</b>. Each transaction must be assigned to its respective customer, vendor, or expense ledger before period closing.
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="scx">
+              <table class="tbl sm">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th class="r">Amount (₹)</th>
+                    <th>Narration / UTR</th>
+                    <th>Audit Reason</th>
+                    <th class="r">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${items.map(item => `
+                    <tr>
+                      <td>${fmtDate(item.date)}</td>
+                      <td>
+                        ${item.type === 'credit'
+                          ? '<span class="bd" style="background:#dcfce7;color:#15803d;font-weight:700">Receipt (Cr)</span>'
+                          : '<span class="bd" style="background:#fee2e2;color:#b91c1c;font-weight:700">Payment (Dr)</span>'}
+                      </td>
+                      <td class="r" style="font-weight:700">${rs(item.amount)}</td>
+                      <td>
+                        <b>${esc(item.narration)}</b>
+                        ${item.ref ? `<div class="mute sm">Ref: ${esc(item.ref)}</div>` : ''}
+                      </td>
+                      <td class="sm" style="color:#b45309">${esc(item.suspenseReason)}</td>
+                      <td class="r">
+                        <button class="btn sm pri btnResolveSusp" data-txnid="${item.id}">⚡ Resolve</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      $$('.btnResolveSusp', area).forEach(b => {
+        b.onclick = () => {
+          const item = items.find(x => x.id === b.dataset.txnid);
+          if (item) openResolveSuspenseModal(item);
+        };
+      });
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  function openResolveSuspenseModal(item) {
+    const ledgers = cachedAccounts.ledgers || [];
+
+    // Extract keyword candidate from narration
+    const cleanWords = item.narration.replace(/[^a-zA-Z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !['NEFT', 'RTGS', 'UPI', 'IMPS', 'PAYMENT', 'BANK', 'TRANSFER', 'FROM'].includes(w.toUpperCase()));
+    const suggestedKeyword = cleanWords[0] || '';
+
+    modal({
+      title: `⚡ Resolve Suspense Item — ${rs(item.amount)}`,
+      body: `
+        <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+          <div class="card" style="background:#f8fafc;padding:12px;font-size:0.85rem">
+            <div><b>Txn Date:</b> ${fmtDate(item.date)} | <b>Type:</b> ${item.type.toUpperCase()} | <b>Amount:</b> ${rs(item.amount)}</div>
+            <div style="margin-top:6px"><b>Narration:</b> ${esc(item.narration)}</div>
+          </div>
+
+          <label class="f">
+            <span>Reclassify to Target Ledger Account <b style="color:#dc2626">*</b></span>
+            <select id="rs_ledger">
+              ${ledgers.map(l => `<option value="${l.id}" data-grp="${esc(l.groupName)}" data-pname="${esc(l.name)}" data-pid="${esc(l.partyId || '')}">${esc(l.name)} (${esc(l.groupName)})</option>`).join('')}
+            </select>
+          </label>
+
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;cursor:pointer">
+            <input type="checkbox" id="rs_remember" checked style="margin-top:3px">
+            <div>
+              <b style="color:#166534">Remember this rule for future statements</b>
+              <div class="mute sm">Automatically route future transactions containing this keyword to this ledger:</div>
+              <input type="text" id="rs_keyword" value="${esc(suggestedKeyword)}" style="margin-top:4px;font-size:0.85rem;text-transform:uppercase">
+            </div>
+          </label>
+        </div>
+      `,
+      okText: '💾 Reclassify & Clear Suspense',
+      onOk: async () => {
+        const selOpt = $('#rs_ledger option:checked');
+        const targetLedgerId = selOpt.value;
+        const targetLedgerName = selOpt.dataset.pname;
+        const targetPartyId = selOpt.dataset.pid || null;
+        const targetPartyName = selOpt.dataset.pname;
+        const rememberRule = $('#rs_remember').checked;
+        const keyword = $('#rs_keyword').value.trim();
+
+        try {
+          await apiPost(`/api/bank/suspense/${item.id}/resolve`, {
+            targetLedgerId,
+            targetLedgerName,
+            targetPartyId,
+            targetPartyName,
+            rememberRule,
+            keyword
+          });
+          toast('✅ Suspense item cleared and reclassified.');
+          closeModal();
+          viewAccounting();
+        } catch (e) {
+          toast(e.message, 'bad');
+          return false;
+        }
+      }
     });
   }
 
