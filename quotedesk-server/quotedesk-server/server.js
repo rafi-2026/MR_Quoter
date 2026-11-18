@@ -3412,6 +3412,99 @@ app.get('/api/bank/rules', auth, async (req, res) => {
   }
 });
 
+// ─── Phase 6: Projects, Petty Cash & Procurement Chain ─────────────────
+const projectsModule = require('./projects.js');
+const pettyCashModule = require('./pettycash.js');
+const procurementModule = require('./procurement.js');
+
+// 34. List Projects
+app.get('/api/projects', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const list = await projectsModule.getProjects(ctx.companyId);
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 35. Create Project
+app.post('/api/projects', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const project = await projectsModule.createProject(ctx.companyId, req.body || {}, ctx);
+    res.json(project);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 36. Project Financials & Budget Analytics
+app.get('/api/projects/:id/financials', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const fin = await projectsModule.getProjectFinancials(ctx.companyId, req.params.id);
+    res.json(fin);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 37. Get Petty Cash Balance
+app.get('/api/pettycash/balance', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const balance = await pettyCashModule.getPettyCashBalance(ctx.companyId, req.query.site || 'Main Site');
+    res.json({ balance });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 38. Record Petty Cash Top-up
+app.post('/api/pettycash/topup', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await pettyCashModule.recordPettyCashTopup(ctx.companyId, req.body || {}, ctx);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 39. Record Petty Cash Expense
+app.post('/api/pettycash/expense', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await pettyCashModule.recordPettyCashExpense(ctx.companyId, req.body || {}, ctx);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 40. Reconcile Physical Cash
+app.post('/api/pettycash/reconcile', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await pettyCashModule.reconcilePhysicalCash(ctx.companyId, req.body.site || 'Main Site', req.body.physicalCount, ctx);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 41. 3-Way Match Verification (Vendor Invoice vs PO vs GRN)
+app.post('/api/procurement/3way-match', auth, async (req, res) => {
+  try {
+    const { poLines, grnLines, invoiceLines, options } = req.body || {};
+    const audit = procurementModule.performThreeWayMatch(poLines || [], grnLines || [], invoiceLines || [], options || {});
+    res.json(audit);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Serve app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

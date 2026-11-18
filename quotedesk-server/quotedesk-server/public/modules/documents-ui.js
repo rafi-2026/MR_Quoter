@@ -551,6 +551,7 @@
               <button class="btn" id="btnMeasurementSheet" style="justify-content:center;padding:10px;background:#f0fdf4;color:#166534;border-color:#bbf7d0">📐 Measurement Sheet (M-Sheet)</button>
               <button class="btn" id="btnVariationStatement" style="justify-content:center;padding:10px;background:#fefce8;color:#854d0e;border-color:#fef08a">📊 Variation Statement</button>
               <button class="btn" id="btnRaBillCalc" style="justify-content:center;padding:10px;background:#faf5ff;color:#6b21a8;border-color:#e9d5ff">📑 RA Bill / Progress Summary</button>
+              <button class="btn" id="btnThreeWayMatch" style="justify-content:center;padding:10px;background:#fef2f2;color:#991b1b;border-color:#fecaca">🔍 3-Way Match Audit</button>
               ${!d.superseded ? `
                 <button class="btn" id="btnDocRevise" style="justify-content:center;padding:10px;color:#0284c7">🔄 Create Revision (R+1)</button>
               ` : ''}
@@ -625,6 +626,9 @@
 
     const btnRA = $('#btnRaBillCalc');
     if (btnRA) btnRA.onclick = () => openRaBillModal(d);
+
+    const btn3W = $('#btnThreeWayMatch');
+    if (btn3W) btn3W.onclick = () => openThreeWayMatchModal(d);
   }
 
   function renderDetailActs(d, isLocked) {
@@ -1697,6 +1701,78 @@
       }
 
       await recalcAndRender();
+    } catch (e) {
+      $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  /**
+   * Modal: 3-Way Match Verification (Vendor Invoice vs PO vs GRN)
+   */
+  async function openThreeWayMatchModal(d) {
+    modal({
+      title: '🔍 3-Way Match Audit (Vendor Invoice vs PO vs GRN)',
+      wide: true,
+      body: `<div class="mute" style="padding:20px;text-align:center">Auditing quantities and rates across PO, GRN and Invoice...</div>`
+    });
+
+    try {
+      const audit = await apiPost('/api/procurement/3way-match', {
+        poLines: d.lines || [],
+        grnLines: d.lines || [],
+        invoiceLines: d.lines || []
+      });
+
+      const bodyEl = $('.modal-body');
+      if (!bodyEl) return;
+
+      bodyEl.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+          <div class="card" style="background:${audit.passed ? '#f0fdf4' : '#fffbeb'};border:1px solid ${audit.passed ? '#bbf7d0' : '#fef08a'};padding:12px">
+            <b style="color:${audit.passed ? '#15803d' : '#b45309'}">
+              ${audit.passed ? '✅ 3-Way Match Passed' : '⚠️ 3-Way Match Audit Warning'}
+            </b>
+            <div class="sm" style="color:${audit.passed ? '#166534' : '#92400e'};margin-top:4px">
+              ${esc(audit.summary)}
+            </div>
+          </div>
+
+          <div class="scx" style="max-height:280px">
+            <table class="tbl sm">
+              <thead>
+                <tr>
+                  <th>Item Description</th>
+                  <th class="r">PO Rate (₹)</th>
+                  <th class="r">Billed Rate (₹)</th>
+                  <th class="r">GRN Received Qty</th>
+                  <th class="r">Billed Qty</th>
+                  <th>Audit Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(audit.lineAudits || []).map(l => `
+                  <tr>
+                    <td><b>${esc(l.item)}</b></td>
+                    <td class="r">${rs(l.poRate)}</td>
+                    <td class="r" style="font-weight:700;color:${l.rateMatched ? '#0f172a' : '#dc2626'}">${rs(l.invRate)}</td>
+                    <td class="r">${l.grnReceivedQty}</td>
+                    <td class="r" style="font-weight:700;color:${l.qtyMatched ? '#0f172a' : '#dc2626'}">${l.invBilledQty}</td>
+                    <td>
+                      ${l.status === 'PASSED'
+                        ? '<span class="bd" style="background:#dcfce7;color:#15803d;font-size:0.75rem">✓ PASSED</span>'
+                        : '<span class="bd" style="background:#fee2e2;color:#b91c1c;font-size:0.75rem">⚠️ ' + esc(l.status) + '</span>'}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="text-align:right;margin-top:10px">
+            <button class="btn sm pri" onclick="closeModal()">Close</button>
+          </div>
+        </div>
+      `;
     } catch (e) {
       $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }

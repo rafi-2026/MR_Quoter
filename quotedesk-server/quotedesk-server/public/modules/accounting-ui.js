@@ -52,6 +52,8 @@
       <div style="display:flex;gap:6px;margin:12px 0 16px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;overflow-x:auto">
         <button class="btn sm ${activeTab === 'vouchers' ? 'pri' : 'ghost'}" data-acctab="vouchers">📋 Vouchers</button>
         <button class="btn sm ${activeTab === 'ledgers' ? 'pri' : 'ghost'}" data-acctab="ledgers">📒 Ledgers</button>
+        <button class="btn sm ${activeTab === 'projects' ? 'pri' : 'ghost'}" data-acctab="projects">🏗️ Projects &amp; P&amp;L</button>
+        <button class="btn sm ${activeTab === 'pettycash' ? 'pri' : 'ghost'}" data-acctab="pettycash">💵 Petty Cash</button>
         <button class="btn sm ${activeTab === 'bank' ? 'pri' : 'ghost'}" data-acctab="bank">🏦 Bank Statements</button>
         <button class="btn sm ${activeTab === 'suspense' ? 'pri' : 'ghost'}" data-acctab="suspense" id="tabBtnSuspense">
           🔔 Suspense <span id="suspenseBadge" class="bd" style="background:#fee2e2;color:#b91c1c;font-size:0.75rem;display:none;margin-left:4px">0</span>
@@ -102,6 +104,8 @@
 
     if (activeTab === 'vouchers') renderVouchersTab(area);
     else if (activeTab === 'ledgers') renderLedgersTab(area);
+    else if (activeTab === 'projects') renderProjectsTab(area);
+    else if (activeTab === 'pettycash') renderPettyCashTab(area);
     else if (activeTab === 'bank') renderBankTab(area);
     else if (activeTab === 'suspense') renderSuspenseTab(area);
     else if (activeTab === 'daybook') renderDayBookTab(area);
@@ -233,6 +237,419 @@
     $$('.btnOpenStmt', area).forEach(b => {
       b.onclick = () => openLedgerStatementModal(b.dataset.lid);
     });
+  }
+
+  // 2A1. Projects & P&L Tab
+  async function renderProjectsTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading projects &amp; budget analytics...</div>`;
+
+    try {
+      const projects = await apiGet('/api/projects');
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" style="padding:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <h4 style="margin:0 0 4px">🏗️ Project-Wise Expense Tracker &amp; P&amp;L</h4>
+              <div class="mute sm">Track Quoted vs Billed vs Actual Material, Labour &amp; Petty Cash costs with real-time budget utilization alerts.</div>
+            </div>
+            <button class="btn pri sm" id="btnCreateProject">+ New Project</button>
+          </div>
+
+          <div class="card">
+            ${!projects.length ? `
+              <div class="mute" style="padding:24px;text-align:center">No active projects created yet. Click "+ New Project" to set up your first project.</div>
+            ` : `
+              <div class="scx">
+                <table class="tbl sm">
+                  <thead>
+                    <tr>
+                      <th>Project Code &amp; Name</th>
+                      <th>Client / Site</th>
+                      <th class="r">Budget (₹)</th>
+                      <th>Status</th>
+                      <th class="r">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${projects.map(p => `
+                      <tr>
+                        <td>
+                          <b>[${esc(p.code)}]</b> ${esc(p.name)}
+                          ${p.notes ? `<div class="mute sm">${esc(p.notes)}</div>` : ''}
+                        </td>
+                        <td>
+                          <b>${esc(p.customerName || '-')}</b>
+                          <div class="mute sm">${esc(p.site || '')}</div>
+                        </td>
+                        <td class="r" style="font-weight:700">${rs(p.budget)}</td>
+                        <td>
+                          <span class="bd" style="background:#e0f2fe;color:#0369a1;text-transform:uppercase">${esc(p.status)}</span>
+                        </td>
+                        <td class="r">
+                          <button class="btn sm ghost btnProjFin" data-pid="${p.id}">📊 P&amp;L Financials</button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+
+      $('#btnCreateProject').onclick = openCreateProjectModal;
+
+      $$('.btnProjFin', area).forEach(b => {
+        b.onclick = () => openProjectFinancialsModal(b.dataset.pid);
+      });
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  function openCreateProjectModal() {
+    modal({
+      title: '🏗️ Create New Project Master',
+      body: `
+        <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+          <label class="f">
+            <span>Project Name <b style="color:#dc2626">*</b></span>
+            <input type="text" id="np_name" placeholder="e.g. Prestige Tech Park Block B">
+          </label>
+          <div class="grid g2" style="gap:10px">
+            <label class="f">
+              <span>Project Code</span>
+              <input type="text" id="np_code" placeholder="e.g. PTPB" style="text-transform:uppercase">
+            </label>
+            <label class="f">
+              <span>Total Project Budget (₹)</span>
+              <input type="number" id="np_budget" value="500000" min="0">
+            </label>
+          </div>
+          <div class="grid g2" style="gap:10px">
+            <label class="f">
+              <span>Client Name</span>
+              <input type="text" id="np_cust" placeholder="Client / Owner">
+            </label>
+            <label class="f">
+              <span>Site Location</span>
+              <input type="text" id="np_site" placeholder="City / Address">
+            </label>
+          </div>
+          <label class="f">
+            <span>Notes / Scope Description</span>
+            <input type="text" id="np_notes" placeholder="Brief project scope">
+          </label>
+        </div>
+      `,
+      okText: 'Create Project',
+      onOk: async () => {
+        const name = $('#np_name').value.trim();
+        const code = $('#np_code').value.trim();
+        const budget = parseFloat($('#np_budget').value) || 0;
+        const customerName = $('#np_cust').value.trim();
+        const site = $('#np_site').value.trim();
+        const notes = $('#np_notes').value.trim();
+
+        if (!name) {
+          toast('Project name is required.', 'bad');
+          return false;
+        }
+
+        try {
+          await apiPost('/api/projects', { name, code, budget, customerName, site, notes });
+          toast('✅ Project master created successfully!');
+          closeModal();
+          renderActiveTab();
+        } catch (e) {
+          toast(e.message, 'bad');
+          return false;
+        }
+      }
+    });
+  }
+
+  async function openProjectFinancialsModal(projectId) {
+    modal({
+      title: '📊 Project Financials & P&L Statement',
+      wide: true,
+      body: `<div class="mute" style="padding:20px;text-align:center">Computing project costs, revenue, and margins...</div>`
+    });
+
+    try {
+      const data = await apiGet(`/api/projects/${projectId}/financials`);
+      const bodyEl = $('.modal-body');
+      if (!bodyEl) return;
+
+      const p = data.project;
+      const m = data.metrics;
+
+      const badgeColor = m.budgetStatus === 'exceeded'
+        ? 'background:#fee2e2;color:#b91c1c'
+        : (m.budgetStatus === 'warning' ? 'background:#fef3c7;color:#b45309' : 'background:#dcfce7;color:#15803d');
+
+      bodyEl.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px;margin:4px 0">
+          <div class="card" style="background:#f8fafc;padding:12px">
+            <div class="grid g4" style="font-size:0.85rem">
+              <div><b>Project:</b> [${esc(p.code)}] ${esc(p.name)}</div>
+              <div><b>Client:</b> ${esc(p.customerName || '-')}</div>
+              <div><b>Budget:</b> ${rs(m.budget)}</div>
+              <div><b>Budget Status:</b> <span class="bd" style="${badgeColor};font-weight:700">${m.budgetStatus.toUpperCase()} (${m.budgetUtilizationPct}%)</span></div>
+            </div>
+          </div>
+
+          <div class="grid g3" style="gap:12px">
+            <div class="card" style="padding:12px">
+              <span class="mute sm">Total Revenue Billed:</span>
+              <div style="font-size:1.3rem;font-weight:900;color:#15803d;margin-top:4px">${rs(m.billedValue)}</div>
+              <div class="mute sm">Quoted: ${rs(m.quotedValue)}</div>
+            </div>
+            <div class="card" style="padding:12px">
+              <span class="mute sm">Total Actual Expenses:</span>
+              <div style="font-size:1.3rem;font-weight:900;color:#dc2626;margin-top:4px">${rs(m.expenses.total)}</div>
+              <div class="mute sm">Budget: ${rs(m.budget)}</div>
+            </div>
+            <div class="card" style="padding:12px;background:#f0fdf4;border-color:#bbf7d0">
+              <span class="mute sm" style="color:#166534">Realized Net Profit &amp; Margin:</span>
+              <div style="font-size:1.3rem;font-weight:900;color:#166534;margin-top:4px">${rs(m.netProfit)}</div>
+              <div style="font-weight:700;color:#15803d">Margin: ${m.marginPct}%</div>
+            </div>
+          </div>
+
+          <!-- Expense Breakdown Table -->
+          <div class="card">
+            <h4 style="margin:0 0 8px">Cost Breakdown by Category</h4>
+            <table class="tbl sm">
+              <thead><tr><th>Cost Category</th><th class="r">Incurred Amount (₹)</th></tr></thead>
+              <tbody>
+                <tr><td>Raw Materials &amp; Purchases</td><td class="r">${rs(m.expenses.materials)}</td></tr>
+                <tr><td>Subcontractor &amp; Labour Wages</td><td class="r">${rs(m.expenses.labour)}</td></tr>
+                <tr><td>Site Petty Cash &amp; Other Expenses</td><td class="r">${rs(m.expenses.other)}</td></tr>
+              </tbody>
+              <tfoot>
+                <tr style="font-weight:900;background:#f8fafc">
+                  <td>TOTAL PROJECT COSTS:</td>
+                  <td class="r" style="color:#dc2626">${rs(m.expenses.total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div style="text-align:right">
+            <button class="btn sm pri" onclick="closeModal()">Close</button>
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 2A2. Petty Cash Tab
+  async function renderPettyCashTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading petty cash register...</div>`;
+
+    try {
+      const res = await apiGet('/api/pettycash/balance');
+      const balance = res.balance || 0;
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <!-- Balance & Action Header -->
+          <div class="card" style="padding:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;background:#f0fdf4;border:1px solid #bbf7d0">
+            <div>
+              <span class="mute sm" style="color:#166534">Current Site Imprest Cash in Hand:</span>
+              <div style="font-size:1.8rem;font-weight:900;color:#166534;margin-top:2px">${rs(balance)}</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn pri sm" id="btnRecordPettyExp">💸 Record Expense</button>
+              <button class="btn sm" id="btnTopupPetty" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd">💳 Replenish Imprest</button>
+              <button class="btn ghost sm" id="btnReconcilePetty">🔍 Reconcile Physical Cash</button>
+            </div>
+          </div>
+
+          <!-- Guidelines Card -->
+          <div class="card" style="background:#f8fafc;padding:16px">
+            <h4 style="margin:0 0 8px">💵 Imprest System &amp; Audit Rules</h4>
+            <ul class="mute sm" style="margin:0;padding-left:18px;line-height:1.6">
+              <li><b>Imprest Limit:</b> Expenses cannot exceed available cash in hand. Over-spending is strictly blocked.</li>
+              <li><b>Double-Entry Auto-Posting:</b> Each recorded expense automatically generates an official Payment Voucher in the general ledger.</li>
+              <li><b>Physical Count Verification:</b> Site supervisors can perform physical cash counts; any shortage or surplus is automatically audited.</li>
+            </ul>
+          </div>
+        </div>
+      `;
+
+      $('#btnRecordPettyExp').onclick = () => openRecordPettyExpenseModal(balance);
+      $('#btnTopupPetty').onclick = openTopupPettyModal;
+      $('#btnReconcilePetty').onclick = () => openReconcilePettyModal(balance);
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  function openRecordPettyExpenseModal(currentBal) {
+    modal({
+      title: '💸 Record Site Petty Cash Expense',
+      body: `
+        <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+          <div class="card" style="background:#f8fafc;padding:10px;font-size:0.85rem">
+            <b>Available Cash in Hand:</b> <span style="color:#15803d;font-weight:700">${rs(currentBal)}</span>
+          </div>
+          <div class="grid g2" style="gap:10px">
+            <label class="f">
+              <span>Expense Category <b style="color:#dc2626">*</b></span>
+              <select id="pe_head">
+                <option value="Site Tea & Refreshments">Site Tea &amp; Refreshments</option>
+                <option value="Local Travel & Auto Conveyance">Local Travel &amp; Conveyance</option>
+                <option value="Site Minor Hardware">Minor Hardware &amp; Screws</option>
+                <option value="Postage & Courier Charges">Postage &amp; Courier</option>
+                <option value="Material Unloading Charges">Unloading / Coolie</option>
+              </select>
+            </label>
+            <label class="f">
+              <span>Amount (₹) <b style="color:#dc2626">*</b></span>
+              <input type="number" id="pe_amt" placeholder="e.g. 350" min="1" max="${currentBal}">
+            </label>
+          </div>
+          <div class="grid g2" style="gap:10px">
+            <label class="f">
+              <span>Paid To (Person / Shop)</span>
+              <input type="text" id="pe_paidTo" placeholder="Vendor / Shop name">
+            </label>
+            <label class="f">
+              <span>Bill / Cash Memo No</span>
+              <input type="text" id="pe_billNo" placeholder="Receipt / Memo ref">
+            </label>
+          </div>
+          <label class="f">
+            <span>Remarks / Purpose</span>
+            <input type="text" id="pe_notes" placeholder="Purpose of this site expense">
+          </label>
+        </div>
+      `,
+      okText: 'Record Expense',
+      onOk: async () => {
+        const expenseHeadName = $('#pe_head').value;
+        const amount = parseFloat($('#pe_amt').value) || 0;
+        const paidTo = $('#pe_paidTo').value.trim();
+        const billNo = $('#pe_billNo').value.trim();
+        const notes = $('#pe_notes').value.trim();
+
+        if (amount <= 0) {
+          toast('Amount must be greater than zero.', 'bad');
+          return false;
+        }
+        if (amount > currentBal) {
+          toast(`Amount exceeds available balance of ${rs(currentBal)}.`, 'bad');
+          return false;
+        }
+
+        try {
+          await apiPost('/api/pettycash/expense', { expenseHeadName, amount, paidTo, billNo, notes });
+          toast('✅ Petty cash expense recorded and voucher posted!');
+          closeModal();
+          renderActiveTab();
+        } catch (e) {
+          toast(e.message, 'bad');
+          return false;
+        }
+      }
+    });
+  }
+
+  function openTopupPettyModal() {
+    modal({
+      title: '💳 Replenish Petty Cash Imprest',
+      body: `
+        <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+          <label class="f">
+            <span>Transfer from Bank Account</span>
+            <select id="pt_bank">
+              <option value="led_bank_default">Primary Bank Account</option>
+            </select>
+          </label>
+          <label class="f">
+            <span>Top-up Amount (₹) <b style="color:#dc2626">*</b></span>
+            <input type="number" id="pt_amt" value="10000" min="1">
+          </label>
+          <label class="f">
+            <span>Cheque / ATM / Withdrawal Ref</span>
+            <input type="text" id="pt_notes" placeholder="e.g. Self Cheque No 123456 / ATM Cash Withdrawal">
+          </label>
+        </div>
+      `,
+      okText: 'Top-up Cash Float',
+      onOk: async () => {
+        const amount = parseFloat($('#pt_amt').value) || 0;
+        const fromLedgerId = $('#pt_bank').value;
+        const notes = $('#pt_notes').value.trim();
+
+        if (amount <= 0) {
+          toast('Amount must be greater than zero.', 'bad');
+          return false;
+        }
+
+        try {
+          await apiPost('/api/pettycash/topup', { amount, fromLedgerId, notes });
+          toast('✅ Imprest fund topped up successfully!');
+          closeModal();
+          renderActiveTab();
+        } catch (e) {
+          toast(e.message, 'bad');
+          return false;
+        }
+      }
+    });
+  }
+
+  function openReconcilePettyModal(bookBal) {
+    modal({
+      title: '🔍 Reconcile Physical Cash Count',
+      body: `
+        <div style="display:flex;flex-direction:column;gap:12px;margin:4px 0">
+          <div class="card" style="background:#f8fafc;padding:10px;font-size:0.85rem">
+            <b>Current Book Balance:</b> <span style="font-weight:700">${rs(bookBal)}</span>
+          </div>
+          <label class="f">
+            <span>Actual Physical Cash Counted in Safe (₹) <b style="color:#dc2626">*</b></span>
+            <input type="number" id="pr_count" value="${bookBal}" min="0" step="1">
+          </label>
+          <div id="pr_diffNote" style="font-size:0.85rem"></div>
+        </div>
+      `,
+      okText: 'Submit Audit Verification',
+      onOk: async () => {
+        const physicalCount = parseFloat($('#pr_count').value) || 0;
+        try {
+          const res = await apiPost('/api/pettycash/reconcile', { physicalCount });
+          if (res.status === 'tallied') toast('✅ Physical count strictly matches book balance!');
+          else if (res.status === 'shortage') toast(`⚠️ Cash shortage of ${rs(Math.abs(res.discrepancy))} recorded in audit log.`, 'bad');
+          else toast(`Cash surplus of ${rs(res.discrepancy)} recorded.`);
+          closeModal();
+          renderActiveTab();
+        } catch (e) {
+          toast(e.message, 'bad');
+          return false;
+        }
+      }
+    });
+
+    const inp = $('#pr_count');
+    if (inp) {
+      inp.oninput = () => {
+        const val = parseFloat(inp.value) || 0;
+        const diff = val - bookBal;
+        const el = $('#pr_diffNote');
+        if (diff === 0) el.innerHTML = `<span style="color:#15803d">✓ Perfect Match (₹0 difference)</span>`;
+        else if (diff < 0) el.innerHTML = `<span style="color:#dc2626">⚠️ Shortage of ₹${Math.abs(diff)}</span>`;
+        else el.innerHTML = `<span style="color:#0284c7">Surplus of ₹${diff}</span>`;
+      };
+      inp.oninput();
+    }
   }
 
   // 2B. Bank Statements Tab
