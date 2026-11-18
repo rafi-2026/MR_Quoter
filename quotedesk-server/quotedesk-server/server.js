@@ -3505,6 +3505,65 @@ app.post('/api/procurement/3way-match', auth, async (req, res) => {
   }
 });
 
+// ─── Phase 7: Exports (Tally Prime XML & Zoho Books) & Settings ──────────
+const exportsModule = require('./exports.js');
+
+// 42. Export Tally Prime XML
+app.get('/api/exports/tally/xml', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const xml = await exportsModule.generateTallyXml(ctx.companyId, req.query.from, req.query.to);
+    const filename = `Tally_Prime_Export_${new Date().toISOString().slice(0, 10)}.xml`;
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(xml);
+  } catch (err) {
+    res.status(500).send('Error generating Tally XML: ' + err.message);
+  }
+});
+
+// 43. Export Zoho Books CSV
+app.get('/api/exports/zoho/csv', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const type = req.query.type || 'invoices';
+    const csv = await exportsModule.generateZohoCsv(ctx.companyId, type);
+    const filename = `Zoho_Books_${type}_${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    res.status(500).send('Error generating Zoho CSV: ' + err.message);
+  }
+});
+
+// 44. Get Accounting Integration Setting
+app.get('/api/settings/accounting-integration', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    const settings = (data.companySettings && data.companySettings[ctx.companyId]) || data.settings || {};
+    res.json({ integrationMode: settings.accountingIntegrationMode || 'native' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 45. Save Accounting Integration Setting
+app.post('/api/settings/accounting-integration', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    data.companySettings = data.companySettings || {};
+    data.companySettings[ctx.companyId] = data.companySettings[ctx.companyId] || {};
+    data.companySettings[ctx.companyId].accountingIntegrationMode = req.body.integrationMode || 'native';
+    saveDb(data);
+    res.json({ ok: true, integrationMode: data.companySettings[ctx.companyId].accountingIntegrationMode });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Serve app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

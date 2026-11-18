@@ -63,6 +63,7 @@
         <button class="btn sm ${activeTab === 'pnl' ? 'pri' : 'ghost'}" data-acctab="pnl">📈 Profit &amp; Loss</button>
         <button class="btn sm ${activeTab === 'balancesheet' ? 'pri' : 'ghost'}" data-acctab="balancesheet">🏦 Balance Sheet</button>
         <button class="btn sm ${activeTab === 'gst' ? 'pri' : 'ghost'}" data-acctab="gst">📑 GST Working Sheet</button>
+        <button class="btn sm ${activeTab === 'exports' ? 'pri' : 'ghost'}" data-acctab="exports">🔄 Tally &amp; Zoho Exports</button>
       </div>
 
       <div id="accountingTabContent">
@@ -113,6 +114,7 @@
     else if (activeTab === 'pnl') renderPnlTab(area);
     else if (activeTab === 'balancesheet') renderBalanceSheetTab(area);
     else if (activeTab === 'gst') renderGstTab(area);
+    else if (activeTab === 'exports') renderExportsTab(area);
   }
 
   // 1. Vouchers Tab
@@ -1191,6 +1193,104 @@
           </div>
         </div>
       `;
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 8. Tally & Zoho Integration & Exports Tab
+  async function renderExportsTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading export settings...</div>`;
+
+    try {
+      const sett = await apiGet('/api/settings/accounting-integration');
+      const mode = sett.integrationMode || 'native';
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <!-- Integration Choice Settings -->
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 6px">⚙️ Accounting Integration Mode</h4>
+            <div class="mute sm" style="margin-bottom:12px">Choose whether to maintain accounts solely in MR_Quoter or enable automatic export packages for your CA / accountant:</div>
+
+            <div style="display:flex;flex-direction:column;gap:8px" id="exp_mode_group">
+              <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer">
+                <input type="radio" name="aimode" value="native" ${mode === 'native' ? 'checked' : ''}>
+                <div><b>Native in-app only (Default)</b> <span class="mute sm">— Use MR_Quoter's built-in double-entry accounting and reports.</span></div>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer">
+                <input type="radio" name="aimode" value="tally" ${mode === 'tally' ? 'checked' : ''}>
+                <div><b>Export to Tally Prime</b> <span class="mute sm">— Generate Tally-importable XML for masters and vouchers.</span></div>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer">
+                <input type="radio" name="aimode" value="zoho" ${mode === 'zoho' ? 'checked' : ''}>
+                <div><b>Export to Zoho Books</b> <span class="mute sm">— Generate Zoho Books standard CSV import files.</span></div>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer">
+                <input type="radio" name="aimode" value="both" ${mode === 'both' ? 'checked' : ''}>
+                <div><b>Both (Native + Tally + Zoho)</b> <span class="mute sm">— Full multi-platform flexibility.</span></div>
+              </label>
+            </div>
+            <div style="margin-top:12px;text-align:right">
+              <button class="btn pri sm" id="btnSaveAiMode">💾 Save Integration Preference</button>
+            </div>
+          </div>
+
+          <!-- Tally Prime XML Section -->
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 6px;color:#0284c7">📥 Tally Prime XML Import Export</h4>
+            <p class="mute sm">Generates an official XML envelope containing your chart of accounts, party GST particulars, and all balanced double-entry vouchers (Sales, Purchases, Receipts, Payments, Journals) ready for direct import into Tally Prime without manual re-entry.</p>
+            <div style="margin-top:10px">
+              <button class="btn sm pri" id="btnExportTallyXml" style="background:#0284c7;border-color:#0284c7">
+                📄 Download Official Tally Prime XML
+              </button>
+            </div>
+          </div>
+
+          <!-- Zoho Books CSV Section -->
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 6px;color:#15803d">📥 Zoho Books Standard CSV Exports</h4>
+            <p class="mute sm">Formatted specifically according to Zoho Books import templates for rapid bulk upload:</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+              <button class="btn sm" id="btnZohoInvoices" style="background:#f0fdf4;color:#15803d;border-color:#bbf7d0">
+                📊 Download Invoices CSV
+              </button>
+              <button class="btn sm" id="btnZohoCustomers" style="background:#f0fdf4;color:#15803d;border-color:#bbf7d0">
+                👥 Download Customers CSV
+              </button>
+              <button class="btn sm" id="btnZohoCoa" style="background:#f0fdf4;color:#15803d;border-color:#bbf7d0">
+                📒 Download Chart of Accounts CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      $('#btnSaveAiMode').onclick = async () => {
+        const val = $('input[name="aimode"]:checked').value;
+        try {
+          await apiPost('/api/settings/accounting-integration', { integrationMode: val });
+          toast('✅ Accounting integration preference saved.');
+        } catch (e) {
+          toast(e.message, 'bad');
+        }
+      };
+
+      $('#btnExportTallyXml').onclick = () => {
+        window.open('/api/exports/tally/xml', '_blank');
+      };
+
+      $('#btnZohoInvoices').onclick = () => {
+        window.open('/api/exports/zoho/csv?type=invoices', '_blank');
+      };
+
+      $('#btnZohoCustomers').onclick = () => {
+        window.open('/api/exports/zoho/csv?type=customers', '_blank');
+      };
+
+      $('#btnZohoCoa').onclick = () => {
+        window.open('/api/exports/zoho/csv?type=chart_of_accounts', '_blank');
+      };
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
