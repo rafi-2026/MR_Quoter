@@ -65,11 +65,14 @@ class LocalCollection {
     } catch (e) { }
   }
 
-  async find(query = {}) {
+  find(query = {}) {
     let items = this.data.filter(doc => {
       for (const [k, v] of Object.entries(query)) {
-        if (v && typeof v === 'object' && v.$ne !== undefined) {
-          if (doc[k] === v.$ne) return false;
+        if (v && typeof v === 'object') {
+          if (v.$ne !== undefined && doc[k] === v.$ne) return false;
+          if (v.$gte !== undefined && doc[k] < v.$gte) return false;
+          if (v.$lte !== undefined && doc[k] > v.$lte) return false;
+          if (v.$in !== undefined && !v.$in.includes(doc[k])) return false;
         } else if (doc[k] !== v) {
           return false;
         }
@@ -77,7 +80,7 @@ class LocalCollection {
       return true;
     });
 
-    return {
+    const cursor = {
       sort: (sortObj = {}) => {
         const [field, dir] = Object.entries(sortObj)[0] || ['_id', 1];
         items.sort((a, b) => {
@@ -85,12 +88,40 @@ class LocalCollection {
           if (a[field] > b[field]) return 1 * dir;
           return 0;
         });
-        return {
-          toArray: async () => items
-        };
+        return cursor;
       },
-      toArray: async () => items
+      toArray: async () => items,
+      then: (resolve, reject) => Promise.resolve(items).then(resolve, reject),
+      [Symbol.iterator]: () => items[Symbol.iterator]()
     };
+    return cursor;
+  }
+
+  async insertOne(doc) {
+    this.data.push(doc);
+    this.save();
+    return { acknowledged: true, insertedId: doc._id || doc.id };
+  }
+
+  async insertMany(docs) {
+    this.data.push(...docs);
+    this.save();
+    return { acknowledged: true, insertedCount: docs.length };
+  }
+
+  async deleteOne(query) {
+    const idx = this.data.findIndex(d => {
+      for (const [k, v] of Object.entries(query)) {
+        if (d[k] !== v) return false;
+      }
+      return true;
+    });
+    if (idx >= 0) {
+      this.data.splice(idx, 1);
+      this.save();
+      return { acknowledged: true, deletedCount: 1 };
+    }
+    return { acknowledged: true, deletedCount: 0 };
   }
 
   async findOne(query = {}) {

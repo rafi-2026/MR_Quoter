@@ -76,6 +76,8 @@
   <script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.js"></script>
   <!-- Universal Document Engine UI (Phase 1) -->
   <script src="/modules/documents-ui.js"></script>
+  <!-- Accounting Core UI (Phase 4) -->
+  <script src="/modules/accounting-ui.js"></script>
   <style>
     :root {
       --ink: #0f172a;
@@ -3970,7 +3972,8 @@
         ['quotes', '📋 Quotes'],
         ['customers', '👥 Customers'],
         ['rates', '⚡ Rate Library'],
-        ['documents', '📑 Billing & Docs']
+        ['documents', '📑 Billing & Docs'],
+        ['accounting', '📖 Accounting & Books']
       ];
       if (isAdmin() || isMaster()) { nav.push(['users', '👤 Users'], ['settings', '⚙️ Settings']); }
       if (isMaster()) { nav.push(['companies', '🏢 Companies'], ['audit', '🛡️ Security Logs']); }
@@ -4032,7 +4035,8 @@
         companies: viewCompanies,
         audit: viewAudit,
         documents: window.viewDocuments || viewDash,
-        document: window.viewDocument || viewDash
+        document: window.viewDocument || viewDash,
+        accounting: window.viewAccounting || viewDash
       }[r.name];
       if ((r.name === 'users' || r.name === 'settings') && !isAdmin() && !isMaster()) { go('#/dash'); return }
       if ((r.name === 'companies' || r.name === 'audit') && !isMaster()) { go('#/dash'); return }

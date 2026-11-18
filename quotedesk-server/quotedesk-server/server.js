@@ -2894,6 +2894,17 @@ app.post('/api/documents/:id/status', auth, async (req, res) => {
     const { status, reason } = req.body || {};
     const ctx = getDocUserCtx(req);
     const updated = await docEngine.setDocumentStatus(req.params.id, status, reason, ctx);
+
+    // Auto-post to accounting ledger when Tax Invoice or RA Bill is officially issued
+    if (status === 'issued' && (updated.docType === 'inv' || updated.docType === 'ra')) {
+      try {
+        const { postSalesInvoiceVoucher } = require('./vouchers.js');
+        await postSalesInvoiceVoucher(updated, ctx);
+      } catch (postErr) {
+        console.error('[Accounting Auto-Post Error]:', postErr.message);
+      }
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -3172,6 +3183,174 @@ app.post('/api/documents/:id/rabill/calculate', auth, async (req, res) => {
     res.json(summary);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── Phase 4: Accounting Core (Double-Entry & Financial Reports) ──────
+const accountsModule = require('./accounts.js');
+const vouchersModule = require('./vouchers.js');
+const reportsModule = require('./reports.js');
+
+// 19. Get Chart of Accounts & Ledgers
+app.get('/api/accounts', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    const ledgers = await accountsModule.getCompanyLedgers(ctx.companyId, data.customers || [], data.vendors || []);
+    res.json({
+      groups: accountsModule.STANDARD_GROUPS,
+      ledgers
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 20. Create Custom Ledger
+app.post('/api/accounts', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const ledger = await accountsModule.createLedger(ctx.companyId, req.body || {});
+    res.json(ledger);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 21. List Vouchers
+app.get('/api/vouchers', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const { getCollection } = require('./db.js');
+    const col = await getCollection('vouchers');
+    const query = { companyId: ctx.companyId };
+    if (req.query.type && req.query.type !== 'all') {
+      query.voucherType = req.query.type;
+    }
+    const vouchers = await col.find(query);
+    res.json(vouchers.sort((a, b) => b.createdAt - a.createdAt));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 22. Create Balanced Double-Entry Voucher
+app.post('/api/vouchers', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const voucherData = { ...req.body, companyId: ctx.companyId };
+    const voucher = await vouchersModule.createVoucher(voucherData, ctx);
+    res.json(voucher);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 23. Cancel Voucher
+app.post('/api/vouchers/:id/cancel', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const cancelled = await vouchersModule.cancelVoucher(req.params.id, req.body.reason, ctx);
+    res.json(cancelled);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 24. Report: Day Book
+app.get('/api/reports/daybook', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const daybook = await reportsModule.getDayBook(ctx.companyId, req.query.from, req.query.to);
+    res.json(daybook);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 25. Report: Ledger Statement
+app.get('/api/reports/ledger/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    const statement = await reportsModule.getLedgerStatement(
+      ctx.companyId,
+      req.params.id,
+      req.query.from,
+      req.query.to,
+      data.customers || [],
+      data.vendors || []
+    );
+    res.json(statement);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 26. Report: Trial Balance
+app.get('/api/reports/trialbalance', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    const tb = await reportsModule.getTrialBalance(
+      ctx.companyId,
+      req.query.asOfDate,
+      data.customers || [],
+      data.vendors || []
+    );
+    res.json(tb);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 27. Report: Profit & Loss Statement
+app.get('/api/reports/pnl', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    const pnl = await reportsModule.getProfitAndLoss(
+      ctx.companyId,
+      req.query.from,
+      req.query.to,
+      data.customers || [],
+      data.vendors || []
+    );
+    res.json(pnl);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 28. Report: Balance Sheet
+app.get('/api/reports/balancesheet', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = getDb();
+    const bs = await reportsModule.getBalanceSheet(
+      ctx.companyId,
+      req.query.asOfDate,
+      data.customers || [],
+      data.vendors || []
+    );
+    res.json(bs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 29. Report: GSTR-1 & GSTR-3B Summary
+app.get('/api/reports/gst', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const gst = await reportsModule.getGstSummary(
+      ctx.companyId,
+      req.query.from,
+      req.query.to
+    );
+    res.json(gst);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
