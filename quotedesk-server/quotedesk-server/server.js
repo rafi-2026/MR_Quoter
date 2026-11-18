@@ -2946,6 +2946,107 @@ app.post('/api/documents/convert-from-quote/:quoteId', auth, async (req, res) =>
   }
 });
 
+// ── Phase 2: Delivery Challan & E-Way Bill Endpoints ──────────────────────
+const challanModule = require('./challan.js');
+const ewaybillModule = require('./ewaybill.js');
+
+// 10. Delivery Challan PDF Download (With Value or Without Value)
+app.get('/api/documents/:id/challan/pdf', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).send('Document not found');
+    const ctx = getDocUserCtx(req);
+    if (!ctx.isMaster && doc.companyId !== ctx.companyId) {
+      return res.status(403).send('Unauthorized');
+    }
+
+    const mode = req.query.mode === 'without_value' ? 'without_value' : 'with_value';
+    const withValue = mode === 'with_value';
+    const data = getDb();
+    const settings = (data.companySettings && data.companySettings[doc.companyId]) || data.settings || {};
+
+    const pdfBuffer = await challanModule.generateDeliveryChallanPdf(doc, settings, withValue);
+    await challanModule.logChallanAccess(doc.id, mode, ctx);
+
+    const safeFilename = `Challan_${(doc.no || 'dc').replace(/[/\\?%*:|"<>]/g, '_')}_${mode}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('[Challan PDF Error]:', err);
+    res.status(500).send('Error generating Delivery Challan PDF: ' + err.message);
+  }
+});
+
+// 11. Generate Official E-Way Bill JSON (Phase A)
+app.post('/api/documents/:id/ewaybill/json', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const ctx = getDocUserCtx(req);
+    if (!ctx.isMaster && doc.companyId !== ctx.companyId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const data = getDb();
+    const settings = (data.companySettings && data.companySettings[doc.companyId]) || data.settings || {};
+    const transport = req.body || {};
+
+    const ewbResult = ewaybillModule.generateOfficialEwayBillJson(doc, transport, settings);
+    res.json(ewbResult);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 12. Save E-Way Bill Details after portal upload
+app.post('/api/documents/:id/ewaybill/record', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const ctx = getDocUserCtx(req);
+    if (!ctx.isMaster && doc.companyId !== ctx.companyId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { ewbNo, ewbDate, ewbValidUpto } = req.body || {};
+    if (!ewbNo) return res.status(400).json({ error: 'E-Way Bill Number is required' });
+
+    doc.metadata = doc.metadata || {};
+    doc.metadata.ewbNo = String(ewbNo).trim();
+    doc.metadata.ewbDate = ewbDate || new Date().toISOString().slice(0, 10);
+    doc.metadata.ewbValidUpto = ewbValidUpto || '';
+
+    doc.log = doc.log || [];
+    doc.log.push({
+      t: Date.now(),
+      u: ctx.name,
+      x: `Recorded E-Way Bill #${ewbNo}`,
+      reason: `Validity: ${ewbValidUpto || 'Standard'}`
+    });
+
+    const { saveDoc } = require('./documents.js');
+    await saveDoc(doc);
+    res.json({ ok: true, metadata: doc.metadata });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 13. Pending Delivery Quantities Tracker
+app.get('/api/documents/:id/pending-deliveries', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const ctx = getDocUserCtx(req);
+    const tracking = await challanModule.getPendingDeliveryQuantities(req.params.id, ctx.companyId);
+    res.json(tracking);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Serve app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

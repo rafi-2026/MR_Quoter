@@ -539,6 +539,15 @@
               ${!isLocked ? `
                 <button class="btn pri" id="btnSaveDocLines" style="justify-content:center;padding:10px">💾 Save Changes</button>
               ` : ''}
+              ${d.docType === 'dc' ? `
+                <button class="btn" id="btnChallanPdf" style="justify-content:center;padding:10px;background:#e0f2fe;color:#0369a1;border-color:#bae6fd">🚚 Print / Download Challan</button>
+              ` : ''}
+              ${(d.docType === 'dc' || d.docType === 'inv') ? `
+                <button class="btn" id="btnDocEwayBill" style="justify-content:center;padding:10px;background:#fef3c7;color:#b45309;border-color:#fde68a">⚡ Generate E-Way Bill</button>
+              ` : ''}
+              ${d.sourceDocId ? `
+                <button class="btn" id="btnCheckDeliveries" style="justify-content:center;padding:10px">📦 Track Partial Deliveries</button>
+              ` : ''}
               ${!d.superseded ? `
                 <button class="btn" id="btnDocRevise" style="justify-content:center;padding:10px;color:#0284c7">🔄 Create Revision (R+1)</button>
               ` : ''}
@@ -595,6 +604,15 @@
     $('#btnDocRevise').onclick = () => promptCreateRevision(d.id);
     $('#btnDocHistory').onclick = () => openRevisionHistoryModal(d.id);
     $('#btnDocCompare').onclick = () => openCompareModal(d.id);
+
+    const btnChallan = $('#btnChallanPdf');
+    if (btnChallan) btnChallan.onclick = () => openChallanPdfModal(d);
+
+    const btnEwb = $('#btnDocEwayBill');
+    if (btnEwb) btnEwb.onclick = () => openEwayBillModal(d);
+
+    const btnDeliv = $('#btnCheckDeliveries');
+    if (btnDeliv) btnDeliv.onclick = () => openPendingDeliveriesModal(d);
   }
 
   function renderDetailActs(d, isLocked) {
@@ -976,6 +994,239 @@
       await refreshDiff();
     } catch (e) {
       toast(e.message, 'bad');
+    }
+  }
+
+  /**
+   * Modal: Delivery Challan PDF Print (With Value vs Without Value)
+   */
+  function openChallanPdfModal(d) {
+    modal({
+      title: '🚚 Print / Download Delivery Challan',
+      body: `
+        <div style="margin:8px 0">
+          <p class="mute sm" style="margin-bottom:14px">
+            Per CGST Rule 55, MR_Quoter supports two distinct Delivery Challan print modes using the exact same document number:
+          </p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <label style="display:flex;align-items:flex-start;gap:12px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;background:#f8fafc">
+              <input type="radio" name="chl_mode" value="with_value" checked style="margin-top:4px">
+              <div>
+                <b style="color:#0f172a">1. Commercial Copy (WITH VALUE)</b>
+                <div class="mute sm">Includes item rates, taxable value, GST tax amount, and total consignment value. Required for road transport, check-posts, and E-Way Bill inspection.</div>
+              </div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:12px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;background:#f8fafc">
+              <input type="radio" name="chl_mode" value="without_value" style="margin-top:4px">
+              <div>
+                <b style="color:#0f172a">2. Gate Pass / Site Copy (WITHOUT VALUE)</b>
+                <div class="mute sm">Shows items, quantities, UOM, and HSN only. Rates, prices, taxes, and totals are completely hidden. Ideal for client security gate entry, site stores, and receiver acknowledgements.</div>
+              </div>
+            </label>
+          </div>
+          <div class="mute sm" style="margin-top:14px;background:#e0f2fe;padding:10px;border-radius:6px;color:#0369a1">
+            🛡️ <b>Audit Trail:</b> Each print or download is securely recorded in the document audit log with the user's name and selected mode.
+          </div>
+        </div>
+      `,
+      okText: '📄 Download Official PDF',
+      onOk: () => {
+        const mode = $('input[name="chl_mode"]:checked').value;
+        const url = `/api/documents/${d.id}/challan/pdf?mode=${mode}`;
+        window.open(url, '_blank');
+        toast(`✅ Delivery Challan (${mode === 'without_value' ? 'Without Value' : 'With Value'}) opened.`);
+      }
+    });
+  }
+
+  /**
+   * Modal: E-Way Bill Generator & JSON Bulk-Upload Export (Phase A)
+   */
+  function openEwayBillModal(d) {
+    const meta = d.metadata || {};
+    const t = d.totals || {};
+
+    modal({
+      title: '⚡ Generate E-Way Bill (NIC Compliant)',
+      wide: true,
+      body: `
+        <div style="margin:8px 0">
+          <div class="card" style="background:#f8fafc;padding:12px;margin-bottom:14px">
+            <div class="grid g2" style="font-size:0.88rem">
+              <div><b>Document No:</b> ${esc(d.no)} (Length: ${d.no.length} chars &le; 16)</div>
+              <div><b>Consignment Value:</b> ₹${Number(t.grandTotal || 0).toLocaleString('en-IN')} ${t.grandTotal >= 50000 ? '<span class="bd" style="background:#dcfce7;color:#15803d;font-size:0.75rem">&ge; ₹50,000</span>' : '<span class="bd" style="background:#fef3c7;color:#b45309;font-size:0.75rem">&lt; ₹50,000</span>'}</div>
+              <div><b>From (Supplier):</b> ${esc(db.settings.company || 'Consignor')} [${esc(db.settings.gstin || 'No GSTIN')}]</div>
+              <div><b>To (Recipient):</b> ${esc(d.cust && d.cust.name || 'Consignee')} [${esc(d.cust && d.cust.gstin || 'URP')}]</div>
+            </div>
+          </div>
+
+          <h4 style="margin:0 0 10px">Part-A &amp; Part-B Transportation Details</h4>
+          <div class="grid g2" style="gap:10px">
+            <label class="f">
+              <span>Vehicle Number (Part-B)</span>
+              <input type="text" id="ewb_vehNo" value="${esc(meta.vehicleNo || '')}" placeholder="e.g. TN01AB1234" style="text-transform:uppercase">
+            </label>
+            <label class="f">
+              <span>Transporter ID (GSTIN / TRANSIN)</span>
+              <input type="text" id="ewb_transId" value="${esc(meta.transporterId || '')}" placeholder="15-character Transporter GSTIN">
+            </label>
+            <label class="f">
+              <span>Transporter Name</span>
+              <input type="text" id="ewb_transName" value="${esc(meta.transporterName || '')}" placeholder="Transporter company name">
+            </label>
+            <label class="f">
+              <span>LR / Bilty / RR No</span>
+              <input type="text" id="ewb_lrNo" value="${esc(meta.lrNo || '')}" placeholder="Lorry receipt number">
+            </label>
+            <label class="f">
+              <span>Destination PIN Code</span>
+              <input type="text" id="ewb_toPin" value="${esc((d.cust && d.cust.pincode) || '')}" placeholder="6-digit PIN">
+            </label>
+            <label class="f">
+              <span>Approximate Distance (KM)</span>
+              <input type="number" id="ewb_dist" value="50" min="1" max="4000">
+            </label>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn pri" id="btnExportEwbJson" style="background:#15803d;border-color:#15803d;padding:10px">
+              📥 Export Official NIC Bulk-Upload JSON
+            </button>
+          </div>
+
+          <hr style="margin:16px 0;border:0;border-top:1px solid #e2e8f0">
+
+          <h4 style="margin:0 0 8px">Record Generated E-Way Bill (From Portal)</h4>
+          <div class="mute sm" style="margin-bottom:10px">After uploading the JSON to ewaybillgst.gov.in, enter the assigned 12-digit E-Way Bill Number below to record it permanently on this document:</div>
+          <div class="grid g3" style="gap:10px">
+            <label class="f">
+              <span>E-Way Bill Number (12 digits)</span>
+              <input type="text" id="rec_ewbNo" value="${esc(meta.ewbNo || '')}" placeholder="e.g. 121000000001" maxlength="12">
+            </label>
+            <label class="f">
+              <span>EWB Date</span>
+              <input type="date" id="rec_ewbDate" value="${meta.ewbDate || today()}">
+            </label>
+            <label class="f">
+              <span>Valid Until Date</span>
+              <input type="date" id="rec_ewbValid" value="${meta.ewbValidUpto || ''}">
+            </label>
+          </div>
+          <div style="margin-top:10px">
+            <button class="btn" id="btnRecordEwbData" style="color:#0284c7">💾 Record EWB on Document</button>
+          </div>
+        </div>
+      `,
+      noFooter: true
+    });
+
+    $('#btnExportEwbJson').onclick = async () => {
+      const transport = {
+        vehicleNo: $('#ewb_vehNo').value.trim(),
+        transporterId: $('#ewb_transId').value.trim(),
+        transporterName: $('#ewb_transName').value.trim(),
+        lrNo: $('#ewb_lrNo').value.trim(),
+        toPincode: $('#ewb_toPin').value.trim(),
+        distanceKm: Number($('#ewb_dist').value) || 50
+      };
+
+      try {
+        const res = await apiPost(`/api/documents/${d.id}/ewaybill/json`, transport);
+        if (res.validation && res.validation.errors && res.validation.errors.length) {
+          toast('EWB Validation warning: ' + res.validation.errors[0], 'bad');
+        }
+
+        const jsonStr = JSON.stringify(res.payload, null, 2);
+        download(`EwayBill_${(d.no || 'doc').replace(/[/\\?%*:|"<>]/g, '_')}.json`, jsonStr, 'application/json');
+        toast('✅ Official E-Way Bill JSON downloaded! Ready for upload at ewaybillgst.gov.in');
+      } catch (err) {
+        toast('Failed to generate EWB JSON: ' + err.message, 'bad');
+      }
+    };
+
+    $('#btnRecordEwbData').onclick = async () => {
+      const ewbNo = $('#rec_ewbNo').value.trim();
+      const ewbDate = $('#rec_ewbDate').value;
+      const ewbValidUpto = $('#rec_ewbValid').value;
+      if (!ewbNo) {
+        toast('Please enter the E-Way Bill Number.', 'bad');
+        return;
+      }
+      try {
+        await apiPost(`/api/documents/${d.id}/ewaybill/record`, { ewbNo, ewbDate, ewbValidUpto });
+        toast(`✅ E-Way Bill #${ewbNo} recorded on document!`);
+        closeModal();
+        viewDocument(d.id);
+      } catch (err) {
+        toast('Failed to record EWB: ' + err.message, 'bad');
+      }
+    };
+  }
+
+  /**
+   * Modal: Track Partial Delivery Quantities
+   */
+  async function openPendingDeliveriesModal(d) {
+    if (!d.sourceDocId) {
+      toast('This document has no linked source order.', 'bad');
+      return;
+    }
+
+    modal({
+      title: '📦 Partial Deliveries Tracker',
+      body: `<div style="padding:20px;text-align:center" class="mute">⏳ Loading delivery ledger...</div>`,
+      noFooter: true
+    });
+
+    try {
+      const tracking = await apiGet(`/api/documents/${d.sourceDocId}/pending-deliveries`);
+      if (!tracking.length) {
+        $('.modal-body').innerHTML = '<div class="empty">No lines found on source document.</div>';
+        return;
+      }
+
+      $('.modal-body').innerHTML = `
+        <div style="margin:8px 0">
+          <p class="mute sm" style="margin-bottom:12px">
+            Tracking ordered quantities on Source <b>${esc(d.sourceDocNo || 'Order')}</b> vs cumulative dispatched quantities across all Delivery Challans:
+          </p>
+          <table class="tbl sm">
+            <thead>
+              <tr>
+                <th>Item Name</th>
+                <th>HSN</th>
+                <th>UOM</th>
+                <th class="r">Ordered</th>
+                <th class="r">Delivered</th>
+                <th class="r">Pending</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tracking.map(t => `
+                <tr>
+                  <td><b>${esc(t.name)}</b></td>
+                  <td>${esc(t.hsn)}</td>
+                  <td>${esc(t.unit)}</td>
+                  <td class="r">${t.orderedQty}</td>
+                  <td class="r">${t.deliveredQty}</td>
+                  <td class="r" style="font-weight:700;color:${t.pendingQty > 0 ? '#b45309' : '#15803d'}">${t.pendingQty}</td>
+                  <td>
+                    ${t.isFullyDelivered
+                      ? '<span class="bd" style="background:#dcfce7;color:#15803d;font-size:0.75rem">Fully Delivered</span>'
+                      : '<span class="bd" style="background:#fef3c7;color:#b45309;font-size:0.75rem">Partial / Pending</span>'}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div style="margin-top:14px;text-align:right">
+            <button class="btn sm pri" onclick="closeModal()">Close</button>
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
   }
 
