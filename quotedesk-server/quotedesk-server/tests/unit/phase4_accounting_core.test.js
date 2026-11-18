@@ -274,3 +274,4 @@ describe('Phase 4: Financial Reports (Day Book, Trial Balance, P&L, Balance Shee
     expect(stmt.closingBalanceType).toBe('Dr');
   });
 });
+

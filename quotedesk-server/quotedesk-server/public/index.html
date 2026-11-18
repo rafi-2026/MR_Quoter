@@ -4707,6 +4707,43 @@
       </table>
     </div>
   </div>` : ''}
+
+  <!-- Contractor Billing & Accounting Snapshot (NEW ADD-ON) -->
+  <div class="card" style="margin-bottom:18px;padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <h3 style="margin:0;font-size:1.05rem;color:#0f172a">📖 Contractor Billing &amp; Accounting Snapshot</h3>
+        <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.72rem;font-weight:700">NEW ADD-ON</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn sm ghost" id="btnDashReleaseNotes" style="font-size:0.8rem">✨ Release Notes</button>
+        <a href="#/accounting" class="btn sm pri" style="font-size:0.8rem">Open Full Books &rarr;</a>
+      </div>
+    </div>
+    <div class="grid g4" id="dashAccountingKpis" style="gap:10px">
+      <div class="card" style="padding:12px;background:#ffffff">
+        <small class="mute" style="font-size:0.75rem;text-transform:uppercase;font-weight:600">Receivables Due</small>
+        <b style="display:block;font-size:1.2rem;color:#1e3a8a;margin-top:2px" id="kpi_dash_recv">₹0</b>
+        <span class="mute sm" style="font-size:0.75rem">Sundry Debtors</span>
+      </div>
+      <div class="card" style="padding:12px;background:#ffffff">
+        <small class="mute" style="font-size:0.75rem;text-transform:uppercase;font-weight:600">Payables Due</small>
+        <b style="display:block;font-size:1.2rem;color:#dc2626;margin-top:2px" id="kpi_dash_pay">₹0</b>
+        <span class="mute sm" style="font-size:0.75rem">Sundry Creditors</span>
+      </div>
+      <div class="card" style="padding:12px;background:#ffffff">
+        <small class="mute" style="font-size:0.75rem;text-transform:uppercase;font-weight:600">Cash &amp; Bank Float</small>
+        <b style="display:block;font-size:1.2rem;color:#15803d;margin-top:2px" id="kpi_dash_cash">₹0</b>
+        <span class="mute sm" style="font-size:0.75rem">Cash in Hand + Bank</span>
+      </div>
+      <div class="card" style="padding:12px;background:#ffffff">
+        <small class="mute" style="font-size:0.75rem;text-transform:uppercase;font-weight:600">Unallocated Suspense</small>
+        <b style="display:block;font-size:1.2rem;color:#b45309;margin-top:2px" id="kpi_dash_susp">0 items</b>
+        <span class="mute sm" style="font-size:0.75rem">Requires Allocation</span>
+      </div>
+    </div>
+  </div>
+
   <div class="two"><div>
     ${isMgr() && pend.length ? `<div class="card"><h3>Waiting for your approval</h3><div class="scx"><table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer</th><th class="r">Total</th><th>Status</th><th class="r">Actions</th></tr></thead><tbody>${pend.map(quoteRow).join('')}</tbody></table></div></div>` : ''}
     <div class="card"><div class="card-h"><h3>Recent quotes</h3><a href="#/quotes">View all</a></div>
@@ -4766,6 +4803,169 @@
         const el = $('#followupCard');
         if (el) el.innerHTML = `<h3>Follow up</h3>${stale.length ? `<div class="mute sm" style="margin-bottom:8px">Sent more than 7 days ago with no answer.</div>${stale.map(q => `<div style="padding:6px 0;border-bottom:1px solid var(--line2)"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a> ${esc(q.cust.name)}<div class="mute sm">Sent ${fmtDate(new Date(q.sentAt).toISOString().slice(0, 10))}, ${rs(quoteTotal(q), 0)}</div></div>`).join('')}` : '<div class="mute">Nothing to chase right now.</div>'}`;
       }
+
+      loadDashboardAccountingKpis();
+    }
+
+    function loadDashboardAccountingKpis() {
+      const btnRn = $('#btnDashReleaseNotes');
+      if (btnRn) btnRn.onclick = openReleaseNotesModal;
+
+      // Fetch Trial Balance for Debtors, Creditors, Cash
+      apiGet('/api/reports/trialbalance').then(tb => {
+        let debtors = 0, creditors = 0, cashBank = 0;
+        (tb.rows || []).forEach(r => {
+          if (r.groupId === 'grp_debtors' || r.ledgerId.startsWith('led_cust')) debtors += (r.debit - r.credit);
+          else if (r.groupId === 'grp_creditors' || r.ledgerId.startsWith('led_vend')) creditors += (r.credit - r.debit);
+          else if (r.groupId === 'grp_bank' || r.groupId === 'grp_cash' || r.ledgerId === 'led_cash' || r.ledgerId === 'led_bank_default') cashBank += (r.debit - r.credit);
+        });
+        const elRecv = $('#kpi_dash_recv');
+        if (elRecv) elRecv.innerText = rs(Math.max(0, debtors), 0);
+        const elPay = $('#kpi_dash_pay');
+        if (elPay) elPay.innerText = rs(Math.max(0, creditors), 0);
+        const elCash = $('#kpi_dash_cash');
+        if (elCash) elCash.innerText = rs(Math.max(0, cashBank), 0);
+      }).catch(() => {});
+
+      // Fetch Suspense count
+      apiGet('/api/bank/suspense').then(susp => {
+        const elSusp = $('#kpi_dash_susp');
+        if (elSusp) {
+          elSusp.innerText = susp.count > 0 ? `${susp.count} (₹${Number(susp.totalAmount).toLocaleString('en-IN')})` : '0 (₹0)';
+          if (susp.count > 0) elSusp.style.color = '#dc2626';
+        }
+      }).catch(() => {});
+    }
+
+    function openReleaseNotesModal() {
+      modal({
+        title: '✨ MR_Quoter Contractor Billing &amp; Accounting Suite — Release Notes',
+        wide: true,
+        body: `
+          <div style="margin:4px 0;max-height:460px;overflow-y:auto;padding-right:6px">
+            <p class="mute sm" style="margin-bottom:14px">
+              MR_Quoter has been upgraded to a contractor-ready billing and double-entry accounting suite. All new capabilities are strictly additive, multi-tenant, and fully compliant with Indian GST and statutory standards.
+            </p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>1. GST Validation &amp; Place of Supply</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Validates 15-character GSTIN checksums, state codes, place of supply rules (CGST+SGST for intra-state vs IGST for inter-state), and HSN/SAC codes.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>2. Credit Note &amp; Debit Note Adjustment Engine</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Full support for Credit Notes (CRN) and Debit Notes (DBN) with mandatory revision reasons and statutory lock on issued invoices.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>3. Universal Document Approval Workflow</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Multi-stage document governance (Draft &rarr; Submit for Approval &rarr; Approved &rarr; Issued/Finalised) across all 9 document types.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>4. Document Attachments &amp; Version History</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Side-by-side visual diff comparison across revisions (Rev 0, Rev 1...) highlighting added, modified, and removed lines.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>5. Payment Reminders &amp; Outstanding Follow-ups</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Dynamic customer statement of accounts with running balances, overdue tracking, and automated follow-up messages.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>6. TDS Receivable Tracker (Section 194C / 194J)</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Automatically tracks tax deducted at source by clients for easy Form 26AS reconciliation at financial year close.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>7. Retention &amp; Security Deposit Tracker</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Tracks contract retention money withheld until the Defect Liability Period (DLP) expires.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>8. Subcontractor &amp; Labour Billing with BOCW Cess</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">1% Labour Welfare Cess calculation and TDS deduction on running account contract bills.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>9. Dual-Mode Delivery Challan &amp; Measurement Annexure</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Commercial Copy (With Value) vs Gate Pass (Without Value) per CGST Rule 55, plus L &times; B &times; H Measurement Annexure PDF.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>10. NIC E-Way Bill Bulk Upload JSON Export</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">One-click JSON generation compliant with ewaybillgst.gov.in bulk upload schema v1.0.0421.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>11. Global Search &amp; Multi-Entity Filters</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Instant cross-search across document numbers, customer names, sites, and projects.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>12. Audit Trail &amp; Tally / Zoho Exports</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Export chart of accounts and vouchers directly to Tally Prime XML or Zoho Books standard CSV.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>13. Bank Statement Upload &amp; Suspense Engine</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">SHA-256 duplicate protection, fuzzy party name matching, and automated Suspense clearing with rule learning.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>14. Project Costing &amp; 3-Way Match Procurement</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Project P&amp;L analytics with budget threshold warnings and 3-way matching between Vendor PO, GRN, and Vendor Bill.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>15. Site Petty Cash Register &amp; Physical Count Audit</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Site imprest cash float management with physical cash count reconciliation and over-spending protection.</div>
+              </div>
+              <div class="card" style="padding:10px 14px;background:#f8fafc">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <b>16. Executive Financial Dashboard Cards</b>
+                  <span class="bd" style="background:#e0e7ff;color:#3730a3;font-size:0.75rem;font-weight:700">NEW ADD-ON</span>
+                </div>
+                <div class="mute sm" style="margin-top:4px">Live monitoring of Debtors, Creditors, Cash Float, and Unallocated Suspense items directly on the dashboard.</div>
+              </div>
+            </div>
+          </div>
+        `,
+        okText: 'Close'
+      });
+    }
+    window.openReleaseNotesModal = openReleaseNotesModal;
     }
     ACT.newQuote = () => { if (!canWrite()) { toast('Your account is set to Only Read. You cannot create quotations.', 'bad'); return; } const q = newQuote(); logq(q, 'Created quotation'); db.quotes.push(q); persist(true); go('#/quote/' + q.id) };
 

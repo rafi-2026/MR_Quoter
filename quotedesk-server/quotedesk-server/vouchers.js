@@ -289,3 +289,4 @@ module.exports = {
   cancelVoucher,
   postSalesInvoiceVoucher
 };
+
