@@ -74,6 +74,8 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Framer Motion Web Engine for smooth animations -->
   <script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.js"></script>
+  <!-- Universal Document Engine UI (Phase 1) -->
+  <script src="/modules/documents-ui.js"></script>
   <style>
     :root {
       --ink: #0f172a;
@@ -3967,11 +3969,12 @@
         ['dash', '📊 Dashboard'],
         ['quotes', '📋 Quotes'],
         ['customers', '👥 Customers'],
-        ['rates', '⚡ Rate Library']
+        ['rates', '⚡ Rate Library'],
+        ['documents', '📑 Billing & Docs']
       ];
       if (isAdmin() || isMaster()) { nav.push(['users', '👤 Users'], ['settings', '⚙️ Settings']); }
       if (isMaster()) { nav.push(['companies', '🏢 Companies'], ['audit', '🛡️ Security Logs']); }
-      const name = r.name === 'quote' ? 'quotes' : r.name;
+      const name = r.name === 'quote' ? 'quotes' : (r.name === 'document' ? 'documents' : r.name);
       const coName = (db && db.settings && db.settings.company) || 'MR_Quoter';
       root.innerHTML = `<div class="app">
         <!-- Sticky Mobile Top Bar -->
@@ -4018,7 +4021,19 @@
         <main class="main" id="main"></main>
       </div>`;
       updateLiveClock();
-      const v = { dash: viewDash, quotes: viewQuotes, quote: viewQuote, customers: viewCustomers, rates: viewRates, users: viewUsers, settings: viewSettings, companies: viewCompanies, audit: viewAudit }[r.name];
+      const v = {
+        dash: viewDash,
+        quotes: viewQuotes,
+        quote: viewQuote,
+        customers: viewCustomers,
+        rates: viewRates,
+        users: viewUsers,
+        settings: viewSettings,
+        companies: viewCompanies,
+        audit: viewAudit,
+        documents: window.viewDocuments || viewDash,
+        document: window.viewDocument || viewDash
+      }[r.name];
       if ((r.name === 'users' || r.name === 'settings') && !isAdmin() && !isMaster()) { go('#/dash'); return }
       if ((r.name === 'companies' || r.name === 'audit') && !isMaster()) { go('#/dash'); return }
       (v || viewDash)(r.arg);
@@ -4635,12 +4650,12 @@
       m.innerHTML = `<div class="ph"><div><h1>Dashboard</h1><div class="mute">Hello ${esc(me.name.split(' ')[0])}. ${isMaster() ? 'Master Platform Admin session.' : (isMgr() ? 'Showing all quotes.' : 'Showing your quotes.')}</div></div><div class="acts">${isMaster() ? '<a href="#/companies" class="btn sm">🏢 Company Management</a><a href="#/audit" class="btn sm">🛡️ Login IP Audit</a>' : ''}<button class="btn pri" data-act="newQuote">New quotation</button></div></div>
   <div class="kpis">
    <div class="kpi"><small>Awaiting approval</small><b>${cnt(['pending'])}</b><span>${rs(sum(['pending']), 0)}</span></div>
-   <div class="kpi"><small>Open (approved + sent)</small><b>${rs(sum(['approved', 'sent']), 0)}</b><span>${cnt(['approved', 'sent'])} quotes</span></div>
-   <div class="kpi"><small>Won in FY ${fy}</small><b>${rs(wonFy.reduce((a, q) => a + quoteTotal(q), 0), 0)}</b><span>${wonFy.length} quotes</span></div>
+   <div class="kpi"><small>Open (approved + sent)</small><b>${rs(sum(['approved', 'sent']), 0)}</b><span>${cnt(['approved', 'sent'])} ${cnt(['approved', 'sent']) === 1 ? 'quote' : 'quotes'}</span></div>
+   <div class="kpi"><small>Won in FY ${fy}</small><b>${rs(wonFy.reduce((a, q) => a + quoteTotal(q), 0), 0)}</b><span>${wonFy.length} ${wonFy.length === 1 ? 'quote' : 'quotes'}</span></div>
    <div class="kpi"><small>Win rate</small><b>${rate}</b><span>${won} won, ${lost} lost</span></div>
    <div class="kpi" style="border-top:2px solid var(--glass)"><small>Quotes this month</small><b>${monthQs.length}</b><span>${rs(monthTotal, 0)} total</span></div>
-   <div class="kpi" style="border-top:2px solid var(--glass)"><small>Total quoted value</small><b>${rs(sum(['draft','pending','approved','sent','won']), 0)}</b><span>${qs.length} quotes</span></div>
-   <div class="kpi" style="border-top:2px solid var(--glass)"><small>Approved / sent value</small><b>${rs(sum(['approved','sent','won']), 0)}</b><span>${cnt(['approved','sent','won'])} quotes</span></div>
+   <div class="kpi" style="border-top:2px solid var(--glass)"><small>Total quoted value</small><b>${rs(sum(['draft','pending','approved','sent','won']), 0)}</b><span>${qs.length} ${qs.length === 1 ? 'quote' : 'quotes'}</span></div>
+   <div class="kpi" style="border-top:2px solid var(--glass)"><small>Approved / sent value</small><b>${rs(sum(['approved','sent','won']), 0)}</b><span>${cnt(['approved','sent','won'])} ${cnt(['approved','sent','won']) === 1 ? 'quote' : 'quotes'}</span></div>
    <div class="kpi" style="border-top:2px solid var(--glass)"><small>Avg rate / sq ft</small><b>${avgRateSqft > 0 ? rs(avgRateSqft, 0) : '—'}</b><span>Approved + sent</span></div>
   </div>
   ${isMaster() && (db.companies || []).length ? `
@@ -4675,7 +4690,7 @@
               <td><b>${esc(c.name)}</b></td>
               <td><span style="background:rgba(2,132,199,0.12);color:#0284c7;padding:2px 6px;border-radius:4px;font-weight:700;font-size:0.8rem">${esc(c.code || '-')}</span></td>
               <td>
-                <span class="bd" style="background:#e0f2fe;color:#0369a1;font-weight:700">${qCount} Quotes</span>
+                <span class="bd" style="background:#e0f2fe;color:#0369a1;font-weight:700">${qCount} ${qCount === 1 ? 'Quote' : 'Quotes'}</span>
                 <span class="mute sm">(${s.approvedCount || 0} approved, ${s.draftCount || 0} in prep)</span>
               </td>
               <td><b>${uCount}</b> staff</td>

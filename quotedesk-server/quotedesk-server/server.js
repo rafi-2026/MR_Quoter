@@ -2757,6 +2757,195 @@ app.get('/api/followups', auth, (req, res) => {
   res.json(rows);
 });
 
+// ── Universal Document Engine Endpoints (Phase 1) ─────────────────────────
+const docEngine = require('./documents.js');
+
+function getDocUserCtx(req) {
+  const data = getDb();
+  if (req.userId === 'master') {
+    return {
+      id: 'master',
+      name: 'Master Admin',
+      role: 'master',
+      companyId: 'master',
+      companyCode: 'MRQ',
+      isMaster: true
+    };
+  }
+  const user = (data.users || []).find(u => u.id === req.userId) || { id: req.userId, name: 'User', role: 'admin' };
+  const coId = user.companyId || 'default';
+  const targetCompany = (data.companies || []).find(c => c.id === coId);
+  const companyCode = targetCompany && targetCompany.code ? targetCompany.code : 'CTB';
+  return {
+    id: user.id,
+    name: user.name || user.username || 'User',
+    role: user.role || 'user',
+    companyId: coId,
+    companyCode: companyCode,
+    isMaster: false
+  };
+}
+
+// 1. List documents
+app.get('/api/documents', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const { docType, status, showAllRevs } = req.query;
+    const docs = await docEngine.listDocuments({
+      companyId: ctx.companyId,
+      docType: docType || 'all',
+      status: status || 'all',
+      showAllRevs: showAllRevs === 'true',
+      isMaster: ctx.isMaster
+    });
+    res.json(docs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Create document
+app.post('/api/documents', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const body = req.body || {};
+    body.companyId = ctx.companyId;
+    body.companyCode = ctx.companyCode;
+    const doc = await docEngine.createDocument(body, ctx);
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 3. Get document by id
+app.get('/api/documents/:id', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const ctx = getDocUserCtx(req);
+    if (!ctx.isMaster && doc.companyId !== ctx.companyId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Update document
+app.put('/api/documents/:id', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const ctx = getDocUserCtx(req);
+    if (!ctx.isMaster && doc.companyId !== ctx.companyId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    const updated = await docEngine.updateDocument(req.params.id, req.body, ctx);
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 5. Create Revision (with mandatory reason)
+app.post('/api/documents/:id/revise', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const ctx = getDocUserCtx(req);
+    if (!ctx.isMaster && doc.companyId !== ctx.companyId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    const { revReason } = req.body || {};
+    const rev = await docEngine.createRevision(req.params.id, revReason, ctx);
+    res.json(rev);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 6. Get revision history
+app.get('/api/documents/:id/history', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const history = await docEngine.getRevisionHistory(doc.rootId);
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Compare revisions
+app.get('/api/documents/:id/compare/:targetId', auth, async (req, res) => {
+  try {
+    const diff = await docEngine.compareRevisions(req.params.id, req.params.targetId);
+    res.json(diff);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 8. Set status
+app.post('/api/documents/:id/status', auth, async (req, res) => {
+  try {
+    const { status, reason } = req.body || {};
+    const ctx = getDocUserCtx(req);
+    const updated = await docEngine.setDocumentStatus(req.params.id, status, reason, ctx);
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 9. Convert Quote to Document
+app.post('/api/documents/convert-from-quote/:quoteId', auth, async (req, res) => {
+  try {
+    const data = getDb();
+    const quote = (data.quotes || []).find(q => q.id === req.params.quoteId);
+    if (!quote) return res.status(404).json({ error: 'Quote not found' });
+
+    const ctx = getDocUserCtx(req);
+    const { targetDocType } = req.body || { targetDocType: 'pi' };
+
+    const lines = (quote.lines || []).map(l => ({
+      name: l.name || l.desc || 'Line Item',
+      desc: l.spec || l.desc || '',
+      hsn: l.hsn || '7610',
+      qty: Number(l.qty) || 1,
+      unit: l.unit || (quote.dimUnit || 'sqft'),
+      rate: Number(l.rate) || 0,
+      disc: Number(l.disc) || 0,
+      discType: quote.discType || 'pct',
+      gstRate: quote.gstRate || 18
+    }));
+
+    const doc = await docEngine.createDocument({
+      companyId: ctx.companyId,
+      companyCode: ctx.companyCode,
+      docType: targetDocType,
+      date: new Date().toISOString().slice(0, 10),
+      cust: quote.cust || {},
+      project: quote.project || '',
+      site: quote.site || '',
+      pos: quote.pos || 'Tamil Nadu',
+      lines,
+      terms: quote.terms || '',
+      notes: `Converted from Quotation ${quote.no} (Rev ${quote.rev || 0})`,
+      sourceDocId: quote.id,
+      sourceDocNo: quote.no,
+      sourceDocType: 'quote',
+      sourceRev: quote.rev || 0
+    }, ctx);
+
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Serve app for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

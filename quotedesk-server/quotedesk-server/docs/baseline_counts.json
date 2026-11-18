@@ -1,0 +1,32 @@
+{
+  "companies": 2,
+  "users": 7,
+  "customers": 3,
+  "products": 13,
+  "items": 13,
+  "quotes": 3,
+  "profiles": 28,
+  "materials": 125,
+  "companySettings": 12,
+  "companySeq": 5,
+  "productTemplates": 32,
+  "topLevelKeys": [
+    "settings",
+    "companies",
+    "profiles",
+    "users",
+    "customers",
+    "products",
+    "items",
+    "quotes",
+    "seq",
+    "companySeq",
+    "companySettings",
+    "companyCostingSettings",
+    "costingSettings",
+    "materials",
+    "productTemplates"
+  ],
+  "generatedAt": "2026-11-18T16:02:09.425Z",
+  "source": "local_quotedesk.json"
+}
