@@ -25,7 +25,7 @@ const PETTY_EXPENSE_HEADS = [
 
 async function getPettyCashBalance(companyId, site = 'Main Site') {
   const col = await getCollection('petty_cash');
-  const entries = await col.find({ companyId, site });
+  const entries = await col.find({ companyId, site }).toArray();
 
   let balance = 0;
   entries.forEach(e => {

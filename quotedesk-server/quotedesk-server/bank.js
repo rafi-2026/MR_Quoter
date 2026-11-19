@@ -269,7 +269,7 @@ async function processBankStatement({
 
   const txnCol = await getCollection('bank_txns');
   const rulesCol = await getCollection('bank_rules');
-  const customRules = await rulesCol.find({ companyId });
+  const customRules = await rulesCol.find({ companyId }).toArray();
 
   let postedCount = 0;
   let duplicateCount = 0;
@@ -437,7 +437,7 @@ async function resolveSuspenseTransaction(txnId, resolution, user = {}) {
  */
 async function getSuspenseSummary(companyId) {
   const txnCol = await getCollection('bank_txns');
-  const items = await txnCol.find({ companyId, isSuspense: true });
+  const items = await txnCol.find({ companyId, isSuspense: true }).toArray();
 
   const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 

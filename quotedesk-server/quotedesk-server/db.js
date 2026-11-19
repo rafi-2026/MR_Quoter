@@ -5,7 +5,12 @@
  * the existing getDb() / saveDb() single-document pattern.
  * Golden Rule: never touches or breaks existing getDb() / saveDb() / memoryDb.
  */
-const { MongoClient } = require('mongodb');
+const { MongoClient, FindCursor } = require('mongodb');
+if (FindCursor && !FindCursor.prototype.then) {
+  FindCursor.prototype.then = function (resolve, reject) {
+    return this.toArray().then(resolve, reject);
+  };
+}
 const path = require('path');
 const fs = require('fs');
 

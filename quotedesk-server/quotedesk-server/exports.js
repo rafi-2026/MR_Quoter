@@ -44,7 +44,7 @@ async function generateTallyXml(companyId, fromDate, toDate, options = {}) {
     query.date = { $gte: fromDate, $lte: toDate };
   }
 
-  const vouchers = await vchCol.find(query);
+  const vouchers = await vchCol.find(query).toArray();
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   xml += `<ENVELOPE>\n`;
@@ -126,7 +126,7 @@ async function generateZohoCsv(companyId, entityType = 'invoices') {
 
   if (entityType === 'invoices') {
     const docCol = await getCollection('documents');
-    const invoices = await docCol.find({ companyId, docType: { $in: ['inv', 'ra'] }, superseded: false });
+    const invoices = await docCol.find({ companyId, docType: { $in: ['inv', 'ra'] }, superseded: false }).toArray();
 
     let csv = csvRow(['Invoice Number', 'Customer Name', 'Invoice Date', 'Due Date', 'Item Name', 'Rate', 'Quantity', 'Tax Percentage', 'Total']);
     invoices.forEach(inv => {

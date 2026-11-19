@@ -97,7 +97,7 @@ async function createVoucher(data, user = {}) {
 
   // Allocate sequential voucher number
   const vchCol = await getCollection('vouchers');
-  const count = (await vchCol.find({ companyId, voucherType })).length + 1;
+  const count = (await vchCol.find({ companyId, voucherType }).toArray()).length + 1;
   const seqStr = String(count).padStart(4, '0');
   const fyYear = new Date(date).getFullYear().toString().slice(-2);
   const nextFy = (parseInt(fyYear, 10) + 1).toString().padStart(2, '0');
@@ -183,7 +183,7 @@ async function cancelVoucher(voucherId, reason, user = {}) {
 
   // Mark all corresponding ledger entries as cancelled
   const ledgerCol = await getCollection('ledger_entries');
-  const entries = await ledgerCol.find({ voucherId });
+  const entries = await ledgerCol.find({ voucherId }).toArray();
   for (const ent of entries) {
     ent.cancelled = true;
     await ledgerCol.replaceOne({ id: ent.id }, ent);

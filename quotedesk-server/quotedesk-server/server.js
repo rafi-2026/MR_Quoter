@@ -3227,8 +3227,8 @@ app.get('/api/vouchers', auth, async (req, res) => {
     if (req.query.type && req.query.type !== 'all') {
       query.voucherType = req.query.type;
     }
-    const vouchers = await col.find(query);
-    res.json(vouchers.sort((a, b) => b.createdAt - a.createdAt));
+    const vouchers = await col.find(query).toArray();
+    res.json(vouchers.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -3405,7 +3405,7 @@ app.get('/api/bank/rules', auth, async (req, res) => {
     const ctx = getDocUserCtx(req);
     const { getCollection } = require('./db.js');
     const col = await getCollection('bank_rules');
-    const rules = await col.find({ companyId: ctx.companyId });
+    const rules = await col.find({ companyId: ctx.companyId }).toArray();
     res.json(rules);
   } catch (err) {
     res.status(500).json({ error: err.message });

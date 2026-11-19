@@ -4966,7 +4966,6 @@
       });
     }
     window.openReleaseNotesModal = openReleaseNotesModal;
-    }
     ACT.newQuote = () => { if (!canWrite()) { toast('Your account is set to Only Read. You cannot create quotations.', 'bad'); return; } const q = newQuote(); logq(q, 'Created quotation'); db.quotes.push(q); persist(true); go('#/quote/' + q.id) };
 
     /* ========== quotes list ========== */

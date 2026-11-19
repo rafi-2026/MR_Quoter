@@ -33,7 +33,7 @@ async function getDayBook(companyId, fromDate, toDate) {
     query.date = fromDate;
   }
 
-  const vouchers = await vchCol.find(query);
+  const vouchers = await vchCol.find(query).toArray();
   return vouchers.sort((a, b) => (a.date > b.date ? 1 : -1));
 }
 
@@ -51,7 +51,7 @@ async function getLedgerStatement(companyId, ledgerId, fromDate, toDate, rawCust
   };
 
   const ledgerCol = await getCollection('ledger_entries');
-  const entries = await ledgerCol.find({ companyId, ledgerId, cancelled: false });
+  const entries = await ledgerCol.find({ companyId, ledgerId, cancelled: false }).toArray();
 
   // Sort chronologically
   entries.sort((a, b) => (a.date > b.date ? 1 : (a.date < b.date ? -1 : (a.createdAt - b.createdAt))));
@@ -111,7 +111,7 @@ async function getLedgerStatement(companyId, ledgerId, fromDate, toDate, rawCust
 async function getTrialBalance(companyId, asOfDate, rawCustomers = [], rawVendors = []) {
   const allLedgers = await getCompanyLedgers(companyId, rawCustomers, rawVendors);
   const ledgerCol = await getCollection('ledger_entries');
-  const entries = await ledgerCol.find({ companyId, cancelled: false });
+  const entries = await ledgerCol.find({ companyId, cancelled: false }).toArray();
 
   const balances = new Map();
 
@@ -272,7 +272,7 @@ async function getBalanceSheet(companyId, asOfDate, rawCustomers = [], rawVendor
  */
 async function getGstSummary(companyId, fromDate, toDate) {
   const vchCol = await getCollection('vouchers');
-  const vouchers = await vchCol.find({ companyId, cancelled: false });
+  const vouchers = await vchCol.find({ companyId, cancelled: false }).toArray();
 
   let outwardTaxable = 0;
   let outwardCgst = 0;

@@ -1,13 +1,13 @@
 {
   "companies": 2,
-  "users": 7,
+  "users": 4,
   "customers": 3,
   "products": 13,
   "items": 13,
-  "quotes": 3,
-  "profiles": 28,
+  "quotes": 4,
+  "profiles": 44,
   "materials": 125,
-  "companySettings": 12,
+  "companySettings": 13,
   "companySeq": 5,
   "productTemplates": 32,
   "topLevelKeys": [
@@ -27,6 +27,6 @@
     "materials",
     "productTemplates"
   ],
-  "generatedAt": "2026-11-18T16:02:09.425Z",
-  "source": "local_quotedesk.json"
+  "generatedAt": "2026-11-19T15:22:52.892Z",
+  "source": "mongodb_atlas_sync"
 }

@@ -18,7 +18,8 @@ const { getCollection } = require('./db.js');
 
 async function getProjects(companyId) {
   const col = await getCollection('projects');
-  return (await col.find({ companyId })).sort((a, b) => b.createdAt - a.createdAt);
+  const list = await col.find({ companyId }).toArray();
+  return list.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 async function createProject(companyId, data, user = {}) {
@@ -66,7 +67,7 @@ async function getProjectFinancials(companyId, projectId) {
 
   // Gather linked documents & expenses
   const docCol = await getCollection('documents');
-  const docs = await docCol.find({ companyId, project: project.name, superseded: false });
+  const docs = await docCol.find({ companyId, project: project.name, superseded: false }).toArray();
 
   let quotedValue = 0;
   let poValue = 0;
@@ -81,7 +82,7 @@ async function getProjectFinancials(companyId, projectId) {
 
   // Gather project expenses from ledger entries
   const ledgerCol = await getCollection('ledger_entries');
-  const allEntries = await ledgerCol.find({ companyId, cancelled: false });
+  const allEntries = await ledgerCol.find({ companyId, cancelled: false }).toArray();
 
   let materialExpenses = 0;
   let labourExpenses = 0;

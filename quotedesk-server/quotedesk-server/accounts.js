@@ -76,7 +76,7 @@ const DEFAULT_SYSTEM_LEDGERS = [
  */
 async function initCompanyAccounts(companyId) {
   const col = await getCollection('accounts');
-  const existing = await col.find({ companyId });
+  const existing = await col.find({ companyId }).toArray();
 
   if (existing.length === 0) {
     const toInsert = DEFAULT_SYSTEM_LEDGERS.map(l => ({
@@ -100,7 +100,7 @@ async function initCompanyAccounts(companyId) {
  */
 async function getCompanyLedgers(companyId, rawCustomers = [], rawVendors = []) {
   const col = await getCollection('accounts');
-  let ledgers = await col.find({ companyId });
+  let ledgers = await col.find({ companyId }).toArray();
 
   if (ledgers.length === 0) {
     ledgers = await initCompanyAccounts(companyId);
