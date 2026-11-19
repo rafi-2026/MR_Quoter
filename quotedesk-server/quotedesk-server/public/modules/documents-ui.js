@@ -222,10 +222,13 @@
                 <td class="r nowrap"><b>${rs(total, 0)}</b></td>
                 <td>${statusBadge(d.status)}</td>
                 <td class="r nowrap">
-                  <button class="btn sm ghost" data-docact="view" data-id="${d.id}" title="View Details">👁️</button>
-                  <button class="btn sm ghost" data-docact="history" data-id="${d.id}" title="Revision History">📜 History</button>
-                  ${!d.superseded && !(d.docType === 'inv' && d.status === 'issued') ? `
-                    <button class="btn sm ghost" data-docact="revise" data-id="${d.id}" title="Create Revision" style="color:#0284c7">🔄 Revise</button>
+                  <button class="btn sm ghost" data-docact="quickView" data-id="${d.id}" title="View Preview">👁 View</button>
+                  <button class="btn sm ghost" data-docact="quickDownload" data-id="${d.id}" title="Download Options">📥</button>
+                  <button class="btn sm ghost" data-docact="shareMail" data-id="${d.id}" title="Send Mail">✉</button>
+                  <button class="btn sm ghost" data-docact="shareWhatsapp" data-id="${d.id}" title="Share WhatsApp" style="color:#128c7e">📱</button>
+                  <button class="btn sm ghost" data-docact="history" data-id="${d.id}" title="Revision History">📜</button>
+                  ${!d.superseded && !(d.docType === 'inv' && ['issued', 'finalised'].includes(d.status)) ? `
+                    <button class="btn sm ghost" data-docact="delDocRow" data-id="${d.id}" title="Delete Document" style="color:var(--bad)">🗑️</button>
                   ` : ''}
                 </td>
               </tr>
@@ -235,9 +238,89 @@
       </table>
     `;
 
-    $$('[data-docact="view"]', el).forEach(b => b.onclick = () => go('#/document/' + b.dataset.id));
-    $$('[data-docact="history"]', el).forEach(b => b.onclick = () => openRevisionHistoryModal(b.dataset.id));
-    $$('[data-docact="revise"]', el).forEach(b => b.onclick = () => promptCreateRevision(b.dataset.id));
+    $$('[data-docact="quickView"]', el).forEach(b => {
+      b.onclick = () => {
+        const d = currentDocsList.find(x => x.id === b.dataset.id);
+        if (!d) return;
+        if (d.docType === 'dc') {
+          openChallanPdfModal(d);
+        } else if (window.QuoteDeskPrint) {
+          window.QuoteDeskPrint.previewDoc(d);
+        } else {
+          go('#/document/' + d.id);
+        }
+      };
+    });
+
+    $$('[data-docact="quickDownload"]', el).forEach(b => {
+      b.onclick = () => {
+        const d = currentDocsList.find(x => x.id === b.dataset.id);
+        if (!d) return;
+        modal({
+          title: `Download & Export: ${d.no}`,
+          noFooter: true,
+          body: `
+            <div class="grid g2" style="margin:12px 0;gap:12px">
+              <button class="btn pri" id="btnDlPdf" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📄 Download Official PDF Document</button>
+              <button class="btn" id="btnDlPrint" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600;border:1px solid #cbd5e1">🖨️ Open Print &amp; PDF Sheet</button>
+              ${d.docType === 'dc' ? `
+                <button class="btn" id="btnDlGatePass" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600;background:#f0fdf4;border:1px solid #86efac;color:#166534">🚚 Gate Pass (Without Value) PDF</button>
+              ` : ''}
+              ${d.docType === 'inv' ? `
+                <button class="btn" id="btnDlEway" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af">⚡ NIC E-Way Bill JSON</button>
+              ` : ''}
+            </div>
+          `
+        });
+        const btnPdf = $('#btnDlPdf');
+        if (btnPdf) btnPdf.onclick = () => { closeModal(); window.QuoteDeskPrint.downloadDocPdfDirect(d); };
+        const btnPrint = $('#btnDlPrint');
+        if (btnPrint) btnPrint.onclick = () => { closeModal(); window.QuoteDeskPrint.previewDoc(d); };
+        const btnGate = $('#btnDlGatePass');
+        if (btnGate) btnGate.onclick = () => { closeModal(); window.QuoteDeskPrint.downloadDocPdfDirect(d, { mode: 'without_value' }); };
+        const btnEway = $('#btnDlEway');
+        if (btnEway) btnEway.onclick = () => { closeModal(); openEwayBillModal(d); };
+      };
+    });
+
+    $$('[data-docact="shareMail"]', el).forEach(b => {
+      b.onclick = () => {
+        const d = currentDocsList.find(x => x.id === b.dataset.id);
+        if (d && window.QuoteDeskPrint) window.QuoteDeskPrint.openEmailModal(d, false);
+      };
+    });
+
+    $$('[data-docact="shareWhatsapp"]', el).forEach(b => {
+      b.onclick = () => {
+        const d = currentDocsList.find(x => x.id === b.dataset.id);
+        if (d && window.QuoteDeskPrint) window.QuoteDeskPrint.openWhatsAppShare(d, false);
+      };
+    });
+
+    $$('[data-docact="history"]', el).forEach(b => {
+      b.onclick = () => openRevisionHistoryModal(b.dataset.id);
+    });
+
+    $$('[data-docact="delDocRow"]', el).forEach(b => {
+      b.onclick = () => {
+        const d = currentDocsList.find(x => x.id === b.dataset.id);
+        if (!d) return;
+        confirmBox(`Are you sure you want to permanently delete document "${esc(d.no)}"?`, async () => {
+          try {
+            const apiDel = window.apiDelete || (async (u) => {
+              const r = await fetch(u, { method: 'DELETE', credentials: 'include' });
+              if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error || r.statusText); }
+              return r.json();
+            });
+            await apiDel('/api/documents/' + d.id);
+            toast(`✅ Document "${d.no}" deleted.`);
+            loadAndRenderDocs();
+          } catch (err) {
+            toast(err.message, 'bad');
+          }
+        }, 'Delete', 'bad');
+      };
+    });
   }
 
   /**
@@ -498,24 +581,38 @@
           <!-- Lines Card -->
           <div class="card" style="margin-bottom:14px">
             <div class="card-h">
-              <h3>Line Items &amp; GST Rates</h3>
-              ${!isLocked ? `<button class="btn sm pri" id="btnAddDocLine">+ Add Item Line</button>` : ''}
+              <h3>${d.docType === 'mrl' ? '📦 Raw Material Requisition Items (with Code &amp; Brand)' : 'Line Items &amp; GST Rates'}</h3>
+              ${!isLocked ? `<button class="btn sm pri" id="btnAddDocLine">${d.docType === 'mrl' ? '+ Add Material Line' : '+ Add Item Line'}</button>` : ''}
             </div>
             <div class="scx" style="margin-top:10px">
               <table class="tbl" id="docLinesTable">
                 <thead>
-                  <tr>
-                    <th>Item Description</th>
-                    <th>HSN/SAC</th>
-                    <th class="r">Qty</th>
-                    <th>UOM</th>
-                    <th class="r">Rate (₹)</th>
-                    <th class="r">Disc %</th>
-                    <th class="r">Taxable (₹)</th>
-                    <th class="r">GST %</th>
-                    <th class="r">Total (₹)</th>
-                    ${!isLocked ? '<th class="r"></th>' : ''}
-                  </tr>
+                  ${d.docType === 'mrl' ? `
+                    <tr>
+                      <th style="width:110px">Code</th>
+                      <th style="width:120px">Brand / Make</th>
+                      <th>Material Description</th>
+                      <th style="width:85px">Category</th>
+                      <th class="r" style="width:70px">Req Qty</th>
+                      <th style="width:60px">UOM</th>
+                      <th class="r" style="width:85px">Rate (₹)</th>
+                      <th class="r" style="width:95px">Total (₹)</th>
+                      ${!isLocked ? '<th class="r" style="width:35px"></th>' : ''}
+                    </tr>
+                  ` : `
+                    <tr>
+                      <th>Item Description</th>
+                      <th>HSN/SAC</th>
+                      <th class="r">Qty</th>
+                      <th>UOM</th>
+                      <th class="r">Rate (₹)</th>
+                      <th class="r">Disc %</th>
+                      <th class="r">Taxable (₹)</th>
+                      <th class="r">GST %</th>
+                      <th class="r">Total (₹)</th>
+                      ${!isLocked ? '<th class="r"></th>' : ''}
+                    </tr>
+                  `}
                 </thead>
                 <tbody id="docLinesTbody"></tbody>
               </table>
@@ -570,17 +667,32 @@
     if (!isLocked) {
       $('#btnAddDocLine').onclick = () => {
         d.lines = d.lines || [];
-        d.lines.push({
-          id: 'line_' + Math.random().toString(36).slice(2, 8),
-          name: 'New Item',
-          desc: '',
-          hsn: '7610',
-          qty: 1,
-          unit: 'nos',
-          rate: 1000,
-          disc: 0,
-          gstRate: 18
-        });
+        if (d.docType === 'mrl') {
+          d.lines.push({
+            id: 'line_' + Math.random().toString(36).slice(2, 8),
+            code: '5045',
+            brand: 'Domal 27',
+            name: 'New Profile Section',
+            category: 'profile',
+            qty: 1,
+            unit: 'mtr',
+            rate: 500,
+            disc: 0,
+            gstRate: 18
+          });
+        } else {
+          d.lines.push({
+            id: 'line_' + Math.random().toString(36).slice(2, 8),
+            name: 'New Item',
+            desc: '',
+            hsn: '7610',
+            qty: 1,
+            unit: 'nos',
+            rate: 1000,
+            disc: 0,
+            gstRate: 18
+          });
+        }
         recalcAndDrawLines();
       };
 
@@ -636,6 +748,11 @@
     if (!el) return;
 
     const acts = [];
+    acts.push(`<button class="btn sm ghost" id="actViewPrint" title="Printable Preview">👁 View / Print</button>`);
+    acts.push(`<button class="btn sm ghost" id="actDownloadPdf" title="Download PDF">📥 PDF</button>`);
+    acts.push(`<button class="btn sm ghost" id="actMailDoc" title="Email Document">✉ Email</button>`);
+    acts.push(`<button class="btn sm ghost" id="actWaDoc" title="Share via WhatsApp" style="color:#128c7e">📱 WhatsApp</button>`);
+
     if (d.status === 'draft') {
       acts.push(`<button class="btn pri sm" id="actSubmitApproval">Submit for Approval</button>`);
     } else if (d.status === 'pending') {
@@ -645,6 +762,27 @@
     }
 
     el.innerHTML = acts.join('');
+
+    const btnVp = $('#actViewPrint');
+    if (btnVp) btnVp.onclick = () => {
+      if (d.docType === 'dc') openChallanPdfModal(d);
+      else if (window.QuoteDeskPrint) window.QuoteDeskPrint.previewDoc(d);
+    };
+
+    const btnDp = $('#actDownloadPdf');
+    if (btnDp) btnDp.onclick = () => {
+      if (window.QuoteDeskPrint) window.QuoteDeskPrint.downloadDocPdfDirect(d);
+    };
+
+    const btnEm = $('#actMailDoc');
+    if (btnEm) btnEm.onclick = () => {
+      if (window.QuoteDeskPrint) window.QuoteDeskPrint.openEmailModal(d, false);
+    };
+
+    const btnWa = $('#actWaDoc');
+    if (btnWa) btnWa.onclick = () => {
+      if (window.QuoteDeskPrint) window.QuoteDeskPrint.openWhatsAppShare(d, false);
+    };
 
     const btnSub = $('#actSubmitApproval');
     if (btnSub) btnSub.onclick = async () => {
@@ -681,15 +819,25 @@
     const rows = $$('tr[data-lineid]', tbody);
     activeDoc.lines = rows.map(r => {
       const lid = r.dataset.lineid;
+      const codeEl = $('.l_code', r);
+      const brandEl = $('.l_brand', r);
+      const catEl = $('.l_cat', r);
+      const hsnEl = $('.l_hsn', r);
+      const discEl = $('.l_disc', r);
+      const gstEl = $('.l_gst', r);
+
       return {
         id: lid,
-        name: $('.l_name', r).value.trim(),
-        hsn: $('.l_hsn', r).value.trim(),
-        qty: Number($('.l_qty', r).value) || 0,
-        unit: $('.l_unit', r).value.trim() || 'nos',
-        rate: Number($('.l_rate', r).value) || 0,
-        disc: Number($('.l_disc', r).value) || 0,
-        gstRate: Number($('.l_gst', r).value) || 18
+        code: codeEl ? codeEl.value.trim() : '',
+        brand: brandEl ? brandEl.value.trim() : '',
+        category: catEl ? catEl.value.trim() : 'profile',
+        name: $('.l_name', r) ? $('.l_name', r).value.trim() : '',
+        hsn: hsnEl ? hsnEl.value.trim() : '7610',
+        qty: Number($('.l_qty', r) ? $('.l_qty', r).value : 1) || 0,
+        unit: ($('.l_unit', r) ? $('.l_unit', r).value.trim() : '') || 'mtr',
+        rate: Number($('.l_rate', r) ? $('.l_rate', r).value : 0) || 0,
+        disc: discEl ? (Number(discEl.value) || 0) : 0,
+        gstRate: gstEl ? (Number(gstEl.value) || 18) : 18
       };
     });
   }
@@ -724,6 +872,7 @@
   function renderLinesTable(d, isLocked) {
     const tbody = $('#docLinesTbody');
     if (!tbody) return;
+    const isMrl = d.docType === 'mrl';
 
     tbody.innerHTML = (d.lines || []).map((l, i) => {
       const gross = (l.qty || 0) * (l.rate || 0);
@@ -731,6 +880,24 @@
       const tax = gross - discAmt;
       const gstAmt = tax * (l.gstRate || 18) / 100;
       const tot = tax + gstAmt;
+
+      if (isMrl) {
+        return `
+          <tr data-lineid="${l.id || i}">
+            <td><input type="text" class="l_code" value="${esc(l.code || '')}" placeholder="e.g. 5045" style="width:100px;font-family:monospace;font-weight:700;color:#0284c7" ${isLocked ? 'disabled' : ''}></td>
+            <td><input type="text" class="l_brand" value="${esc(l.brand || '')}" placeholder="e.g. Domal 27" style="width:110px;font-weight:600" ${isLocked ? 'disabled' : ''}></td>
+            <td><input type="text" class="l_name" value="${esc(l.name || '')}" placeholder="Material description" style="min-width:180px;font-weight:700" ${isLocked ? 'disabled' : ''}></td>
+            <td><input type="text" class="l_cat" value="${esc(l.category || 'profile')}" placeholder="profile" style="width:75px" ${isLocked ? 'disabled' : ''}></td>
+            <td><input type="number" step="any" class="l_qty" value="${l.qty != null ? l.qty : 1}" style="width:65px;text-align:right;font-weight:700" ${isLocked ? 'disabled' : ''}></td>
+            <td><input type="text" class="l_unit" value="${esc(l.unit || 'mtr')}" style="width:50px" ${isLocked ? 'disabled' : ''}></td>
+            <td><input type="number" step="any" class="l_rate" value="${l.rate != null ? l.rate : 0}" style="width:75px;text-align:right" ${isLocked ? 'disabled' : ''}></td>
+            <td class="r nowrap"><b>${rs(Math.round(tax), 0)}</b></td>
+            ${!isLocked ? `
+              <td class="r"><button class="btn sm bad" data-delline="${l.id || i}" style="padding:2px 8px">&times;</button></td>
+            ` : ''}
+          </tr>
+        `;
+      }
 
       return `
         <tr data-lineid="${l.id || i}">

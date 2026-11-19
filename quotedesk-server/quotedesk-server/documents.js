@@ -537,6 +537,22 @@ async function setDocumentStatus(id, newStatus, reason = '', user) {
   return doc;
 }
 
+async function deleteDocument(id, user = {}) {
+  const doc = await getDocumentById(id);
+  if (!doc) throw new Error('Document not found');
+  if (doc.docType === 'inv' && ['issued', 'finalised'].includes(doc.status)) {
+    throw new Error('Statutory lock: An issued/finalised Tax Invoice cannot be deleted. Issue a Credit Note instead.');
+  }
+
+  const col = await getCollection('documents');
+  await col.deleteOne({ id });
+
+  const local = readLocalDocs().filter(d => d.id !== id);
+  writeLocalDocs(local);
+
+  return { ok: true, id, no: doc.no };
+}
+
 module.exports = {
   createDocument,
   updateDocument,
@@ -546,6 +562,7 @@ module.exports = {
   getRevisionHistory,
   compareRevisions,
   setDocumentStatus,
+  deleteDocument,
   calcDocTotals,
   DOC_TYPES
 };

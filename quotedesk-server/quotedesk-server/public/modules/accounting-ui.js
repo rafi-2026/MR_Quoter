@@ -13,6 +13,8 @@
   let activeTab = 'vouchers';
   let cachedAccounts = { groups: [], ledgers: [] };
   let cachedVouchers = [];
+  let vchFilter = { q: '', type: 'all', status: 'all', fromDate: '', toDate: '' };
+  let ledgerFilter = { q: '', nature: 'all', groupId: 'all' };
 
   function $(sel, root = document) { return root.querySelector(sel); }
   function $$(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
@@ -37,33 +39,33 @@
     if (!main) return;
 
     main.innerHTML = `
-      <div class="top-bar">
+      <div class="ph">
         <div>
-          <h2>📖 Accounting &amp; Financial Ledgers</h2>
-          <p class="mute sm">Tally-compatible double-entry books, verified trial balance, and statutory reports.</p>
+          <h1>📖 Accounting &amp; Financial Ledgers</h1>
+          <div class="mute">Tally-compatible double-entry books, verified trial balance, and statutory reports.</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div class="acts">
+          <button class="btn sm" id="btnNewLedger" style="background:#f8fafc;border:1px solid #cbd5e1">+ New Ledger</button>
           <button class="btn pri sm" id="btnNewVoucher">+ Create Voucher</button>
-          <button class="btn ghost sm" id="btnNewLedger">+ New Ledger</button>
         </div>
       </div>
 
-      <!-- Accounting Sub-Navigation Tabs -->
-      <div style="display:flex;gap:6px;margin:12px 0 16px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;overflow-x:auto">
-        <button class="btn sm ${activeTab === 'vouchers' ? 'pri' : 'ghost'}" data-acctab="vouchers">📋 Vouchers</button>
-        <button class="btn sm ${activeTab === 'ledgers' ? 'pri' : 'ghost'}" data-acctab="ledgers">📒 Ledgers</button>
-        <button class="btn sm ${activeTab === 'projects' ? 'pri' : 'ghost'}" data-acctab="projects">🏗️ Projects &amp; P&amp;L</button>
-        <button class="btn sm ${activeTab === 'pettycash' ? 'pri' : 'ghost'}" data-acctab="pettycash">💵 Petty Cash</button>
-        <button class="btn sm ${activeTab === 'bank' ? 'pri' : 'ghost'}" data-acctab="bank">🏦 Bank Statements</button>
-        <button class="btn sm ${activeTab === 'suspense' ? 'pri' : 'ghost'}" data-acctab="suspense" id="tabBtnSuspense">
+      <!-- Accounting Sub-Navigation Tabs matching QuoteDesk Design -->
+      <div class="chips" style="margin:10px 0 16px;overflow-x:auto;padding-bottom:4px;gap:6px">
+        <button class="chip ${activeTab === 'vouchers' ? 'on' : ''}" data-acctab="vouchers">📋 Vouchers</button>
+        <button class="chip ${activeTab === 'ledgers' ? 'on' : ''}" data-acctab="ledgers">📒 Ledgers</button>
+        <button class="chip ${activeTab === 'projects' ? 'on' : ''}" data-acctab="projects">🏗️ Projects</button>
+        <button class="chip ${activeTab === 'pettycash' ? 'on' : ''}" data-acctab="pettycash">💵 Petty Cash</button>
+        <button class="chip ${activeTab === 'bank' ? 'on' : ''}" data-acctab="bank">🏦 Bank Statements</button>
+        <button class="chip ${activeTab === 'suspense' ? 'on' : ''}" data-acctab="suspense" id="tabBtnSuspense">
           🔔 Suspense <span id="suspenseBadge" class="bd" style="background:#fee2e2;color:#b91c1c;font-size:0.75rem;display:none;margin-left:4px">0</span>
         </button>
-        <button class="btn sm ${activeTab === 'daybook' ? 'pri' : 'ghost'}" data-acctab="daybook">📅 Day Book</button>
-        <button class="btn sm ${activeTab === 'trialbalance' ? 'pri' : 'ghost'}" data-acctab="trialbalance">⚖️ Trial Balance</button>
-        <button class="btn sm ${activeTab === 'pnl' ? 'pri' : 'ghost'}" data-acctab="pnl">📈 Profit &amp; Loss</button>
-        <button class="btn sm ${activeTab === 'balancesheet' ? 'pri' : 'ghost'}" data-acctab="balancesheet">🏦 Balance Sheet</button>
-        <button class="btn sm ${activeTab === 'gst' ? 'pri' : 'ghost'}" data-acctab="gst">📑 GST Working Sheet</button>
-        <button class="btn sm ${activeTab === 'exports' ? 'pri' : 'ghost'}" data-acctab="exports">🔄 Tally &amp; Zoho Exports</button>
+        <button class="chip ${activeTab === 'daybook' ? 'on' : ''}" data-acctab="daybook">📅 Day Book</button>
+        <button class="chip ${activeTab === 'trialbalance' ? 'on' : ''}" data-acctab="trialbalance">⚖️ Trial Balance</button>
+        <button class="chip ${activeTab === 'pnl' ? 'on' : ''}" data-acctab="pnl">📈 Profit &amp; Loss</button>
+        <button class="chip ${activeTab === 'balancesheet' ? 'on' : ''}" data-acctab="balancesheet">🏦 Balance Sheet</button>
+        <button class="chip ${activeTab === 'gst' ? 'on' : ''}" data-acctab="gst">📑 GST Working Sheet</button>
+        <button class="chip ${activeTab === 'exports' ? 'on' : ''}" data-acctab="exports">🔄 Tally &amp; Zoho Exports</button>
       </div>
 
       <div id="accountingTabContent">
@@ -88,7 +90,7 @@
       cachedAccounts = await apiGet('/api/accounts');
       const suspSummary = await apiGet('/api/bank/suspense');
       const badge = $('#suspenseBadge');
-      if (badge && suspSummary.count > 0) {
+      if (badge && suspSummary && suspSummary.count > 0) {
         badge.innerText = suspSummary.count;
         badge.style.display = 'inline';
       }
@@ -120,72 +122,183 @@
   // 1. Vouchers Tab
   async function renderVouchersTab(area) {
     try {
-      const vouchers = await apiGet('/api/vouchers');
-      cachedVouchers = vouchers;
-
-      if (!vouchers.length) {
-        area.innerHTML = `
-          <div class="card" style="padding:32px;text-align:center">
-            <p class="mute">No accounting vouchers recorded yet.</p>
-            <button class="btn pri sm" id="btnEmptyVch">+ Create First Voucher</button>
-          </div>
-        `;
-        $('#btnEmptyVch').onclick = openNewVoucherModal;
-        return;
+      if (!cachedVouchers || !cachedVouchers.length) {
+        cachedVouchers = await apiGet('/api/vouchers');
       }
 
+      const totalCount = cachedVouchers.length;
+      const postedCount = cachedVouchers.filter(v => !v.cancelled).length;
+      const cancelledCount = cachedVouchers.filter(v => v.cancelled).length;
+
+      const q = (vchFilter.q || '').trim().toLowerCase();
+      const filtered = cachedVouchers.filter(v => {
+        if (vchFilter.type !== 'all' && v.voucherType !== vchFilter.type) return false;
+        if (vchFilter.status === 'posted' && v.cancelled) return false;
+        if (vchFilter.status === 'cancelled' && !v.cancelled) return false;
+        if (vchFilter.fromDate && v.date < vchFilter.fromDate) return false;
+        if (vchFilter.toDate && v.date > vchFilter.toDate) return false;
+        if (q) {
+          const text = [
+            v.voucherNo,
+            v.partyName,
+            v.narration,
+            v.docRef,
+            v.chequeNo,
+            ...(v.entries || []).map(e => e.ledgerName || e.ledgerId)
+          ].filter(Boolean).join(' ').toLowerCase();
+          if (!text.includes(q)) return false;
+        }
+        return true;
+      });
+
       area.innerHTML = `
-        <div class="card">
+        <div class="tools" style="flex-wrap:wrap;gap:8px;margin-bottom:12px">
+          <input type="search" id="vchSearchInput" placeholder="Search voucher number, party, narration, reference..." style="flex:1;min-width:220px" value="${esc(vchFilter.q)}">
+          <select id="vchTypeSelect" style="max-width:180px">
+            <option value="all" ${vchFilter.type === 'all' ? 'selected' : ''}>All Voucher Types</option>
+            <option value="sales" ${vchFilter.type === 'sales' ? 'selected' : ''}>Sales (SLS)</option>
+            <option value="purchase" ${vchFilter.type === 'purchase' ? 'selected' : ''}>Purchase (PUR)</option>
+            <option value="payment" ${vchFilter.type === 'payment' ? 'selected' : ''}>Payment (PMT)</option>
+            <option value="receipt" ${vchFilter.type === 'receipt' ? 'selected' : ''}>Receipt (RCP)</option>
+            <option value="journal" ${vchFilter.type === 'journal' ? 'selected' : ''}>Journal (JRN)</option>
+            <option value="contra" ${vchFilter.type === 'contra' ? 'selected' : ''}>Contra (CTR)</option>
+            <option value="debit_note" ${vchFilter.type === 'debit_note' ? 'selected' : ''}>Debit Note (DBN)</option>
+            <option value="credit_note" ${vchFilter.type === 'credit_note' ? 'selected' : ''}>Credit Note (CRN)</option>
+          </select>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="sm mute">From:</span>
+            <input type="date" id="vchFromDate" value="${vchFilter.fromDate || ''}" style="max-width:130px;padding:4px 8px;font-size:0.82rem">
+            <span class="sm mute">To:</span>
+            <input type="date" id="vchToDate" value="${vchFilter.toDate || ''}" style="max-width:130px;padding:4px 8px;font-size:0.82rem">
+          </div>
+        </div>
+
+        <div class="chips" id="vchStatusChips" style="margin-bottom:12px">
+          <button class="chip ${vchFilter.status === 'all' ? 'on' : ''}" data-vchstat="all">All <b>${totalCount}</b></button>
+          <button class="chip ${vchFilter.status === 'posted' ? 'on' : ''}" data-vchstat="posted">Posted <b>${postedCount}</b></button>
+          <button class="chip ${vchFilter.status === 'cancelled' ? 'on' : ''}" data-vchstat="cancelled">Cancelled <b>${cancelledCount}</b></button>
+        </div>
+
+        <div class="card" style="padding:6px 10px">
           <div class="scx">
-            <table class="tbl sm">
-              <thead>
-                <tr>
-                  <th>Voucher No</th>
-                  <th>Type</th>
-                  <th>Date</th>
-                  <th>Party / Narration</th>
-                  <th>Reference</th>
-                  <th class="r">Total Amount</th>
-                  <th>Status</th>
-                  <th class="r">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${vouchers.map(v => {
-                  const typeLabel = (v.voucherType || '').toUpperCase();
-                  return `
-                    <tr>
-                      <td><b>${esc(v.voucherNo)}</b></td>
-                      <td><span class="bd" style="background:#f1f5f9;color:#0f172a;font-weight:700">${typeLabel}</span></td>
-                      <td>${fmtDate(v.date)}</td>
-                      <td>
-                        <b>${esc(v.partyName || '')}</b>
-                        <div class="mute sm">${esc(v.narration || '')}</div>
-                      </td>
-                      <td>${esc(v.docRef || '-')}</td>
-                      <td class="r" style="font-weight:700">${rs(v.totalAmount)}</td>
-                      <td>
-                        ${v.cancelled
-                          ? '<span class="bd" style="background:#fee2e2;color:#b91c1c;font-weight:700">CANCELLED</span>'
-                          : '<span class="bd" style="background:#dcfce7;color:#15803d">Posted</span>'}
-                      </td>
-                      <td class="r">
-                        <button class="btn sm ghost btnViewVch" data-vid="${v.id}" title="View Details">👁️</button>
-                        ${!v.cancelled ? `<button class="btn sm ghost btnCancelVch" data-vid="${v.id}" style="color:#dc2626" title="Cancel Voucher">✕</button>` : ''}
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
+            ${filtered.length ? `
+              <table class="tbl sm">
+                <thead>
+                  <tr>
+                    <th>Voucher No</th>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Party / Narration</th>
+                    <th>Reference</th>
+                    <th class="r">Total Amount</th>
+                    <th>Status</th>
+                    <th class="r">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${filtered.map(v => {
+                    const typeLabel = (v.voucherType || '').toUpperCase();
+                    return `
+                      <tr>
+                        <td><b>${esc(v.voucherNo)}</b></td>
+                        <td><span class="bd" style="background:#f1f5f9;color:#0f172a;font-weight:700">${typeLabel}</span></td>
+                        <td>${fmtDate(v.date)}</td>
+                        <td>
+                          <b>${esc(v.partyName || '')}</b>
+                          <div class="mute sm">${esc(v.narration || '')}</div>
+                        </td>
+                        <td>${esc(v.docRef || '-')}</td>
+                        <td class="r" style="font-weight:700">${rs(v.totalAmount)}</td>
+                        <td>
+                          ${v.cancelled
+                            ? '<span class="bd" style="background:#fee2e2;color:#b91c1c;font-weight:700">CANCELLED</span>'
+                            : '<span class="bd" style="background:#dcfce7;color:#15803d">Posted</span>'}
+                        </td>
+                        <td class="r nowrap">
+                          <button class="btn sm ghost btnViewVch" data-vid="${v.id}" title="View Preview">👁 View</button>
+                          <button class="btn sm ghost btnDlVch" data-vid="${v.id}" title="Download Options">📥</button>
+                          <button class="btn sm ghost btnMailVch" data-vid="${v.id}" title="Send Mail">✉</button>
+                          <button class="btn sm ghost btnWaVch" data-vid="${v.id}" title="Share WhatsApp" style="color:#128c7e">📱</button>
+                          ${!v.cancelled ? `
+                            <button class="btn sm ghost btnCancelVch" data-vid="${v.id}" style="color:var(--bad)" title="Cancel Voucher">🗑️</button>
+                          ` : ''}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            ` : `
+              <div class="empty" style="padding:24px 12px">
+                ${cachedVouchers.length ? 'No vouchers match this filter.' : 'No accounting vouchers recorded yet.'}
+                <div style="margin-top:10px">
+                  <button class="btn sm pri" id="btnEmptyVch">+ Create First Voucher</button>
+                </div>
+              </div>
+            `}
           </div>
         </div>
       `;
 
+      const searchInput = $('#vchSearchInput', area);
+      if (searchInput) searchInput.oninput = (e) => { vchFilter.q = e.target.value; renderVouchersTab(area); };
+
+      const typeSelect = $('#vchTypeSelect', area);
+      if (typeSelect) typeSelect.onchange = (e) => { vchFilter.type = e.target.value; renderVouchersTab(area); };
+
+      const fromInput = $('#vchFromDate', area);
+      if (fromInput) fromInput.onchange = (e) => { vchFilter.fromDate = e.target.value; renderVouchersTab(area); };
+
+      const toInput = $('#vchToDate', area);
+      if (toInput) toInput.onchange = (e) => { vchFilter.toDate = e.target.value; renderVouchersTab(area); };
+
+      $$('[data-vchstat]', area).forEach(b => {
+        b.onclick = () => { vchFilter.status = b.dataset.vchstat; renderVouchersTab(area); };
+      });
+
+      const btnEmpty = $('#btnEmptyVch', area);
+      if (btnEmpty) btnEmpty.onclick = openNewVoucherModal;
+
       $$('.btnViewVch', area).forEach(b => {
         b.onclick = () => {
           const v = cachedVouchers.find(x => x.id === b.dataset.vid);
-          if (v) openVoucherDetailModal(v);
+          if (v && window.QuoteDeskPrint) window.QuoteDeskPrint.previewVoucher(v);
+          else if (v) openVoucherDetailModal(v);
+        };
+      });
+
+      $$('.btnDlVch', area).forEach(b => {
+        b.onclick = () => {
+          const v = cachedVouchers.find(x => x.id === b.dataset.vid);
+          if (!v) return;
+          modal({
+            title: `Download & Export Voucher: ${v.voucherNo}`,
+            noFooter: true,
+            body: `
+              <div class="grid g2" style="margin:12px 0;gap:12px">
+                <button class="btn pri" id="btnDlVchPdf" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600">📄 Download Official PDF Document</button>
+                <button class="btn" id="btnDlVchPrint" style="justify-content:center;padding:14px;font-size:0.92rem;font-weight:600;border:1px solid #cbd5e1">🖨️ Open Print &amp; PDF Sheet</button>
+              </div>
+            `
+          });
+          const btnPdf = $('#btnDlVchPdf');
+          if (btnPdf) btnPdf.onclick = () => { closeModal(); window.QuoteDeskPrint.downloadVchPdfDirect(v); };
+          const btnPrint = $('#btnDlVchPrint');
+          if (btnPrint) btnPrint.onclick = () => { closeModal(); window.QuoteDeskPrint.previewVoucher(v); };
+        };
+      });
+
+      $$('.btnMailVch', area).forEach(b => {
+        b.onclick = () => {
+          const v = cachedVouchers.find(x => x.id === b.dataset.vid);
+          if (v && window.QuoteDeskPrint) window.QuoteDeskPrint.openEmailModal(v, true);
+        };
+      });
+
+      $$('.btnWaVch', area).forEach(b => {
+        b.onclick = () => {
+          const v = cachedVouchers.find(x => x.id === b.dataset.vid);
+          if (v && window.QuoteDeskPrint) window.QuoteDeskPrint.openWhatsAppShare(v, true);
         };
       });
 
@@ -200,41 +313,83 @@
   // 2. Ledgers Tab
   function renderLedgersTab(area) {
     const ledgers = cachedAccounts.ledgers || [];
+    const groups = cachedAccounts.groups || [];
     if (!ledgers.length) {
       area.innerHTML = `<div class="card mute" style="padding:24px;text-align:center">No ledgers found.</div>`;
       return;
     }
 
+    const q = (ledgerFilter.q || '').trim().toLowerCase();
+    const filtered = ledgers.filter(l => {
+      if (ledgerFilter.nature !== 'all' && l.nature !== ledgerFilter.nature) return false;
+      if (ledgerFilter.groupId !== 'all' && l.groupId !== ledgerFilter.groupId) return false;
+      if (q) {
+        const text = [l.name, l.code, l.groupName, l.nature].filter(Boolean).join(' ').toLowerCase();
+        if (!text.includes(q)) return false;
+      }
+      return true;
+    });
+
     area.innerHTML = `
-      <div class="card">
+      <div class="tools" style="flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <input type="search" id="ledgerSearchInput" placeholder="Search ledger name, code or group..." style="flex:1;min-width:220px" value="${esc(ledgerFilter.q)}">
+        <select id="ledgerGroupSelect" style="max-width:220px">
+          <option value="all">All Account Groups</option>
+          ${groups.map(g => `<option value="${g.id}" ${ledgerFilter.groupId === g.id ? 'selected' : ''}>${esc(g.name)} (${esc(g.nature)})</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="chips" id="ledgerNatureChips" style="margin-bottom:12px">
+        <button class="chip ${ledgerFilter.nature === 'all' ? 'on' : ''}" data-nature="all">All <b>${ledgers.length}</b></button>
+        <button class="chip ${ledgerFilter.nature === 'assets' ? 'on' : ''}" data-nature="assets">Assets <b>${ledgers.filter(l => l.nature === 'assets').length}</b></button>
+        <button class="chip ${ledgerFilter.nature === 'liabilities' ? 'on' : ''}" data-nature="liabilities">Liabilities <b>${ledgers.filter(l => l.nature === 'liabilities').length}</b></button>
+        <button class="chip ${ledgerFilter.nature === 'income' ? 'on' : ''}" data-nature="income">Incomes <b>${ledgers.filter(l => l.nature === 'income').length}</b></button>
+        <button class="chip ${ledgerFilter.nature === 'expenses' ? 'on' : ''}" data-nature="expenses">Expenses <b>${ledgers.filter(l => l.nature === 'expenses').length}</b></button>
+      </div>
+
+      <div class="card" style="padding:6px 10px">
         <div class="scx">
-          <table class="tbl sm">
-            <thead>
-              <tr>
-                <th>Ledger Name</th>
-                <th>Under Group</th>
-                <th>Nature</th>
-                <th class="r">Opening Balance</th>
-                <th class="r">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${ledgers.map(l => `
+          ${filtered.length ? `
+            <table class="tbl sm">
+              <thead>
                 <tr>
-                  <td><b>${esc(l.name)}</b> ${l.isSystem ? '<span class="mute sm" style="font-size:0.75rem">(System)</span>' : ''}</td>
-                  <td>${esc(l.groupName)}</td>
-                  <td><span class="bd" style="text-transform:capitalize">${esc(l.nature)}</span></td>
-                  <td class="r">${rs(l.openingBalance || 0)} ${l.openingBalanceType || 'Dr'}</td>
-                  <td class="r">
-                    <button class="btn sm ghost btnOpenStmt" data-lid="${l.id}">📜 Statement</button>
-                  </td>
+                  <th>Ledger Name</th>
+                  <th>Under Group</th>
+                  <th>Nature</th>
+                  <th class="r">Opening Balance</th>
+                  <th class="r">Actions</th>
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${filtered.map(l => `
+                  <tr>
+                    <td><b>${esc(l.name)}</b> ${l.isSystem ? '<span class="mute sm" style="font-size:0.75rem">(System)</span>' : ''}</td>
+                    <td>${esc(l.groupName)}</td>
+                    <td><span class="bd" style="text-transform:capitalize">${esc(l.nature)}</span></td>
+                    <td class="r">${rs(l.openingBalance || 0)} ${l.openingBalanceType || 'Dr'}</td>
+                    <td class="r nowrap">
+                      <button class="btn sm ghost btnOpenStmt" data-lid="${l.id}" title="View Ledger Statement">📜 Statement</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : `
+            <div class="empty" style="padding:20px;text-align:center">No ledgers match this filter.</div>
+          `}
         </div>
       </div>
     `;
+
+    const searchInput = $('#ledgerSearchInput', area);
+    if (searchInput) searchInput.oninput = (e) => { ledgerFilter.q = e.target.value; renderLedgersTab(area); };
+
+    const groupSelect = $('#ledgerGroupSelect', area);
+    if (groupSelect) groupSelect.onchange = (e) => { ledgerFilter.groupId = e.target.value; renderLedgersTab(area); };
+
+    $$('[data-nature]', area).forEach(b => {
+      b.onclick = () => { ledgerFilter.nature = b.dataset.nature; renderLedgersTab(area); };
+    });
 
     $$('.btnOpenStmt', area).forEach(b => {
       b.onclick = () => openLedgerStatementModal(b.dataset.lid);
@@ -897,55 +1052,162 @@
             <span class="sm">Date:</span>
             <input type="date" id="db_date" value="${today}" style="padding:4px 8px">
           </label>
+          <input type="search" id="db_search" placeholder="Search Day Book narration, voucher or party..." style="flex:1;min-width:220px;padding:4px 8px">
           <button class="btn sm pri" id="btnLoadDaybook">Fetch Day Book</button>
+          <button class="btn sm ghost" id="btnPrintDaybook" style="border:1px solid #cbd5e1">🖨️ Print Day Book</button>
         </div>
       </div>
       <div id="daybookResults"></div>
     `;
 
+    let currentDayVouchers = [];
+
     const loadDaybook = async () => {
       const d = $('#db_date').value;
+      const q = ($('#db_search').value || '').trim().toLowerCase();
       const resEl = $('#daybookResults');
       resEl.innerHTML = `<div class="mute" style="padding:20px;text-align:center">Loading day book for ${d}...</div>`;
       try {
         const vouchers = await apiGet(`/api/reports/daybook?from=${d}`);
-        if (!vouchers.length) {
-          resEl.innerHTML = `<div class="card mute" style="padding:20px;text-align:center">No vouchers recorded on ${fmtDate(d)}.</div>`;
+        currentDayVouchers = vouchers;
+
+        const filtered = vouchers.filter(v => {
+          if (!q) return true;
+          const text = [v.voucherNo, v.partyName, v.narration, v.voucherType].filter(Boolean).join(' ').toLowerCase();
+          return text.includes(q);
+        });
+
+        if (!filtered.length) {
+          resEl.innerHTML = `<div class="card mute" style="padding:20px;text-align:center">${vouchers.length ? 'No vouchers match search.' : `No vouchers recorded on ${fmtDate(d)}.`}</div>`;
           return;
         }
 
+        const totalDayAmount = filtered.reduce((sum, v) => sum + (Number(v.totalAmount) || 0), 0);
+
         resEl.innerHTML = `
-          <div class="card">
+          <div class="card" style="padding:6px 10px">
             <div class="scx">
               <table class="tbl sm">
                 <thead>
                   <tr>
                     <th>Voucher No</th>
                     <th>Type</th>
-                    <th>Narration</th>
+                    <th>Date</th>
+                    <th>Party / Narration</th>
                     <th class="r">Total Amount</th>
+                    <th class="r">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${vouchers.map(v => `
+                  ${filtered.map(v => `
                     <tr>
                       <td><b>${esc(v.voucherNo)}</b></td>
-                      <td>${esc(v.voucherType.toUpperCase())}</td>
-                      <td>${esc(v.narration || '-')}</td>
+                      <td><span class="bd" style="background:#f1f5f9;font-weight:700">${esc(v.voucherType.toUpperCase())}</span></td>
+                      <td>${fmtDate(v.date)}</td>
+                      <td>
+                        <b>${esc(v.partyName || '')}</b>
+                        <div class="mute sm">${esc(v.narration || '-')}</div>
+                      </td>
                       <td class="r" style="font-weight:700">${rs(v.totalAmount)}</td>
+                      <td class="r nowrap">
+                        <button class="btn sm ghost btnDbView" data-vid="${v.id}" title="View Preview">👁 View</button>
+                        <button class="btn sm ghost btnDbDl" data-vid="${v.id}" title="Download">📥</button>
+                        <button class="btn sm ghost btnDbMail" data-vid="${v.id}" title="Email">✉</button>
+                        <button class="btn sm ghost btnDbWa" data-vid="${v.id}" title="WhatsApp" style="color:#128c7e">📱</button>
+                      </td>
                     </tr>
                   `).join('')}
                 </tbody>
+                <tfoot>
+                  <tr style="background:#f8fafc;font-weight:800;border-top:2px solid #0f172a">
+                    <td colspan="4" style="text-align:right">DAY TOTAL:</td>
+                    <td class="r" style="color:#1e3a8a;font-size:1.02rem">${rs(totalDayAmount)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
         `;
+
+        $$('.btnDbView', resEl).forEach(b => {
+          b.onclick = () => {
+            const v = currentDayVouchers.find(x => x.id === b.dataset.vid);
+            if (v && window.QuoteDeskPrint) window.QuoteDeskPrint.previewVoucher(v);
+          };
+        });
+
+        $$('.btnDbDl', resEl).forEach(b => {
+          b.onclick = () => {
+            const v = currentDayVouchers.find(x => x.id === b.dataset.vid);
+            if (v && window.QuoteDeskPrint) window.QuoteDeskPrint.downloadVchPdfDirect(v);
+          };
+        });
+
+        $$('.btnDbMail', resEl).forEach(b => {
+          b.onclick = () => {
+            const v = currentDayVouchers.find(x => x.id === b.dataset.vid);
+            if (v && window.QuoteDeskPrint) window.QuoteDeskPrint.openEmailModal(v, true);
+          };
+        });
+
+        $$('.btnDbWa', resEl).forEach(b => {
+          b.onclick = () => {
+            const v = currentDayVouchers.find(x => x.id === b.dataset.vid);
+            if (v && window.QuoteDeskPrint) window.QuoteDeskPrint.openWhatsAppShare(v, true);
+          };
+        });
       } catch (e) {
         resEl.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
       }
     };
 
     $('#btnLoadDaybook').onclick = loadDaybook;
+    $('#db_search').oninput = loadDaybook;
+
+    $('#btnPrintDaybook').onclick = () => {
+      const d = $('#db_date').value;
+      if (!currentDayVouchers.length) {
+        toast('No vouchers to print for this day.', 'bad');
+        return;
+      }
+      const totalDay = currentDayVouchers.reduce((s, v) => s + (Number(v.totalAmount) || 0), 0);
+      const reportHtml = `
+        <div style="margin-bottom:12px;font-size:0.85rem"><b>Date:</b> ${fmtDate(d)} &bull; Total Transactions: ${currentDayVouchers.length}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:14px">
+          <thead>
+            <tr style="background:#0f172a;color:#ffffff;text-align:left">
+              <th style="padding:6px 8px;border:1px solid #0f172a">#</th>
+              <th style="padding:6px 8px;border:1px solid #0f172a">Voucher No</th>
+              <th style="padding:6px 8px;border:1px solid #0f172a">Type</th>
+              <th style="padding:6px 8px;border:1px solid #0f172a">Party / Particulars</th>
+              <th style="padding:6px 8px;border:1px solid #0f172a">Narration</th>
+              <th style="padding:6px 8px;border:1px solid #0f172a;text-align:right">Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${currentDayVouchers.map((v, i) => `
+              <tr style="border-bottom:1px solid #e2e8f0;background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'}">
+                <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${i + 1}</td>
+                <td style="padding:6px 8px;border:1px solid #cbd5e1"><b>${esc(v.voucherNo)}</b></td>
+                <td style="padding:6px 8px;border:1px solid #cbd5e1">${esc(v.voucherType.toUpperCase())}</td>
+                <td style="padding:6px 8px;border:1px solid #cbd5e1">${esc(v.partyName || '-')}</td>
+                <td style="padding:6px 8px;border:1px solid #cbd5e1">${esc(v.narration || '-')}</td>
+                <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:right;font-weight:700">${rs(v.totalAmount)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:#f1f5f9;font-weight:800;border-top:2px solid #0f172a">
+              <td colspan="5" style="padding:8px;border:1px solid #cbd5e1;text-align:right">DAY BOOK TOTAL:</td>
+              <td style="padding:8px;border:1px solid #cbd5e1;text-align:right;color:#1e3a8a;font-size:1rem">${rs(totalDay)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      `;
+      window.QuoteDeskPrint.previewReport(`Day Book Register — ${fmtDate(d)}`, reportHtml);
+    };
+
     loadDaybook();
   }
 
@@ -956,6 +1218,14 @@
       const tb = await apiGet('/api/reports/trialbalance');
       area.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div>
+              <h3 style="margin:0">⚖️ Verified Trial Balance</h3>
+              <div class="mute sm">As of Date: ${fmtDate(tb.asOfDate || new Date())} &bull; Double-entry verification</div>
+            </div>
+            <button class="btn sm" id="btnPrintTbSheet" style="border:1px solid #cbd5e1">🖨️ Print Trial Balance</button>
+          </div>
+
           ${tb.isTallied ? `
             <div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0;padding:12px">
               <b style="color:#15803d">✅ Trial Balance Tallied:</b>
@@ -968,7 +1238,7 @@
             </div>
           `}
 
-          <div class="card">
+          <div class="card" style="padding:6px 10px">
             <div class="scx">
               <table class="tbl sm">
                 <thead>
@@ -1001,6 +1271,43 @@
           </div>
         </div>
       `;
+
+      $('#btnPrintTbSheet').onclick = () => {
+        if (!window.QuoteDeskPrint) return;
+        const reportHtml = `
+          <div style="margin-bottom:12px;font-size:0.85rem"><b>As of Date:</b> ${fmtDate(tb.asOfDate || new Date())} &bull; Status: ${tb.isTallied ? '<b style="color:#15803d">Tallied (₹' + Number(tb.totalDebit).toLocaleString('en-IN') + ')</b>' : '<b style="color:#dc2626">Imbalance</b>'}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:14px">
+            <thead>
+              <tr style="background:#0f172a;color:#ffffff;text-align:left">
+                <th style="padding:6px 8px;border:1px solid #0f172a">#</th>
+                <th style="padding:6px 8px;border:1px solid #0f172a">Particulars (Account Ledger)</th>
+                <th style="padding:6px 8px;border:1px solid #0f172a">Group</th>
+                <th style="padding:6px 8px;border:1px solid #0f172a;text-align:right">Debit (Dr ₹)</th>
+                <th style="padding:6px 8px;border:1px solid #0f172a;text-align:right">Credit (Cr ₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tb.rows.map((r, i) => `
+                <tr style="border-bottom:1px solid #e2e8f0;background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'}">
+                  <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:center">${i + 1}</td>
+                  <td style="padding:6px 8px;border:1px solid #cbd5e1"><b>${esc(r.ledgerName)}</b></td>
+                  <td style="padding:6px 8px;border:1px solid #cbd5e1">${esc(r.groupName)}</td>
+                  <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:right">${r.debit > 0 ? rs(r.debit) : '-'}</td>
+                  <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:right">${r.credit > 0 ? rs(r.credit) : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background:#f1f5f9;font-weight:900;border-top:2px solid #0f172a">
+                <td colspan="3" style="padding:8px;border:1px solid #cbd5e1;text-align:right">TRIAL BALANCE TOTAL:</td>
+                <td style="padding:8px;border:1px solid #cbd5e1;text-align:right;color:#1e3a8a;font-size:1rem">${rs(tb.totalDebit)}</td>
+                <td style="padding:8px;border:1px solid #cbd5e1;text-align:right;color:#1e3a8a;font-size:1rem">${rs(tb.totalCredit)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        `;
+        window.QuoteDeskPrint.previewReport('Trial Balance Statement', reportHtml);
+      };
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
@@ -1012,6 +1319,14 @@
     try {
       const pnl = await apiGet('/api/reports/pnl');
       area.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <h3 style="margin:0">📈 Profit &amp; Loss Statement</h3>
+            <div class="mute sm">Income and expenditure accounting statement</div>
+          </div>
+          <button class="btn sm" id="btnPrintPnlSheet" style="border:1px solid #cbd5e1">🖨️ Print P&amp;L</button>
+        </div>
+
         <div class="grid g2" style="gap:16px">
           <!-- Expenses -->
           <div class="card">
@@ -1069,6 +1384,33 @@
           </span>
         </div>
       `;
+
+      $('#btnPrintPnlSheet').onclick = () => {
+        if (!window.QuoteDeskPrint) return;
+        const reportHtml = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px">
+              <b style="color:#dc2626">Expenses:</b>
+              <table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:6px">
+                ${pnl.expenses.map(e => `<tr><td style="padding:4px 0">${esc(e.ledgerName)}</td><td style="text-align:right;font-weight:600">${rs(e.amount)}</td></tr>`).join('')}
+                <tr style="border-top:1px solid #cbd5e1;font-weight:700"><td>Total Expenses:</td><td style="text-align:right">${rs(pnl.totalExpense)}</td></tr>
+              </table>
+            </div>
+            <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px">
+              <b style="color:#15803d">Income:</b>
+              <table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:6px">
+                ${pnl.income.map(i => `<tr><td style="padding:4px 0">${esc(i.ledgerName)}</td><td style="text-align:right;font-weight:600">${rs(i.amount)}</td></tr>`).join('')}
+                <tr style="border-top:1px solid #cbd5e1;font-weight:700"><td>Total Income:</td><td style="text-align:right">${rs(pnl.totalIncome)}</td></tr>
+              </table>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:2px solid #0f172a;border-radius:6px;padding:12px;display:flex;justify-content:space-between;align-items:center">
+            <b>NET PROFIT / (LOSS):</b>
+            <span style="font-size:1.2rem;font-weight:900;color:${pnl.isProfit ? '#15803d' : '#b91c1c'}">${rs(pnl.netProfit)}</span>
+          </div>
+        `;
+        window.QuoteDeskPrint.previewReport('Profit & Loss Statement', reportHtml);
+      };
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
@@ -1081,6 +1423,14 @@
       const bs = await apiGet('/api/reports/balancesheet');
       area.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div>
+              <h3 style="margin:0">🏦 Balance Sheet</h3>
+              <div class="mute sm">Statement of Financial Position</div>
+            </div>
+            <button class="btn sm" id="btnPrintBsSheet" style="border:1px solid #cbd5e1">🖨️ Print Balance Sheet</button>
+          </div>
+
           ${bs.isBalanced ? `
             <div class="card" style="background:#f0fdf4;border:1px solid #bbf7d0;padding:12px">
               <b style="color:#15803d">✅ Balance Sheet Balanced:</b>
@@ -1134,6 +1484,29 @@
           </div>
         </div>
       `;
+
+      $('#btnPrintBsSheet').onclick = () => {
+        if (!window.QuoteDeskPrint) return;
+        const reportHtml = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px">
+              <b style="color:#1e3a8a">Liabilities &amp; Capital:</b>
+              <table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:6px">
+                ${bs.liabilities.map(l => `<tr><td style="padding:4px 0">${esc(l.ledgerName)}</td><td style="text-align:right;font-weight:600">${rs(l.amount)}</td></tr>`).join('')}
+                <tr style="border-top:1px solid #cbd5e1;font-weight:800"><td>Total Liabilities:</td><td style="text-align:right">${rs(bs.totalLiabilities)}</td></tr>
+              </table>
+            </div>
+            <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px">
+              <b style="color:#1e3a8a">Assets:</b>
+              <table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:6px">
+                ${bs.assets.map(a => `<tr><td style="padding:4px 0">${esc(a.ledgerName)}</td><td style="text-align:right;font-weight:600">${rs(a.amount)}</td></tr>`).join('')}
+                <tr style="border-top:1px solid #cbd5e1;font-weight:800"><td>Total Assets:</td><td style="text-align:right">${rs(bs.totalAssets)}</td></tr>
+              </table>
+            </div>
+          </div>
+        `;
+        window.QuoteDeskPrint.previewReport('Balance Sheet Statement', reportHtml);
+      };
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
@@ -1146,6 +1519,14 @@
       const gst = await apiGet('/api/reports/gst');
       area.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+            <div>
+              <h3 style="margin:0">📑 GST Working Sheet</h3>
+              <div class="mute sm">GSTR-1 Outward Supplies &amp; GSTR-3B Input Tax Credit (ITC)</div>
+            </div>
+            <button class="btn sm" id="btnPrintGstSheet" style="border:1px solid #cbd5e1">🖨️ Print GST Sheet</button>
+          </div>
+
           <!-- GSTR-1 Outward Supplies -->
           <div class="card">
             <h4 style="margin:0 0 10px;color:#1e3a8a">GSTR-1: Outward Taxable Supplies (Sales)</h4>
@@ -1167,32 +1548,76 @@
                   <td class="r">${rs(gst.gstr1.cgst)}</td>
                   <td class="r">${rs(gst.gstr1.sgst)}</td>
                   <td class="r">${rs(gst.gstr1.igst)}</td>
-                  <td class="r" style="font-weight:700;color:#1e3a8a">${rs(gst.gstr1.totalTax)}</td>
+                  <td class="r" style="font-weight:800;color:#15803d">${rs(gst.gstr1.totalTax)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- GSTR-3B Tax Liability & ITC -->
-          <div class="card" style="background:#f8fafc">
-            <h4 style="margin:0 0 10px;color:#0f172a">GSTR-3B: Monthly Tax Liability &amp; Input Tax Credit (ITC)</h4>
-            <div class="grid g3" style="gap:12px;margin-top:10px">
-              <div class="card" style="padding:12px">
-                <span class="mute sm">Total Outward Tax Liability:</span>
-                <div style="font-size:1.25rem;font-weight:900;color:#dc2626;margin-top:4px">${rs(gst.gstr3b.outwardTax)}</div>
-              </div>
-              <div class="card" style="padding:12px">
-                <span class="mute sm">Eligible Input Tax Credit (ITC):</span>
-                <div style="font-size:1.25rem;font-weight:900;color:#15803d;margin-top:4px">${rs(gst.gstr3b.eligibleItc)}</div>
-              </div>
-              <div class="card" style="padding:12px;background:#f0fdf4;border-color:#bbf7d0">
-                <span class="mute sm" style="color:#166534">Net Tax Payable in Cash:</span>
-                <div style="font-size:1.25rem;font-weight:900;color:#166534;margin-top:4px">${rs(gst.gstr3b.netTaxPayableCash)}</div>
-              </div>
+          <!-- GSTR-3B ITC Summary -->
+          <div class="card">
+            <h4 style="margin:0 0 10px;color:#1e3a8a">GSTR-3B: Eligible Input Tax Credit (Purchases)</h4>
+            <table class="tbl sm">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th class="r">Inward Taxable (₹)</th>
+                  <th class="r">Input CGST (₹)</th>
+                  <th class="r">Input SGST (₹)</th>
+                  <th class="r">Input IGST (₹)</th>
+                  <th class="r">Total ITC (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>Total Eligible ITC on Purchases</b></td>
+                  <td class="r" style="font-weight:700">${rs(gst.gstr3b.eligibleItc.taxableSupplies)}</td>
+                  <td class="r">${rs(gst.gstr3b.eligibleItc.cgst)}</td>
+                  <td class="r">${rs(gst.gstr3b.eligibleItc.sgst)}</td>
+                  <td class="r">${rs(gst.gstr3b.eligibleItc.igst)}</td>
+                  <td class="r" style="font-weight:800;color:#0284c7">${rs(gst.gstr3b.eligibleItc.totalTax)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Net GST Payable -->
+          <div class="card" style="background:#f8fafc;border:2px solid #0f172a;padding:16px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:1.1rem;font-weight:800;color:#0f172a">NET GST PAYABLE (CASH / ELECTRONIC LEDGER):</div>
+              <div class="mute sm">Output Tax (${rs(gst.gstr1.totalTax)}) less Eligible ITC (${rs(gst.gstr3b.eligibleItc.totalTax)})</div>
+            </div>
+            <div style="font-size:1.5rem;font-weight:900;color:#1e3a8a">
+              ${rs(gst.netGstPayable.total)}
             </div>
           </div>
         </div>
       `;
+
+      $('#btnPrintGstSheet').onclick = () => {
+        if (!window.QuoteDeskPrint) return;
+        const reportHtml = `
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:10px;margin-bottom:12px">
+            <b>1. GSTR-1 Outward Supplies (Tax on Sales):</b>
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:6px">
+              <tr style="border-bottom:1px solid #cbd5e1"><th style="text-align:left">Taxable Turnover</th><th style="text-align:right">CGST</th><th style="text-align:right">SGST</th><th style="text-align:right">IGST</th><th style="text-align:right">Total Output Tax</th></tr>
+              <tr><td>${rs(gst.gstr1.taxableSupplies)}</td><td style="text-align:right">${rs(gst.gstr1.cgst)}</td><td style="text-align:right">${rs(gst.gstr1.sgst)}</td><td style="text-align:right">${rs(gst.gstr1.igst)}</td><td style="text-align:right;font-weight:700">${rs(gst.gstr1.totalTax)}</td></tr>
+            </table>
+          </div>
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:10px;margin-bottom:12px">
+            <b>2. GSTR-3B Input Tax Credit (ITC on Purchases):</b>
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:6px">
+              <tr style="border-bottom:1px solid #cbd5e1"><th style="text-align:left">Inward Taxable</th><th style="text-align:right">Input CGST</th><th style="text-align:right">Input SGST</th><th style="text-align:right">Input IGST</th><th style="text-align:right">Total ITC</th></tr>
+              <tr><td>${rs(gst.gstr3b.eligibleItc.taxableSupplies)}</td><td style="text-align:right">${rs(gst.gstr3b.eligibleItc.cgst)}</td><td style="text-align:right">${rs(gst.gstr3b.eligibleItc.sgst)}</td><td style="text-align:right">${rs(gst.gstr3b.eligibleItc.igst)}</td><td style="text-align:right;font-weight:700">${rs(gst.gstr3b.eligibleItc.totalTax)}</td></tr>
+            </table>
+          </div>
+          <div style="background:#f8fafc;border:2px solid #0f172a;border-radius:6px;padding:12px;display:flex;justify-content:space-between;align-items:center">
+            <b>NET GST PAYABLE IN CASH:</b>
+            <span style="font-size:1.25rem;font-weight:900;color:#1e3a8a">${rs(gst.netGstPayable.total)}</span>
+          </div>
+        `;
+        window.QuoteDeskPrint.previewReport('GST Statutory Working Sheet', reportHtml);
+      };
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
@@ -1545,11 +1970,67 @@
             </table>
           </div>
 
-          <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <button class="btn sm" id="btnPrintStmtSheet">🖨️ Print Statement</button>
             <button class="btn sm pri" onclick="closeModal()">Close</button>
           </div>
         </div>
       `;
+
+      const btnPrint = $('#btnPrintStmtSheet');
+      if (btnPrint) {
+        btnPrint.onclick = () => {
+          closeModal();
+          if (window.QuoteDeskPrint) {
+            const reportHtml = `
+              <div style="border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;padding:10px 14px;margin-bottom:14px;font-size:0.85rem">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+                  <div><b>Account Name:</b> ${esc(stmt.ledger.name)}</div>
+                  <div><b>Account Group:</b> ${esc(stmt.ledger.groupName || '-')}</div>
+                  <div><b>Opening Balance:</b> ${rs(stmt.openingBalance)} ${stmt.openingBalanceType}</div>
+                </div>
+              </div>
+              <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:14px">
+                <thead>
+                  <tr style="background:#0f172a;color:#ffffff;text-align:left">
+                    <th style="padding:6px 8px;border:1px solid #0f172a">Date</th>
+                    <th style="padding:6px 8px;border:1px solid #0f172a">Voucher No</th>
+                    <th style="padding:6px 8px;border:1px solid #0f172a">Type</th>
+                    <th style="padding:6px 8px;border:1px solid #0f172a">Particulars / Narration</th>
+                    <th style="padding:6px 8px;border:1px solid #0f172a;text-align:right">Debit (Dr ₹)</th>
+                    <th style="padding:6px 8px;border:1px solid #0f172a;text-align:right">Credit (Cr ₹)</th>
+                    <th style="padding:6px 8px;border:1px solid #0f172a;text-align:right">Running Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${stmt.rows.length ? stmt.rows.map((r, idx) => `
+                    <tr style="border-bottom:1px solid #e2e8f0;background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}">
+                      <td style="padding:6px 8px;border:1px solid #cbd5e1">${fmtDate(r.date)}</td>
+                      <td style="padding:6px 8px;border:1px solid #cbd5e1"><b>${esc(r.voucherNo)}</b></td>
+                      <td style="padding:6px 8px;border:1px solid #cbd5e1">${esc(r.voucherType.toUpperCase())}</td>
+                      <td style="padding:6px 8px;border:1px solid #cbd5e1">${esc(r.narration || '-')}</td>
+                      <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:right">${r.debit > 0 ? rs(r.debit) : '-'}</td>
+                      <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:right">${r.credit > 0 ? rs(r.credit) : '-'}</td>
+                      <td style="padding:6px 8px;border:1px solid #cbd5e1;text-align:right;font-weight:700">${rs(r.runningBalance)} ${r.balanceType}</td>
+                    </tr>
+                  `).join('') : `
+                    <tr><td colspan="7" style="text-align:center;padding:16px;color:#64748b">No transactions recorded for this ledger.</td></tr>
+                  `}
+                </tbody>
+                <tfoot>
+                  <tr style="background:#f1f5f9;font-weight:800;border-top:2px solid #0f172a">
+                    <td colspan="4" style="padding:8px;border:1px solid #cbd5e1">PERIOD TOTALS / CLOSING:</td>
+                    <td style="padding:8px;border:1px solid #cbd5e1;text-align:right">${rs(stmt.totalDebit)}</td>
+                    <td style="padding:8px;border:1px solid #cbd5e1;text-align:right">${rs(stmt.totalCredit)}</td>
+                    <td style="padding:8px;border:1px solid #cbd5e1;text-align:right;color:#15803d;font-weight:900">${rs(stmt.closingBalance)} ${stmt.closingBalanceType}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            `;
+            window.QuoteDeskPrint.previewReport(`Statement of Account: ${stmt.ledger.name}`, reportHtml);
+          }
+        };
+      }
     } catch (e) {
       $('.modal-body').innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }

@@ -74,6 +74,8 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Framer Motion Web Engine for smooth animations -->
   <script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.js"></script>
+  <!-- Universal Print, PDF, Email & WhatsApp Templates -->
+  <script src="/modules/print-templates.js"></script>
   <!-- Universal Document Engine UI (Phase 1) -->
   <script src="/modules/documents-ui.js"></script>
   <!-- Accounting Core UI (Phase 4) -->
@@ -4625,7 +4627,7 @@
     function quoteRow(q) {
       const shared = q.shareToken ? `<span title="Viewed ${q.viewCount||0}×" style="font-size:0.75rem;color:var(--ok)">${q.viewCount ? '👁' + q.viewCount : '🔗'}</span>` : '';
       const accepted = q.acceptedBy ? `<span title="Accepted by ${q.acceptedBy}" style="font-size:0.75rem;color:var(--ok)">✅</span>` : '';
-      return `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)} ${shared}${accepted}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="shareLink" data-id="${q.id}" title="Client share link + track" style="color:var(--glass)">🔗</button><button class="btn sm ghost" data-act="delQuoteRow" data-id="${q.id}" title="Delete Quotation" style="color:var(--bad)">🗑️</button></td></tr>`;
+      return `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)} ${shared}${accepted}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="quickMrl" data-id="${q.id}" title="Material Requisition Voucher">📦</button><button class="btn sm ghost" data-act="shareLink" data-id="${q.id}" title="Client share link + track" style="color:var(--glass)">🔗</button><button class="btn sm ghost" data-act="delQuoteRow" data-id="${q.id}" title="Delete Quotation" style="color:var(--bad)">🗑️</button></td></tr>`;
     }
     function viewDash() {
       const qs = liveQuotes(), m = $('#main');
@@ -4990,7 +4992,7 @@
     function drawQuotes() {
       const base = filteredQuotes(true), list = filteredQuotes(false);
       $('#qchips').innerHTML = ['all', ...Object.keys(STATUS)].map(s => `<button class="chip ${qf.status === s ? 'on' : ''}" data-act="qstatus" data-s="${s}">${s === 'all' ? 'All' : STATUS[s]}<b>${s === 'all' ? base.length : base.filter(q => q.status === s).length}</b></button>`).join('');
-      $('#qtable').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer / project</th><th class="r">Total</th><th>Status</th><th>Owner</th><th class="r">Actions</th></tr></thead><tbody>${list.map(q => `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)}</td><td class="nowrap">${esc(userName(q.createdBy))}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="delQuoteRow" data-id="${q.id}" title="Delete Quotation" style="color:var(--bad)">🗑️</button></td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="margin:10px">${db.quotes.length ? 'No quotes match this filter.' : 'No quotes yet. Select New quotation to start.'}</div>`;
+      $('#qtable').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>Number</th><th>Date</th><th>Customer / project</th><th class="r">Total</th><th>Status</th><th>Owner</th><th class="r">Actions</th></tr></thead><tbody>${list.map(q => `<tr><td class="nowrap"><a class="rl" href="#/quote/${q.id}">${esc(q.no)}</a></td><td class="nowrap">${fmtDate(q.date)}<div class="mute sm">${fyOf(q.date)}</div></td><td>${esc(q.cust.name || '(no customer)')}<div class="mute sm">${esc(q.project)}</div></td><td class="r nowrap">${rs(quoteTotal(q), 0)}</td><td>${statusBadge(q.status)}</td><td class="nowrap">${esc(userName(q.createdBy))}</td><td class="r nowrap"><button class="btn sm ghost" data-act="quickView" data-id="${q.id}" title="View Preview">👁 View</button><button class="btn sm ghost" data-act="quickDownload" data-id="${q.id}" title="Download Options">📥</button><button class="btn sm ghost" data-act="shareMail" data-id="${q.id}" title="Send Mail">✉</button><button class="btn sm ghost" data-act="shareWhatsapp" data-id="${q.id}" title="Share WhatsApp" style="color:#128c7e">📱</button><button class="btn sm ghost" data-act="quickMrl" data-id="${q.id}" title="Material Requisition Voucher">📦</button><button class="btn sm ghost" data-act="delQuoteRow" data-id="${q.id}" title="Delete Quotation" style="color:var(--bad)">🗑️</button></td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="margin:10px">${db.quotes.length ? 'No quotes match this filter.' : 'No quotes yet. Select New quotation to start.'}</div>`;
     }
     ACT.qstatus = b => { qf.status = b.dataset.s; drawQuotes() };
     ACT.csv = () => {
@@ -5314,10 +5316,47 @@
       }, 'Delete Quotation', 'bad');
     };
 
+    ACT.createMaterialReq = async () => {
+      if (!Q) return;
+      try {
+        const res = await apiPost('/api/documents/convert-from-quote/' + Q.id, { targetDocType: 'mrl' });
+        toast(`✅ Generated Material Requisition Voucher ${res.no}`);
+        go('#/document/' + res.id);
+      } catch (err) {
+        toast('Failed to create Material Requisition: ' + err.message, 'bad');
+      }
+    };
+
+    ACT.quickMrl = async b => {
+      const qId = b.dataset.id;
+      const q = db.quotes.find(x => x.id === qId);
+      if (!q) return;
+      try {
+        const docs = await apiGet('/api/documents?type=mrl');
+        const existing = (docs || []).find(d => d.sourceDocId === qId && !d.superseded);
+        if (existing) {
+          if (window.QuoteDeskPrint) {
+            window.QuoteDeskPrint.previewDoc(existing);
+          } else {
+            go('#/document/' + existing.id);
+          }
+        } else {
+          const res = await apiPost('/api/documents/convert-from-quote/' + qId, { targetDocType: 'mrl' });
+          toast(`✅ Generated Material Requisition Voucher ${res.no}`);
+          if (window.QuoteDeskPrint) {
+            window.QuoteDeskPrint.previewDoc(res);
+          } else {
+            go('#/document/' + res.id);
+          }
+        }
+      } catch (e) {
+        toast('Error: ' + e.message, 'bad');
+      }
+    };
+
     ACT.shareMail = b => {
       const q = db.quotes.find(x => x.id === b.dataset.id); if (!q) return;
       const t = calcTotals(q);
-      const defSub = `Quotation Ref: ${q.no} - ${q.project || 'Supply & Installation'}`;
       const defMsg = `Dear ${q.cust.name || 'Customer'},\n\nWe are pleased to share our quotation ${q.no} for ${q.project || 'your project'}.\n\nQuotation Details:\n- Quote No: ${q.no}\n- Date: ${fmtDate(q.date)}\n- Valid Until: ${fmtDate(addDays(q.date, q.validity || 30))}\n- Total Amount: ${rs(t.grand, 0)}\n\nPrepared By: ${userName(q.createdBy)}\nCompany: ${db.settings.company}\n\nPlease find the official PDF quotation attached.\n\nBest Regards,\n${db.settings.company}`;
 
       modal({
@@ -8784,6 +8823,7 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
       if (['approved', 'sent', 'won', 'lost'].includes(q.status) && !q.superseded && canWrite()) h += b('revise', 'Create revision');
       h += b('preview', 'Preview and print');
       if (canWrite()) h += b('copyQuote', 'Copy as new quote');
+      if (canWrite()) h += `<button class="btn sm" data-act="createMaterialReq" style="background:#0284c7;color:#fff;border:0;font-weight:600">📦 Material Requisition</button>`;
       if (CLOUD && ['approved', 'sent', 'won'].includes(q.status)) h += `<button class="btn" data-act="shareLink" data-id="${q.id}" style="color:var(--glass);border-color:var(--glass)">🔗 Share with Client</button>`;
       $('#topActs').innerHTML = h;
     }
@@ -9808,6 +9848,15 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
       p.classList.add('on'); p.scrollTop = 0; document.body.style.overflow = 'hidden';
       setTimeout(() => renderDocQr(q), 50);
     }
+    function previewDocInSheet(sheetHtml, docTitle) {
+      const p = $('#preview');
+      p.innerHTML = `<div class="pv-bar"><button class="btn sm" data-act="closePreview">Close</button><button class="btn sm pri" data-act="printNow">Print or save as PDF</button><small>In the print window choose &ldquo;Save as PDF&rdquo; and turn off &ldquo;Headers and footers&rdquo;.</small></div><div class="sheet doc">${sheetHtml}</div>`;
+      p.classList.add('on'); p.scrollTop = 0; document.body.style.overflow = 'hidden';
+    }
+    window.previewDocInSheet = previewDocInSheet;
+    window.closeDocPreview = () => ACT.closePreview();
+    window.getHeaderImg = getHeaderImg;
+    window.getFooterImg = getFooterImg;
     ACT.closePreview = () => { $('#preview').classList.remove('on'); $('#preview').innerHTML = ''; document.body.style.overflow = '' };
     ACT.printNow = () => window.print();
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#preview').classList.contains('on')) ACT.closePreview(); else closeModal() } });

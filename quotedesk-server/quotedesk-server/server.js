@@ -2849,6 +2849,21 @@ app.put('/api/documents/:id', auth, async (req, res) => {
   }
 });
 
+app.delete('/api/documents/:id', auth, async (req, res) => {
+  try {
+    const doc = await docEngine.getDocumentById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const ctx = getDocUserCtx(req);
+    if (!ctx.isMaster && doc.companyId !== ctx.companyId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    const result = await docEngine.deleteDocument(req.params.id, ctx);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // 5. Create Revision (with mandatory reason)
 app.post('/api/documents/:id/revise', auth, async (req, res) => {
   try {
@@ -2921,17 +2936,97 @@ app.post('/api/documents/convert-from-quote/:quoteId', auth, async (req, res) =>
     const ctx = getDocUserCtx(req);
     const { targetDocType } = req.body || { targetDocType: 'pi' };
 
-    const lines = (quote.lines || []).map(l => ({
-      name: l.name || l.desc || 'Line Item',
-      desc: l.spec || l.desc || '',
-      hsn: l.hsn || '7610',
-      qty: Number(l.qty) || 1,
-      unit: l.unit || (quote.dimUnit || 'sqft'),
-      rate: Number(l.rate) || 0,
-      disc: Number(l.disc) || 0,
-      discType: quote.discType || 'pct',
-      gstRate: quote.gstRate || 18
-    }));
+    let lines = [];
+
+    if (targetDocType === 'mrl') {
+      const tpls = (data.productTemplates && data.productTemplates.length) ? data.productTemplates : costingEngine.getSeedTemplates();
+      const settings = data.costingSettings || costingEngine.getDefaultCostingSettings();
+      const allMats = data.materials || [];
+      const rates = {
+        glass: allMats.filter(m => m.category === 'glass'),
+        mesh: allMats.filter(m => m.category === 'mesh'),
+        handle: allMats.filter(m => m.category === 'hardware'),
+        allTemplates: tpls
+      };
+
+      const extracted = [];
+      (quote.lines || []).forEach((l, idx) => {
+        if (l.type === 'size' || l.w || l.h) {
+          const tpl = tpls.find(t => t.id === l.template_id || t.template_key === l.template_id || t.id === l.templateKey) || tpls[0];
+          const calc = costingEngine.calculateItem(tpl, tpl.lines, Number(l.w) || 4, Number(l.h) || 4, l, settings, rates, tpls);
+          const qQty = Number(l.qty) || 1;
+          (calc.lines || []).forEach(bl => {
+            const isProf = bl.kind === 'profile';
+            const matchedMat = allMats.find(m => m.code === bl.profile_no || (bl.profile_no && m.code && String(m.code).trim() === String(bl.profile_no).trim()));
+            const code = bl.profile_no || (matchedMat && matchedMat.code) || bl.code || (isProf ? ('PROF-' + (bl.sl_no || idx + 1)) : ('HW-' + (bl.sl_no || idx + 1)));
+            const brand = (tpl && (tpl.series || tpl.brand)) || (matchedMat && matchedMat.brand) || (isProf ? 'Domal 27' : (bl.kind === 'glass' ? 'Saint-Gobain' : 'Standard'));
+            const reqQty = Math.round((bl.totalMetres ? (bl.totalMetres * qQty) : ((bl.evaluatedNos || bl.nos || 1) * qQty)) * 100) / 100;
+            const unit = isProf ? 'mtr' : (bl.kind === 'glass' || bl.kind === 'mesh' ? 'sqm' : (bl.kind === 'gasket' || bl.kind === 'brush_seal' ? 'mtr' : 'nos'));
+            const amt = Math.round((bl.amount || 0) * qQty * 100) / 100;
+
+            extracted.push({
+              code: String(code),
+              brand: String(brand),
+              name: bl.description || bl.name || 'Raw Material',
+              desc: `For Opening: ${l.name || 'Window'} (${l.w}×${l.h} ${quote.dimUnit || 'ft'}) [Qty: ${qQty}]`,
+              category: bl.kind || 'profile',
+              qty: reqQty,
+              unit,
+              rate: reqQty > 0 ? Math.round(amt / reqQty) : (Number(bl.unit_price) || 0),
+              taxable: amt,
+              hsn: isProf ? '7610' : (bl.kind === 'glass' ? '7005' : '8302'),
+              disc: 0,
+              gstRate: quote.gstRate || 18
+            });
+          });
+        } else {
+          extracted.push({
+            code: l.code || ('BOQ-' + (idx + 1)),
+            brand: l.brand || 'Standard',
+            name: l.name || l.desc || 'BOQ Item',
+            desc: l.spec || '',
+            category: 'boq',
+            qty: Number(l.qty) || 1,
+            unit: l.unit || 'nos',
+            rate: Number(l.rate) || 0,
+            taxable: (Number(l.qty) || 1) * (Number(l.rate) || 0),
+            hsn: l.hsn || '7610',
+            disc: Number(l.disc) || 0,
+            gstRate: quote.gstRate || 18
+          });
+        }
+      });
+
+      // Group identical materials (same code, brand, name, and unit) to present clean consolidated requisition
+      const groupedMap = new Map();
+      extracted.forEach(item => {
+        const key = `${item.code}__${item.brand}__${item.name}__${item.unit}`;
+        if (!groupedMap.has(key)) {
+          groupedMap.set(key, { ...item });
+        } else {
+          const ex = groupedMap.get(key);
+          ex.qty = Math.round((ex.qty + item.qty) * 100) / 100;
+          ex.taxable = Math.round((ex.taxable + item.taxable) * 100) / 100;
+          ex.rate = ex.qty > 0 ? Math.round(ex.taxable / ex.qty) : ex.rate;
+        }
+      });
+
+      lines = Array.from(groupedMap.values());
+    } else {
+      lines = (quote.lines || []).map(l => ({
+        code: l.code || '',
+        brand: l.brand || '',
+        name: l.name || l.desc || 'Line Item',
+        desc: l.spec || l.desc || '',
+        hsn: l.hsn || '7610',
+        qty: Number(l.qty) || 1,
+        unit: l.unit || (quote.dimUnit || 'sqft'),
+        rate: Number(l.rate) || 0,
+        disc: Number(l.disc) || 0,
+        discType: quote.discType || 'pct',
+        gstRate: quote.gstRate || 18
+      }));
+    }
 
     const doc = await docEngine.createDocument({
       companyId: ctx.companyId,
@@ -2943,8 +3038,12 @@ app.post('/api/documents/convert-from-quote/:quoteId', auth, async (req, res) =>
       site: quote.site || '',
       pos: quote.pos || 'Tamil Nadu',
       lines,
-      terms: quote.terms || '',
-      notes: `Converted from Quotation ${quote.no} (Rev ${quote.rev || 0})`,
+      terms: targetDocType === 'mrl'
+        ? '1. Materials issued strictly against approved cutting list and fabrication indent.\n2. Any wastage exceeding approved percentage requires written variance authorization.\n3. Balance unutilized offcuts and glass pieces must be returned to store with job number reference.'
+        : (quote.terms || ''),
+      notes: targetDocType === 'mrl'
+        ? `Material Requisition List (MRL) generated from Quotation ${quote.no} (Rev ${quote.rev || 0})`
+        : `Converted from Quotation ${quote.no} (Rev ${quote.rev || 0})`,
       sourceDocId: quote.id,
       sourceDocNo: quote.no,
       sourceDocType: 'quote',
