@@ -165,6 +165,7 @@
     const totals = d.totals || {};
     const lines = d.lines || [];
     const cust = d.cust || d.vendor || {};
+    const shipping = d.shipping || cust || {};
     const bank = s.bank || {};
     const hasBank = bank.acNo || bank.bankName || bank.ifsc;
     const terms = (d.terms || s.terms || '').split('\n').map(t => t.trim()).filter(Boolean);
@@ -172,18 +173,18 @@
 
     let statutoryTitle = typeLabel.toUpperCase();
     let subTitle = '';
-    if (d.docType === 'inv') subTitle = 'TAX INVOICE (Issued under Section 31 of CGST Act, 2017)';
+    if (d.docType === 'inv') subTitle = 'TAX INVOICE (Issued under Section 31 of CGST Act, 2017 & Rule 46 of CGST Rules)';
     else if (d.docType === 'dc') {
       subTitle = isChallanWithoutVal
         ? 'DELIVERY CHALLAN &bull; GATE PASS / SITE STORE COPY (WITHOUT VALUE)'
         : 'DELIVERY CHALLAN &bull; CONSIGNMENT TRANSPORT COPY (WITH VALUE)';
-    } else if (d.docType === 'pi') subTitle = 'PROFORMA INVOICE / ESTIMATE';
+    } else if (d.docType === 'pi') subTitle = 'PROFORMA INVOICE / STATUTORY ESTIMATE';
     else if (d.docType === 'ra') subTitle = `RUNNING ACCOUNT (RA) BILL #${d.raNumber || 1}`;
     else if (d.docType === 'cn') subTitle = 'CREDIT NOTE (Issued under Section 34 of CGST Act, 2017)';
     else if (d.docType === 'dn') subTitle = 'DEBIT NOTE (Issued under Section 34 of CGST Act, 2017)';
     else if (d.docType === 'mrl') {
       statutoryTitle = 'MATERIAL REQUISITION VOUCHER (MRL)';
-      subTitle = 'FACTORY FABRICATION &amp; STORE ISSUE INDENT';
+      subTitle = 'FACTORY FABRICATION &amp; SITE STORE ISSUE INDENT';
     }
 
     return `
@@ -196,28 +197,66 @@
           ${subTitle ? `<div style="font-size:0.75rem;font-weight:700;color:#475569;margin-top:2px">${esc(subTitle)}</div>` : ''}
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;margin-bottom:14px;background:#f8fafc">
-          <div>
-            <div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:3px">${isMrl ? 'Requisition For / Project Client:' : 'Billed To / Consignee:'}</div>
-            <div style="font-weight:700;font-size:0.95rem;color:#0f172a">${esc(cust.name || '(No Party Assigned)')}</div>
-            ${cust.address ? `<div style="font-size:0.82rem;color:#334155">${esc(cust.address)}</div>` : ''}
-            ${(cust.city || cust.state) ? `<div style="font-size:0.82rem;color:#334155">${[cust.city, cust.state && (cust.state + (cust.pincode ? ' - ' + cust.pincode : ''))].filter(Boolean).map(esc).join(', ')}</div>` : ''}
-            ${cust.gstin ? `<div style="font-size:0.82rem;margin-top:2px"><b>GSTIN:</b> <span style="font-family:monospace">${esc(cust.gstin)}</span></div>` : ''}
-            ${cust.phone || cust.email ? `<div style="font-size:0.8rem;color:#475569;margin-top:2px">${[cust.phone, cust.email].filter(Boolean).map(esc).join(' &bull; ')}</div>` : ''}
-            ${d.site ? `<div style="font-size:0.8rem;color:#0369a1;margin-top:3px"><b>Site Location:</b> ${esc(d.site)}</div>` : ''}
+        <!-- 2-Box Statutory Address Grid: Billed To & Shipped To -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;font-size:0.8rem">
+          <!-- BOX 1: Details of Receiver | Billed to -->
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;background:#f8fafc;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="font-size:0.7rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:5px">
+                Details of Receiver &bull; Billed To
+              </div>
+              <div style="font-size:0.92rem;font-weight:800;color:#0f172a;line-height:1.25">${esc(cust.name || '(No Party Assigned)')}</div>
+              ${cust.address ? `<div style="color:#334155;margin-top:2px">${esc(cust.address)}</div>` : ''}
+              ${(cust.city || cust.state) ? `<div style="color:#334155">${[cust.city, cust.state && (cust.state + (cust.pincode ? ' - ' + cust.pincode : ''))].filter(Boolean).map(esc).join(', ')}</div>` : ''}
+              ${cust.phone || cust.email ? `<div style="color:#64748b;font-size:0.75rem;margin-top:2px">${[cust.phone, cust.email].filter(Boolean).map(esc).join(' &bull; ')}</div>` : ''}
+            </div>
+            <div style="margin-top:6px;padding-top:4px;border-top:1px dashed #cbd5e1;font-size:0.78rem">
+              <div style="display:flex;justify-content:space-between">
+                <span><b>GSTIN / UIN:</b> <span style="font-family:monospace;font-weight:700;color:#0f172a">${esc(cust.gstin || '-')}</span></span>
+                ${cust.stateCode ? `<span>State Code: <b>${esc(cust.stateCode)}</b></span>` : ''}
+              </div>
+              ${cust.pan ? `<div><b>PAN No:</b> <span style="font-family:monospace">${esc(cust.pan)}</span></div>` : ''}
+            </div>
           </div>
 
-          <div style="border-left:1px dashed #cbd5e1;padding-left:12px">
-            <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;font-size:0.82rem">
-              <span style="color:#64748b">Voucher / Doc No:</span><b>${esc(d.no)}</b>
-              <span style="color:#64748b">Date:</span><span>${fmtDate(d.date)}</span>
-              <span style="color:#64748b">Revision:</span><span>Rev ${d.rev || 0} ${d.superseded ? '<span style="color:#dc2626;font-weight:700">(Replaced)</span>' : ''}</span>
-              ${d.sourceDocNo ? `<span style="color:#64748b">Source Quotation:</span><b>${esc(d.sourceDocNo)}</b>` : ''}
-              ${d.project ? `<span style="color:#64748b">Project:</span><b>${esc(d.project)}</b>` : ''}
-              <span style="color:#64748b">Place of Supply:</span><span>${esc(d.pos || s.state || 'Tamil Nadu')} (State Code: ${esc(d.stateCode || '33')})</span>
-              ${d.vehicleNo ? `<span style="color:#64748b">Vehicle No:</span><span>${esc(d.vehicleNo)}</span>` : ''}
-              ${d.transporter ? `<span style="color:#64748b">Transporter:</span><span>${esc(d.transporter)}</span>` : ''}
+          <!-- BOX 2: Details of Consignee | Shipped to / Site Store -->
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;background:#f8fafc;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="font-size:0.7rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:5px">
+                Details of Consignee &bull; Shipped To / Site
+              </div>
+              <div style="font-size:0.92rem;font-weight:800;color:#0f172a;line-height:1.25">${esc(shipping.name || cust.name || 'Site Store / Consignee')}</div>
+              ${shipping.address ? `<div style="color:#334155;margin-top:2px">${esc(shipping.address)}</div>` : (d.site ? `<div style="color:#334155;margin-top:2px">${esc(d.site)}</div>` : '')}
+              ${(shipping.city || shipping.state) ? `<div style="color:#334155">${[shipping.city, shipping.state && (shipping.state + (shipping.pincode ? ' - ' + shipping.pincode : ''))].filter(Boolean).map(esc).join(', ')}</div>` : ''}
+              ${d.site && d.site !== shipping.address ? `<div style="color:#0369a1;font-size:0.75rem;margin-top:2px"><b>Site Location:</b> ${esc(d.site)}</div>` : ''}
             </div>
+            <div style="margin-top:6px;padding-top:4px;border-top:1px dashed #cbd5e1;font-size:0.78rem">
+              <div style="display:flex;justify-content:space-between">
+                <span><b>GSTIN:</b> <span style="font-family:monospace;font-weight:700;color:#0f172a">${esc(shipping.gstin || cust.gstin || '-')}</span></span>
+                ${(shipping.stateCode || cust.stateCode) ? `<span>State Code: <b>${esc(shipping.stateCode || cust.stateCode)}</b></span>` : ''}
+              </div>
+              ${shipping.phone ? `<div><b>Site Contact:</b> ${esc(shipping.phone)}</div>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- BOX 3: Transport, Project, Order & Dispatch Details Grid -->
+        <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px 12px;margin-bottom:14px;background:#ffffff;font-size:0.78rem">
+          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px 12px">
+            <div><span style="color:#64748b">Document No:</span> <b style="color:#0f172a">${esc(d.no)}</b></div>
+            <div><span style="color:#64748b">Date:</span> <b>${fmtDate(d.date)}</b></div>
+            <div><span style="color:#64748b">Buyer PO No:</span> <b style="color:#0f172a">${esc(d.poNo || '-')}</b></div>
+            <div><span style="color:#64748b">PO Date:</span> <span>${d.poDate ? fmtDate(d.poDate) : '-'}</span></div>
+
+            <div><span style="color:#64748b">Project Name:</span> <b style="color:#0369a1">${esc(d.project || '-')}</b></div>
+            <div><span style="color:#64748b">Project Code:</span> <b style="font-family:monospace">${esc(d.projectCode || '-')}</b></div>
+            <div><span style="color:#64748b">Vehicle No:</span> <b style="font-family:monospace;color:#0f172a">${esc(d.vehicleNo || '-')}</b></div>
+            <div><span style="color:#64748b">Place of Supply:</span> <span>${esc(d.pos || s.state || 'Tamil Nadu')} (${esc(d.stateCode || '33')})</span></div>
+
+            <div><span style="color:#64748b">E-Way Bill No:</span> <b style="font-family:monospace;color:#15803d">${esc(d.ewayBillNo || '-')}</b></div>
+            <div><span style="color:#64748b">E-Way Bill Date:</span> <span>${d.ewayBillDate ? fmtDate(d.ewayBillDate) : '-'}</span></div>
+            <div><span style="color:#64748b">Transporter / ID:</span> <span>${esc([d.transporter, d.transporterId].filter(Boolean).join(' / ') || '-')}</span></div>
+            <div><span style="color:#64748b">LR / RR No &amp; Date:</span> <span>${esc([d.lrNo, d.lrDate ? fmtDate(d.lrDate) : null].filter(Boolean).join(' dt ') || '-')}</span></div>
           </div>
         </div>
 
@@ -435,6 +474,8 @@
     const totalDebit = entries.reduce((sum, e) => sum + (Number(e.debit) || 0), 0);
     const totalCredit = entries.reduce((sum, e) => sum + (Number(e.credit) || 0), 0);
     const wmImg = s.watermarkImg || '';
+    const billing = v.billing || (v.partyName ? { name: v.partyName } : {});
+    const shipping = v.shipping || billing || {};
 
     return `
       ${wmImg ? `<img class="wm" src="${wmImg}" alt="" style="position:absolute;top:30%;left:15%;width:70%;opacity:0.07;pointer-events:none;z-index:0">` : ''}
@@ -446,17 +487,56 @@
           <div style="font-size:0.75rem;font-weight:700;color:#64748b;margin-top:2px">DOUBLE-ENTRY STATUTORY ACCOUNTING VOUCHER</div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;margin-bottom:14px;background:#f8fafc;font-size:0.82rem">
-          <div>
-            <div style="color:#64748b">Voucher Number:</div>
-            <div style="font-size:1.05rem;font-weight:800;color:#0f172a">${esc(v.voucherNo)}</div>
-            ${v.partyName ? `<div style="margin-top:4px"><b>Party / Payee:</b> ${esc(v.partyName)}</div>` : ''}
-            ${v.docRef ? `<div><b>Document Ref:</b> ${esc(v.docRef)}</div>` : ''}
+        <!-- 2-Box Statutory Address Grid for Voucher -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;font-size:0.8rem">
+          <!-- BOX 1: Details of Party / Billed to -->
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;background:#f8fafc;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="font-size:0.7rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:5px">
+                Party &bull; Billed To / Payee
+              </div>
+              <div style="font-size:0.92rem;font-weight:800;color:#0f172a;line-height:1.25">${esc(billing.name || v.partyName || '(Not Specified)')}</div>
+              ${billing.address ? `<div style="color:#334155;margin-top:2px">${esc(billing.address)}</div>` : ''}
+              ${(billing.city || billing.state) ? `<div style="color:#334155">${[billing.city, billing.state && (billing.state + (billing.pincode ? ' - ' + billing.pincode : ''))].filter(Boolean).map(esc).join(', ')}</div>` : ''}
+            </div>
+            <div style="margin-top:6px;padding-top:4px;border-top:1px dashed #cbd5e1;font-size:0.78rem">
+              <span><b>GSTIN:</b> <span style="font-family:monospace;font-weight:700;color:#0f172a">${esc(billing.gstin || '-')}</span></span>
+            </div>
           </div>
-          <div style="text-align:right">
+
+          <!-- BOX 2: Details of Site / Shipped to -->
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;background:#f8fafc;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="font-size:0.7rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:5px">
+                Consignee / Site Location
+              </div>
+              <div style="font-size:0.92rem;font-weight:800;color:#0f172a;line-height:1.25">${esc(shipping.name || billing.name || 'Site Store / Delivery')}</div>
+              ${shipping.address ? `<div style="color:#334155;margin-top:2px">${esc(shipping.address)}</div>` : (v.site ? `<div style="color:#334155;margin-top:2px">${esc(v.site)}</div>` : '')}
+              ${v.site && v.site !== shipping.address ? `<div style="color:#0369a1;font-size:0.75rem;margin-top:2px"><b>Site:</b> ${esc(v.site)}</div>` : ''}
+            </div>
+            <div style="margin-top:6px;padding-top:4px;border-top:1px dashed #cbd5e1;font-size:0.78rem">
+              <span><b>Shipping GSTIN:</b> <span style="font-family:monospace;font-weight:700;color:#0f172a">${esc(shipping.gstin || billing.gstin || '-')}</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOX 3: Voucher Statutory & Transport References Grid -->
+        <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px 12px;margin-bottom:14px;background:#ffffff;font-size:0.78rem">
+          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px 12px">
+            <div><span style="color:#64748b">Voucher No:</span> <b style="color:#0f172a">${esc(v.voucherNo)}</b></div>
             <div><span style="color:#64748b">Date:</span> <b>${fmtDate(v.date)}</b></div>
             <div><span style="color:#64748b">Status:</span> ${v.cancelled ? '<b style="color:#dc2626">CANCELLED</b>' : '<b style="color:#16a34a">POSTED</b>'}</div>
-            ${v.chequeNo ? `<div><b>Cheque / Ref No:</b> ${esc(v.chequeNo)}</div>` : ''}
+            <div><span style="color:#64748b">Doc Ref:</span> <b>${esc(v.docRef || '-')}</b></div>
+
+            <div><span style="color:#64748b">Project Name:</span> <b style="color:#0369a1">${esc(v.project || '-')}</b></div>
+            <div><span style="color:#64748b">Project Code:</span> <b style="font-family:monospace">${esc(v.projectCode || '-')}</b></div>
+            <div><span style="color:#64748b">Buyer PO No:</span> <b style="color:#0f172a">${esc(v.poNo || '-')}</b></div>
+            <div><span style="color:#64748b">PO Date:</span> <span>${v.poDate ? fmtDate(v.poDate) : '-'}</span></div>
+
+            <div><span style="color:#64748b">Vehicle No:</span> <b style="font-family:monospace;color:#0f172a">${esc(v.vehicleNo || '-')}</b></div>
+            <div><span style="color:#64748b">E-Way Bill No:</span> <b style="font-family:monospace;color:#15803d">${esc(v.ewayBillNo || '-')}</b></div>
+            <div><span style="color:#64748b">Transporter / LR:</span> <span>${esc([v.transporter, v.lrNo].filter(Boolean).join(' / ') || '-')}</span></div>
+            <div><span style="color:#64748b">Cheque / Ref No:</span> <span>${esc(v.chequeNo || '-')}</span></div>
           </div>
         </div>
 

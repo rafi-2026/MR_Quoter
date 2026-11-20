@@ -1764,6 +1764,52 @@
             <input type="text" id="vch_narration" placeholder="Details of this accounting entry">
           </label>
 
+          <!-- Collapsible Statutory & Transport Details -->
+          <details style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:8px 12px;cursor:pointer">
+            <summary style="font-size:0.82rem;font-weight:700;color:#0f172a;outline:none">
+              📍 Statutory Parties, Project &amp; Transport Details (Optional)
+            </summary>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;cursor:default">
+              <div class="grid g2" style="gap:10px">
+                <!-- Billed To -->
+                <div style="background:#ffffff;padding:8px 10px;border-radius:6px;border:1px solid #e2e8f0">
+                  <div style="font-size:0.72rem;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:6px">Details of Party / Billed To</div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <input type="text" id="vch_partyName" placeholder="Party / Company Name">
+                    <input type="text" id="vch_partyGstin" placeholder="GSTIN (e.g. 33AAAAA0000A1Z5)">
+                    <input type="text" id="vch_partyAddress" placeholder="Billing Address">
+                  </div>
+                </div>
+
+                <!-- Shipped To -->
+                <div style="background:#ffffff;padding:8px 10px;border-radius:6px;border:1px solid #e2e8f0">
+                  <div style="font-size:0.72rem;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:6px">Consignee / Shipped To (Site)</div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <input type="text" id="vch_shipName" placeholder="Consignee / Site Receiver">
+                    <input type="text" id="vch_shipGstin" placeholder="Shipping GSTIN">
+                    <input type="text" id="vch_shipAddress" placeholder="Site / Delivery Address">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Project & Transport Logistics -->
+              <div style="background:#ffffff;padding:8px 10px;border-radius:6px;border:1px solid #e2e8f0">
+                <div style="font-size:0.72rem;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:6px">Project, Order &amp; Transport Logistics</div>
+                <div class="grid g4" style="gap:8px">
+                  <input type="text" id="vch_project" placeholder="Project Name">
+                  <input type="text" id="vch_projectCode" placeholder="Project Code">
+                  <input type="text" id="vch_site" placeholder="Site Location">
+                  <input type="text" id="vch_poNo" placeholder="Buyer PO No">
+
+                  <input type="date" id="vch_poDate" title="PO Date">
+                  <input type="text" id="vch_vehicleNo" placeholder="Vehicle No">
+                  <input type="text" id="vch_ewayBillNo" placeholder="E-Way Bill No">
+                  <input type="text" id="vch_transporter" placeholder="Transporter / LR">
+                </div>
+              </div>
+            </div>
+          </details>
+
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
             <h4 style="margin:0">Double-Entry Lines (Debits &amp; Credits)</h4>
             <button class="btn sm pri" id="btnAddVchLine">+ Add Entry Line</button>
@@ -1800,6 +1846,21 @@
         const vnarration = $('#vch_narration').value.trim();
         const vdocRef = $('#vch_docRef').value.trim();
 
+        const partyName = ($('#vch_partyName') && $('#vch_partyName').value.trim()) || '';
+        const partyGstin = ($('#vch_partyGstin') && $('#vch_partyGstin').value.trim()) || '';
+        const partyAddress = ($('#vch_partyAddress') && $('#vch_partyAddress').value.trim()) || '';
+        const shipName = ($('#vch_shipName') && $('#vch_shipName').value.trim()) || partyName;
+        const shipGstin = ($('#vch_shipGstin') && $('#vch_shipGstin').value.trim()) || partyGstin;
+        const shipAddress = ($('#vch_shipAddress') && $('#vch_shipAddress').value.trim()) || partyAddress;
+        const project = ($('#vch_project') && $('#vch_project').value.trim()) || '';
+        const projectCode = ($('#vch_projectCode') && $('#vch_projectCode').value.trim()) || '';
+        const site = ($('#vch_site') && $('#vch_site').value.trim()) || '';
+        const poNo = ($('#vch_poNo') && $('#vch_poNo').value.trim()) || '';
+        const poDate = ($('#vch_poDate') && $('#vch_poDate').value) || '';
+        const vehicleNo = ($('#vch_vehicleNo') && $('#vch_vehicleNo').value.trim()) || '';
+        const ewayBillNo = ($('#vch_ewayBillNo') && $('#vch_ewayBillNo').value.trim()) || '';
+        const transporter = ($('#vch_transporter') && $('#vch_transporter').value.trim()) || '';
+
         const trs = $$('tr[data-vidx]', $('#vchLinesTbody'));
         const entries = trs.map(tr => ({
           ledgerId: $('.v_ledger', tr).value,
@@ -1814,6 +1875,17 @@
             date: vdate,
             narration: vnarration,
             docRef: vdocRef,
+            partyName,
+            billing: { name: partyName, gstin: partyGstin, address: partyAddress },
+            shipping: { name: shipName, gstin: shipGstin, address: shipAddress },
+            project,
+            projectCode,
+            site,
+            poNo,
+            poDate,
+            vehicleNo,
+            ewayBillNo,
+            transporter,
             entries
           });
           toast('✅ Balanced voucher posted successfully!');
@@ -2040,6 +2112,9 @@
    * Modal: View Voucher Detail
    */
   function openVoucherDetailModal(v) {
+    const billing = v.billing || (v.partyName ? { name: v.partyName } : null);
+    const shipping = v.shipping || null;
+
     modal({
       title: `👁️ Voucher Details — ${esc(v.voucherNo)}`,
       wide: true,
@@ -2057,6 +2132,28 @@
             </div>
             ${v.cancelledReason ? `<div style="margin-top:6px;font-size:0.85rem;color:#dc2626"><b>Cancellation Reason:</b> ${esc(v.cancelledReason)}</div>` : ''}
           </div>
+
+          ${(billing || v.project || v.vehicleNo) ? `
+            <!-- Statutory Billing & Transport Card in Voucher Detail -->
+            <div class="card" style="background:#ffffff;border:1px solid #cbd5e1;padding:12px">
+              <div class="grid g2" style="font-size:0.82rem;gap:12px">
+                <div>
+                  <div style="font-weight:800;color:#475569;text-transform:uppercase;font-size:0.72rem;margin-bottom:4px">Party / Billed To:</div>
+                  <div><b>${esc(billing && billing.name || v.partyName || '-')}</b></div>
+                  ${billing && billing.address ? `<div style="color:#334155">${esc(billing.address)}</div>` : ''}
+                  ${billing && billing.gstin ? `<div><b>GSTIN:</b> <span style="font-family:monospace">${esc(billing.gstin)}</span></div>` : ''}
+                </div>
+                <div>
+                  <div style="font-weight:800;color:#475569;text-transform:uppercase;font-size:0.72rem;margin-bottom:4px">Project &amp; Transport Logistics:</div>
+                  ${v.project ? `<div><b>Project:</b> ${esc(v.project)} ${v.projectCode ? '(' + esc(v.projectCode) + ')' : ''}</div>` : ''}
+                  ${v.site ? `<div><b>Site:</b> ${esc(v.site)}</div>` : ''}
+                  ${v.poNo ? `<div><b>PO No:</b> ${esc(v.poNo)} ${v.poDate ? '(' + fmtDate(v.poDate) + ')' : ''}</div>` : ''}
+                  ${v.vehicleNo ? `<div><b>Vehicle No:</b> <span style="font-family:monospace">${esc(v.vehicleNo)}</span></div>` : ''}
+                  ${v.ewayBillNo ? `<div><b>E-Way Bill:</b> <span style="font-family:monospace">${esc(v.ewayBillNo)}</span></div>` : ''}
+                </div>
+              </div>
+            </div>
+          ` : ''}
 
           <table class="tbl sm">
             <thead>
@@ -2083,12 +2180,21 @@
               </tr>
             </tfoot>
           </table>
-          <div style="text-align:right;margin-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <button class="btn sm" id="btnModalPrintVch" style="background:#f1f5f9;border:1px solid #cbd5e1">🖨️ Print / Preview Voucher</button>
             <button class="btn sm pri" onclick="closeModal()">Close</button>
           </div>
         </div>
       `
     });
+
+    const btnP = $('#btnModalPrintVch');
+    if (btnP && window.QuoteDeskPrint) {
+      btnP.onclick = () => {
+        closeModal();
+        window.QuoteDeskPrint.previewVoucher(v);
+      };
+    }
   }
 
   /**

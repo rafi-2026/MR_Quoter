@@ -122,4 +122,69 @@ describe('Phase 1: Universal Document Engine & Numbering Series', () => {
     expect(item2Diff.status).toBe('REMOVED');
   });
 
+  it('correctly persists and updates statutory billing, separate shipping, project code, and transport logistics', async () => {
+    const doc = await createDocument({
+      companyId: 'co_test_suite',
+      companyCode: 'CTB',
+      docType: 'inv',
+      cust: {
+        name: 'Head Office Corp',
+        address: '100 Business Parkway',
+        city: 'Chennai',
+        state: 'Tamil Nadu',
+        stateCode: '33',
+        gstin: '33AABCT1234A1Z5',
+        pan: 'AABCT1234A'
+      },
+      shipping: {
+        name: 'Project Site Warehouse',
+        address: 'Plot 45 Industrial Zone',
+        city: 'Coimbatore',
+        state: 'Tamil Nadu',
+        stateCode: '33',
+        gstin: '33AABCT1234A1Z5'
+      },
+      project: 'Prestige Tech Tower',
+      projectCode: 'PRJ-2026-004',
+      site: 'Tower B Facade Zone',
+      poNo: 'PO-7842/2026',
+      poDate: '2026-11-15',
+      vehicleNo: 'TN-38-BZ-4512',
+      ewayBillNo: '341098765432',
+      ewayBillDate: '2026-11-20',
+      transporter: 'VRL Logistics',
+      transporterId: '29AABCV1234A1Z1',
+      lrNo: 'LR-8876',
+      lines: [{ name: 'Structural Glazing Panel', qty: 10, rate: 2500, gstRate: 18 }]
+    }, { id: 'usr_test', name: 'Tester' });
+
+    expect(doc.cust.name).toBe('Head Office Corp');
+    expect(doc.cust.gstin).toBe('33AABCT1234A1Z5');
+    expect(doc.shipping.name).toBe('Project Site Warehouse');
+    expect(doc.shipping.address).toBe('Plot 45 Industrial Zone');
+    expect(doc.projectCode).toBe('PRJ-2026-004');
+    expect(doc.poNo).toBe('PO-7842/2026');
+    expect(doc.vehicleNo).toBe('TN-38-BZ-4512');
+    expect(doc.ewayBillNo).toBe('341098765432');
+    expect(doc.transporter).toBe('VRL Logistics');
+    expect(doc.lrNo).toBe('LR-8876');
+
+    // Update logistics and consignee
+    const { updateDocument } = await import('../../documents.js');
+    const updated = await updateDocument(doc.id, {
+      vehicleNo: 'TN-38-BZ-9999',
+      ewayBillNo: '341098769999',
+      shipping: {
+        name: 'Updated Site Depot',
+        address: 'Gate 2 Delivery Bay'
+      }
+    }, { id: 'usr_test', name: 'Tester' });
+
+    expect(updated.vehicleNo).toBe('TN-38-BZ-9999');
+    expect(updated.ewayBillNo).toBe('341098769999');
+    expect(updated.shipping.name).toBe('Updated Site Depot');
+    expect(updated.shipping.address).toBe('Gate 2 Delivery Bay');
+    expect(updated.shipping.gstin).toBe('33AABCT1234A1Z5'); // preserved from previous
+  });
+
 });

@@ -143,7 +143,15 @@ describe('Phase 4: Double-Entry Voucher Engine & Atomic Posting', () => {
       companyId: 'co_inv_autopost',
       date: '2026-11-18',
       project: 'DLF IT Park Project',
-      cust: { id: 'cust_dlf', name: 'DLF Cybercity Ltd' },
+      projectCode: 'PRJ-DLF-01',
+      site: 'Tower 4 Facade',
+      poNo: 'PO-DLF-9988',
+      poDate: '2026-11-10',
+      vehicleNo: 'TN-09-CD-5678',
+      ewayBillNo: '998877665544',
+      transporter: 'SafeX Logistics',
+      cust: { id: 'cust_dlf', name: 'DLF Cybercity Ltd', gstin: '33AABCD1234E1Z1', address: 'DLF Cybercity Chennai' },
+      shipping: { name: 'DLF Site Store', gstin: '33AABCD1234E1Z1', address: 'Plot 7 DLF IT Park' },
       totals: {
         subTotal: 100000,
         cgst: 9000,
@@ -158,6 +166,15 @@ describe('Phase 4: Double-Entry Voucher Engine & Atomic Posting', () => {
     expect(vch.voucherType).toBe('sales');
     expect(vch.docRef).toBe('CTBI/26-27/0099');
     expect(vch.totalAmount).toBe(118000);
+    expect(vch.billing.name).toBe('DLF Cybercity Ltd');
+    expect(vch.billing.gstin).toBe('33AABCD1234E1Z1');
+    expect(vch.shipping.name).toBe('DLF Site Store');
+    expect(vch.project).toBe('DLF IT Park Project');
+    expect(vch.projectCode).toBe('PRJ-DLF-01');
+    expect(vch.poNo).toBe('PO-DLF-9988');
+    expect(vch.vehicleNo).toBe('TN-09-CD-5678');
+    expect(vch.ewayBillNo).toBe('998877665544');
+    expect(vch.transporter).toBe('SafeX Logistics');
 
     const drDebtor = vch.entries.find(e => e.ledgerId === 'led_cust_cust_dlf');
     expect(drDebtor.debit).toBe(118000);

@@ -331,53 +331,164 @@
 
     modal({
       title: '➕ Create New Document',
+      wide: true,
       body: `
-        <div style="display:flex;flex-direction:column;gap:12px;margin:8px 0">
-          <label class="f">
-            <span>Document Type</span>
-            <select id="m_docType">
-              ${Object.entries(DOC_LABELS).map(([k, v]) => `<option value="${k}">${DOC_ICONS[k] || ''} ${esc(v)}</option>`).join('')}
-            </select>
-          </label>
-          <div class="grid g2">
-            <label class="f">
-              <span>Date</span>
-              <input type="date" id="m_docDate" value="${today()}">
-            </label>
-            <label class="f">
-              <span>Place of Supply (State)</span>
-              <input type="text" id="m_docPos" value="${esc(db.settings.state || 'Tamil Nadu')}">
-            </label>
+        <div style="display:flex;flex-direction:column;gap:14px;margin:8px 0;max-height:75vh;overflow-y:auto;padding-right:4px">
+          <!-- Document Basic Parameters -->
+          <div class="card" style="padding:12px;background:#f8fafc;border:1px solid #e2e8f0">
+            <h4 style="margin:0 0 10px;color:#0f172a">Document Type &amp; Date</h4>
+            <div class="grid g3" style="gap:10px">
+              <label class="f">
+                <span class="sm">Document Type</span>
+                <select id="m_docType">
+                  ${Object.entries(DOC_LABELS).map(([k, v]) => `<option value="${k}">${DOC_ICONS[k] || ''} ${esc(v)}</option>`).join('')}
+                </select>
+              </label>
+              <label class="f">
+                <span class="sm">Document Date</span>
+                <input type="date" id="m_docDate" value="${today()}">
+              </label>
+              <label class="f">
+                <span class="sm">Place of Supply (State)</span>
+                <input type="text" id="m_docPos" value="${esc(db.settings.state || 'Tamil Nadu')}">
+              </label>
+            </div>
           </div>
-          <label class="f">
-            <span>Customer / Party</span>
-            <select id="m_docCust">
-              <option value="">-- Choose Existing Customer or type manual below --</option>
-              ${custOptions}
-            </select>
-          </label>
-          <div class="grid g2">
-            <label class="f">
-              <span>Customer Name</span>
-              <input type="text" id="m_docCustName" placeholder="Customer or Company name">
+
+          <!-- Billing Details -->
+          <div class="card" style="padding:12px;background:#ffffff;border:1px solid #cbd5e1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <h4 style="margin:0;color:#0f172a">🏢 Details of Receiver (Billed To)</h4>
+              <div style="font-size:0.75rem;color:#64748b">Head office / Buyer Entity</div>
+            </div>
+            <label class="f" style="margin-bottom:8px">
+              <span class="sm">Choose Saved Customer (or type details below)</span>
+              <select id="m_docCust">
+                <option value="">-- Choose Existing Customer or type manual below --</option>
+                ${custOptions}
+              </select>
             </label>
-            <label class="f">
-              <span>GSTIN</span>
-              <input type="text" id="m_docCustGstin" placeholder="e.g. 33AAAAA0000A1Z5">
+            <div class="grid g2" style="gap:10px;margin-bottom:8px">
+              <label class="f">
+                <span class="sm">Buyer / Customer Name *</span>
+                <input type="text" id="m_docCustName" placeholder="Legal company / customer name">
+              </label>
+              <label class="f">
+                <span class="sm">Billing GSTIN</span>
+                <input type="text" id="m_docCustGstin" placeholder="e.g. 33AAAAA0000A1Z5">
+              </label>
+            </div>
+            <label class="f" style="margin-bottom:8px">
+              <span class="sm">Billing Address</span>
+              <input type="text" id="m_docCustAddress" placeholder="Street, Building, Area">
             </label>
+            <div class="grid g3" style="gap:10px">
+              <label class="f">
+                <span class="sm">City</span>
+                <input type="text" id="m_docCustCity" placeholder="City">
+              </label>
+              <label class="f">
+                <span class="sm">State &amp; Code</span>
+                <input type="text" id="m_docCustState" value="${esc(db.settings.state || 'Tamil Nadu')}" placeholder="State">
+              </label>
+              <label class="f">
+                <span class="sm">PAN No</span>
+                <input type="text" id="m_docCustPan" placeholder="PAN (e.g. AAAAA0000A)">
+              </label>
+            </div>
           </div>
-          <div class="grid g2">
-            <label class="f">
-              <span>Project Title</span>
-              <input type="text" id="m_docProject" placeholder="e.g. Commercial Glazing or Villa Windows">
-            </label>
-            <label class="f">
-              <span>Site Location / Address</span>
-              <input type="text" id="m_docSite" placeholder="Site address">
-            </label>
+
+          <!-- Shipping Details (Consignee) -->
+          <div class="card" style="padding:12px;background:#ffffff;border:1px solid #cbd5e1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <h4 style="margin:0;color:#0f172a">📍 Details of Consignee (Shipped To / Site Store)</h4>
+              <label class="chk" style="font-size:0.8rem;margin:0">
+                <input type="checkbox" id="m_sameAsBilling" checked> Same as Billing Address
+              </label>
+            </div>
+            <div id="m_shippingFields" style="display:none">
+              <div class="grid g2" style="gap:10px;margin-bottom:8px">
+                <label class="f">
+                  <span class="sm">Consignee / Site Receiver Name</span>
+                  <input type="text" id="m_shipName" placeholder="Receiving party / Store keeper name">
+                </label>
+                <label class="f">
+                  <span class="sm">Shipping GSTIN</span>
+                  <input type="text" id="m_shipGstin" placeholder="e.g. 33AAAAA0000A1Z5">
+                </label>
+              </div>
+              <label class="f" style="margin-bottom:8px">
+                <span class="sm">Shipping / Delivery Address</span>
+                <input type="text" id="m_shipAddress" placeholder="Site / Warehouse delivery address">
+              </label>
+              <div class="grid g3" style="gap:10px">
+                <label class="f">
+                  <span class="sm">City</span>
+                  <input type="text" id="m_shipCity" placeholder="City">
+                </label>
+                <label class="f">
+                  <span class="sm">State</span>
+                  <input type="text" id="m_shipState" value="${esc(db.settings.state || 'Tamil Nadu')}" placeholder="State">
+                </label>
+                <label class="f">
+                  <span class="sm">Site Contact Phone</span>
+                  <input type="text" id="m_shipPhone" placeholder="Phone number">
+                </label>
+              </div>
+            </div>
           </div>
-          <div class="mute sm" style="background:#f8fafc;padding:10px;border-radius:6px;border:1px solid #e2e8f0">
-            💡 <b>Universal Numbering:</b> Number will be automatically allocated with gap-less Indian FY series. Statutory 16-character GST limit strictly applied for Invoices &amp; Challans.
+
+          <!-- Project, Order & Logistics Details -->
+          <div class="card" style="padding:12px;background:#f8fafc;border:1px solid #cbd5e1">
+            <h4 style="margin:0 0 10px;color:#0f172a">🚚 Project, Order &amp; Transport Details</h4>
+            <div class="grid g3" style="gap:10px;margin-bottom:8px">
+              <label class="f">
+                <span class="sm">Project Name</span>
+                <input type="text" id="m_docProject" placeholder="e.g. Prestige Tech Park">
+              </label>
+              <label class="f">
+                <span class="sm">Project Code</span>
+                <input type="text" id="m_docProjectCode" placeholder="e.g. PRJ-2026-004">
+              </label>
+              <label class="f">
+                <span class="sm">Site Location</span>
+                <input type="text" id="m_docSite" placeholder="Site / Work location">
+              </label>
+            </div>
+            <div class="grid g2" style="gap:10px;margin-bottom:8px">
+              <label class="f">
+                <span class="sm">Buyer PO / Work Order No</span>
+                <input type="text" id="m_docPoNo" placeholder="e.g. PO-7842/2026">
+              </label>
+              <label class="f">
+                <span class="sm">Buyer PO Date</span>
+                <input type="date" id="m_docPoDate">
+              </label>
+            </div>
+            <div class="grid g3" style="gap:10px;margin-bottom:8px">
+              <label class="f">
+                <span class="sm">Vehicle Number</span>
+                <input type="text" id="m_docVehicleNo" placeholder="e.g. TN-01-AB-1234">
+              </label>
+              <label class="f">
+                <span class="sm">E-Way Bill Number</span>
+                <input type="text" id="m_docEwayBillNo" placeholder="12-digit E-Way Bill No">
+              </label>
+              <label class="f">
+                <span class="sm">E-Way Bill Date</span>
+                <input type="date" id="m_docEwayBillDate">
+              </label>
+            </div>
+            <div class="grid g2" style="gap:10px">
+              <label class="f">
+                <span class="sm">Transporter Name / ID</span>
+                <input type="text" id="m_docTransporter" placeholder="Transporter name or GSTIN">
+              </label>
+              <label class="f">
+                <span class="sm">LR / RR / Consignment No &amp; Date</span>
+                <input type="text" id="m_docLrNo" placeholder="e.g. LR-9982">
+              </label>
+            </div>
           </div>
         </div>
       `,
@@ -386,13 +497,34 @@
         const docType = $('#m_docType').value;
         const date = $('#m_docDate').value || today();
         const pos = $('#m_docPos').value.trim() || 'Tamil Nadu';
-        const project = $('#m_docProject').value.trim();
-        const site = $('#m_docSite').value.trim();
 
         const custId = $('#m_docCust').value;
         const selCust = (db.customers || []).find(c => c.id === custId) || {};
         const custName = $('#m_docCustName').value.trim() || selCust.name || 'Client';
         const custGstin = $('#m_docCustGstin').value.trim() || selCust.gstin || '';
+        const custAddress = $('#m_docCustAddress').value.trim() || selCust.address || '';
+        const custCity = $('#m_docCustCity').value.trim() || selCust.city || '';
+        const custState = $('#m_docCustState').value.trim() || selCust.state || pos;
+        const custPan = $('#m_docCustPan').value.trim() || (custGstin ? custGstin.slice(2, 12) : '');
+
+        const sameAsBilling = $('#m_sameAsBilling').checked;
+        const shipName = sameAsBilling ? custName : ($('#m_shipName').value.trim() || custName);
+        const shipGstin = sameAsBilling ? custGstin : ($('#m_shipGstin').value.trim() || custGstin);
+        const shipAddress = sameAsBilling ? custAddress : ($('#m_shipAddress').value.trim() || custAddress);
+        const shipCity = sameAsBilling ? custCity : ($('#m_shipCity').value.trim() || custCity);
+        const shipState = sameAsBilling ? custState : ($('#m_shipState').value.trim() || custState);
+        const shipPhone = sameAsBilling ? (selCust.phone || '') : ($('#m_shipPhone').value.trim() || selCust.phone || '');
+
+        const project = $('#m_docProject').value.trim();
+        const projectCode = $('#m_docProjectCode').value.trim();
+        const site = $('#m_docSite').value.trim();
+        const poNo = $('#m_docPoNo').value.trim();
+        const poDate = $('#m_docPoDate').value;
+        const vehicleNo = $('#m_docVehicleNo').value.trim();
+        const ewayBillNo = $('#m_docEwayBillNo').value.trim();
+        const ewayBillDate = $('#m_docEwayBillDate').value;
+        const transporter = $('#m_docTransporter').value.trim();
+        const lrNo = $('#m_docLrNo').value.trim();
 
         try {
           const created = await apiPost('/api/documents', {
@@ -400,16 +532,33 @@
             date,
             pos,
             project,
+            projectCode,
             site,
+            poNo,
+            poDate,
+            vehicleNo,
+            ewayBillNo,
+            ewayBillDate,
+            transporter,
+            lrNo,
             customerId: custId || '',
             cust: {
               name: custName,
               gstin: custGstin,
+              pan: custPan,
               phone: selCust.phone || '',
               email: selCust.email || '',
-              address: selCust.address || '',
-              city: selCust.city || '',
-              state: selCust.state || pos
+              address: custAddress,
+              city: custCity,
+              state: custState
+            },
+            shipping: {
+              name: shipName,
+              gstin: shipGstin,
+              address: shipAddress,
+              city: shipCity,
+              state: shipState,
+              phone: shipPhone
             },
             lines: [
               {
@@ -436,12 +585,27 @@
       }
     });
 
+    // Toggle Shipping Fields visibility
+    const chkSame = $('#m_sameAsBilling');
+    const shipDiv = $('#m_shippingFields');
+    if (chkSame && shipDiv) {
+      chkSame.onchange = () => {
+        shipDiv.style.display = chkSame.checked ? 'none' : 'block';
+      };
+    }
+
     // Auto-fill customer details on dropdown change
     $('#m_docCust').onchange = e => {
       const c = (db.customers || []).find(x => x.id === e.target.value);
       if (c) {
         $('#m_docCustName').value = c.name || '';
         $('#m_docCustGstin').value = c.gstin || '';
+        $('#m_docCustAddress').value = c.address || '';
+        $('#m_docCustCity').value = c.city || '';
+        $('#m_docCustState').value = c.state || db.settings.state || 'Tamil Nadu';
+        if (c.gstin && c.gstin.length >= 12) {
+          $('#m_docCustPan').value = c.gstin.slice(2, 12);
+        }
       }
     };
   }
@@ -547,33 +711,149 @@
 
       <div class="qg">
         <div>
-          <!-- Party Card -->
-          <div class="card" style="margin-bottom:14px">
-            <h3>Party &amp; Project Information</h3>
-            <div class="grid g2" style="margin-top:10px">
+          <!-- Statutory Parties Card (Billed To & Shipped To) -->
+          <div class="card" style="margin-bottom:14px;background:#ffffff;border:1px solid #cbd5e1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #f1f5f9;padding-bottom:8px">
+              <h3 style="margin:0;color:#0f172a">🏢 Statutory Parties &bull; Billing &amp; Shipping</h3>
+              ${!isLocked ? `<button type="button" class="btn sm" id="btnCopyBillingToShip" style="background:#f8fafc;border:1px solid #cbd5e1;font-size:0.78rem">📋 Copy Billing to Shipping</button>` : ''}
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <!-- Billed To -->
+              <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0">
+                <div style="font-size:0.75rem;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:8px">
+                  Details of Receiver (Billed To)
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label class="f">
+                    <span class="sm">Party / Buyer Name *</span>
+                    <input type="text" id="ed_custName" value="${esc(d.cust && d.cust.name || '')}" ${isLocked ? 'disabled' : ''}>
+                  </label>
+                  <div class="grid g2" style="gap:8px">
+                    <label class="f">
+                      <span class="sm">Billing GSTIN</span>
+                      <input type="text" id="ed_custGstin" value="${esc(d.cust && d.cust.gstin || '')}" placeholder="33AAAAA0000A1Z5" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                    <label class="f">
+                      <span class="sm">PAN No</span>
+                      <input type="text" id="ed_custPan" value="${esc(d.cust && d.cust.pan || '')}" placeholder="PAN" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                  </div>
+                  <label class="f">
+                    <span class="sm">Billing Address</span>
+                    <input type="text" id="ed_custAddress" value="${esc(d.cust && d.cust.address || '')}" placeholder="Street, Building" ${isLocked ? 'disabled' : ''}>
+                  </label>
+                  <div class="grid g3" style="gap:8px">
+                    <label class="f">
+                      <span class="sm">City</span>
+                      <input type="text" id="ed_custCity" value="${esc(d.cust && d.cust.city || '')}" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                    <label class="f">
+                      <span class="sm">State</span>
+                      <input type="text" id="ed_custState" value="${esc(d.cust && d.cust.state || d.pos || 'Tamil Nadu')}" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                    <label class="f">
+                      <span class="sm">State Code</span>
+                      <input type="text" id="ed_custStateCode" value="${esc(d.cust && d.cust.stateCode || '33')}" style="width:60px" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Shipped To -->
+              <div style="background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0">
+                <div style="font-size:0.75rem;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:8px">
+                  Details of Consignee (Shipped To / Site)
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <label class="f">
+                    <span class="sm">Consignee / Site Name</span>
+                    <input type="text" id="ed_shipName" value="${esc((d.shipping && d.shipping.name) || (d.cust && d.cust.name) || '')}" ${isLocked ? 'disabled' : ''}>
+                  </label>
+                  <div class="grid g2" style="gap:8px">
+                    <label class="f">
+                      <span class="sm">Shipping GSTIN</span>
+                      <input type="text" id="ed_shipGstin" value="${esc((d.shipping && d.shipping.gstin) || (d.cust && d.cust.gstin) || '')}" placeholder="33AAAAA0000A1Z5" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                    <label class="f">
+                      <span class="sm">Site Contact Phone</span>
+                      <input type="text" id="ed_shipPhone" value="${esc((d.shipping && d.shipping.phone) || (d.cust && d.cust.phone) || '')}" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                  </div>
+                  <label class="f">
+                    <span class="sm">Shipping / Site Address</span>
+                    <input type="text" id="ed_shipAddress" value="${esc((d.shipping && d.shipping.address) || d.site || (d.cust && d.cust.address) || '')}" placeholder="Site location / delivery address" ${isLocked ? 'disabled' : ''}>
+                  </label>
+                  <div class="grid g3" style="gap:8px">
+                    <label class="f">
+                      <span class="sm">City</span>
+                      <input type="text" id="ed_shipCity" value="${esc((d.shipping && d.shipping.city) || (d.cust && d.cust.city) || '')}" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                    <label class="f">
+                      <span class="sm">State</span>
+                      <input type="text" id="ed_shipState" value="${esc((d.shipping && d.shipping.state) || d.pos || 'Tamil Nadu')}" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                    <label class="f">
+                      <span class="sm">State Code</span>
+                      <input type="text" id="ed_shipStateCode" value="${esc((d.shipping && d.shipping.stateCode) || '33')}" style="width:60px" ${isLocked ? 'disabled' : ''}>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Project, Order & Transport Logistics Card -->
+          <div class="card" style="margin-bottom:14px;background:#ffffff;border:1px solid #cbd5e1">
+            <h3 style="margin:0 0 12px;color:#0f172a">🚚 Project, Order &amp; Transport Logistics</h3>
+            <div class="grid g3" style="gap:10px;margin-bottom:10px">
               <label class="f">
-                <span>Party / Customer Name</span>
-                <input type="text" id="ed_custName" value="${esc(d.cust && d.cust.name || '')}" ${isLocked ? 'disabled' : ''}>
+                <span class="sm">Project Name</span>
+                <input type="text" id="ed_project" value="${esc(d.project || '')}" placeholder="Project name" ${isLocked ? 'disabled' : ''}>
               </label>
               <label class="f">
-                <span>GSTIN</span>
-                <input type="text" id="ed_custGstin" value="${esc(d.cust && d.cust.gstin || '')}" ${isLocked ? 'disabled' : ''}>
+                <span class="sm">Project Code</span>
+                <input type="text" id="ed_projectCode" value="${esc(d.projectCode || '')}" placeholder="e.g. PRJ-2026-004" ${isLocked ? 'disabled' : ''}>
               </label>
               <label class="f">
-                <span>Project Name</span>
-                <input type="text" id="ed_project" value="${esc(d.project || '')}" ${isLocked ? 'disabled' : ''}>
+                <span class="sm">Site Location</span>
+                <input type="text" id="ed_site" value="${esc(d.site || '')}" placeholder="Site address" ${isLocked ? 'disabled' : ''}>
+              </label>
+            </div>
+            <div class="grid g4" style="gap:10px;margin-bottom:10px">
+              <label class="f">
+                <span class="sm">Buyer PO / WO No</span>
+                <input type="text" id="ed_poNo" value="${esc(d.poNo || '')}" placeholder="PO number" ${isLocked ? 'disabled' : ''}>
               </label>
               <label class="f">
-                <span>Site Address</span>
-                <input type="text" id="ed_site" value="${esc(d.site || '')}" ${isLocked ? 'disabled' : ''}>
+                <span class="sm">Buyer PO Date</span>
+                <input type="date" id="ed_poDate" value="${d.poDate || ''}" ${isLocked ? 'disabled' : ''}>
               </label>
               <label class="f">
-                <span>Date</span>
+                <span class="sm">Document Date</span>
                 <input type="date" id="ed_date" value="${d.date || today()}" ${isLocked ? 'disabled' : ''}>
               </label>
               <label class="f">
-                <span>Place of Supply</span>
+                <span class="sm">Place of Supply</span>
                 <input type="text" id="ed_pos" value="${esc(d.pos || 'Tamil Nadu')}" ${isLocked ? 'disabled' : ''}>
+              </label>
+            </div>
+            <div class="grid g4" style="gap:10px">
+              <label class="f">
+                <span class="sm">Vehicle Number</span>
+                <input type="text" id="ed_vehicleNo" value="${esc(d.vehicleNo || '')}" placeholder="e.g. TN-01-AB-1234" ${isLocked ? 'disabled' : ''}>
+              </label>
+              <label class="f">
+                <span class="sm">E-Way Bill Number</span>
+                <input type="text" id="ed_ewayBillNo" value="${esc(d.ewayBillNo || '')}" placeholder="12-digit EWB No" ${isLocked ? 'disabled' : ''}>
+              </label>
+              <label class="f">
+                <span class="sm">E-Way Bill Date</span>
+                <input type="date" id="ed_ewayBillDate" value="${d.ewayBillDate || ''}" ${isLocked ? 'disabled' : ''}>
+              </label>
+              <label class="f">
+                <span class="sm">Transporter / LR No</span>
+                <input type="text" id="ed_transporter" value="${esc(d.transporter || '')}" placeholder="Transporter / LR" ${isLocked ? 'disabled' : ''}>
               </label>
             </div>
           </div>
@@ -696,13 +976,51 @@
         recalcAndDrawLines();
       };
 
+      // Copy Billing to Shipping button handler
+      const btnCopy = $('#btnCopyBillingToShip');
+      if (btnCopy) {
+        btnCopy.onclick = () => {
+          $('#ed_shipName').value = $('#ed_custName').value;
+          $('#ed_shipGstin').value = $('#ed_custGstin').value;
+          $('#ed_shipAddress').value = $('#ed_custAddress').value;
+          $('#ed_shipCity').value = $('#ed_custCity').value;
+          $('#ed_shipState').value = $('#ed_custState').value;
+          $('#ed_shipStateCode').value = $('#ed_custStateCode').value;
+          toast('📋 Copied billing details to shipping.');
+        };
+      }
+
       $('#btnSaveDocLines').onclick = async () => {
         collectFormLines();
         try {
           const updated = await apiPut('/api/documents/' + d.id, {
-            cust: { name: $('#ed_custName').value.trim(), gstin: $('#ed_custGstin').value.trim() },
+            cust: {
+              name: $('#ed_custName').value.trim(),
+              gstin: $('#ed_custGstin').value.trim(),
+              pan: $('#ed_custPan').value.trim(),
+              address: $('#ed_custAddress').value.trim(),
+              city: $('#ed_custCity').value.trim(),
+              state: $('#ed_custState').value.trim(),
+              stateCode: $('#ed_custStateCode').value.trim()
+            },
+            shipping: {
+              name: $('#ed_shipName').value.trim(),
+              gstin: $('#ed_shipGstin').value.trim(),
+              phone: $('#ed_shipPhone').value.trim(),
+              address: $('#ed_shipAddress').value.trim(),
+              city: $('#ed_shipCity').value.trim(),
+              state: $('#ed_shipState').value.trim(),
+              stateCode: $('#ed_shipStateCode').value.trim()
+            },
             project: $('#ed_project').value.trim(),
+            projectCode: $('#ed_projectCode').value.trim(),
             site: $('#ed_site').value.trim(),
+            poNo: $('#ed_poNo').value.trim(),
+            poDate: $('#ed_poDate').value,
+            vehicleNo: $('#ed_vehicleNo').value.trim(),
+            ewayBillNo: $('#ed_ewayBillNo').value.trim(),
+            ewayBillDate: $('#ed_ewayBillDate').value,
+            transporter: $('#ed_transporter').value.trim(),
             date: $('#ed_date').value,
             pos: $('#ed_pos').value.trim(),
             terms: $('#ed_terms').value,

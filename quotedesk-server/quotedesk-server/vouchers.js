@@ -86,7 +86,21 @@ async function createVoucher(data, user = {}) {
     partyId = null,
     partyName = '',
     docRef = '',
-    entries = []
+    entries = [],
+    billing = null,
+    shipping = null,
+    project = '',
+    projectCode = '',
+    site = '',
+    poNo = '',
+    poDate = '',
+    vehicleNo = '',
+    ewayBillNo = '',
+    ewayBillDate = '',
+    transporter = '',
+    transporterId = '',
+    lrNo = '',
+    lrDate = ''
   } = data;
 
   if (!VOUCHER_TYPES[voucherType]) {
@@ -129,7 +143,21 @@ async function createVoucher(data, user = {}) {
     status: 'posted',
     cancelled: false,
     createdAt: Date.now(),
-    createdBy: user.name || 'System'
+    createdBy: user.name || 'System',
+    billing: billing || (partyName ? { name: partyName } : null),
+    shipping: shipping || billing || null,
+    project: project || '',
+    projectCode: projectCode || '',
+    site: site || '',
+    poNo: poNo || '',
+    poDate: poDate || '',
+    vehicleNo: vehicleNo || '',
+    ewayBillNo: ewayBillNo || '',
+    ewayBillDate: ewayBillDate || '',
+    transporter: transporter || '',
+    transporterId: transporterId || '',
+    lrNo: lrNo || '',
+    lrDate: lrDate || ''
   };
 
   await vchCol.insertOne(voucher);
@@ -278,6 +306,20 @@ async function postSalesInvoiceVoucher(invDoc, user = {}) {
     partyId: invDoc.cust && invDoc.cust.id,
     partyName: customerName,
     docRef: invDoc.no,
+    billing: invDoc.cust || { name: customerName },
+    shipping: invDoc.shipping || invDoc.cust || null,
+    project: invDoc.project || '',
+    projectCode: invDoc.projectCode || '',
+    site: invDoc.site || '',
+    poNo: invDoc.poNo || '',
+    poDate: invDoc.poDate || '',
+    vehicleNo: invDoc.vehicleNo || '',
+    ewayBillNo: invDoc.ewayBillNo || '',
+    ewayBillDate: invDoc.ewayBillDate || '',
+    transporter: invDoc.transporter || '',
+    transporterId: invDoc.transporterId || '',
+    lrNo: invDoc.lrNo || '',
+    lrDate: invDoc.lrDate || '',
     entries
   }, user);
 }

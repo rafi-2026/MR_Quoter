@@ -210,9 +210,20 @@ async function createDocument(data, user) {
     docType,
     date = new Date().toISOString().slice(0, 10),
     cust = {},
+    shipping = null,
     vendor = {},
     project = '',
+    projectCode = '',
     site = '',
+    poNo = '',
+    poDate = '',
+    vehicleNo = '',
+    ewayBillNo = '',
+    ewayBillDate = '',
+    transporter = '',
+    transporterId = '',
+    lrNo = '',
+    lrDate = '',
     pos = 'Tamil Nadu',
     lines = [],
     terms = '',
@@ -254,9 +265,20 @@ async function createDocument(data, user) {
     preparedByName: user ? user.name : '',
     preparedByRole: user ? user.role : '',
     cust,
+    shipping: shipping || (cust ? { ...cust } : {}),
     vendor,
     project,
+    projectCode,
     site,
+    poNo,
+    poDate,
+    vehicleNo,
+    ewayBillNo,
+    ewayBillDate,
+    transporter,
+    transporterId,
+    lrNo,
+    lrDate,
     pos,
     gstRate,
     isInterState,
@@ -303,9 +325,20 @@ async function updateDocument(id, updates, user) {
   const {
     date,
     cust,
+    shipping,
     vendor,
     project,
+    projectCode,
     site,
+    poNo,
+    poDate,
+    vehicleNo,
+    ewayBillNo,
+    ewayBillDate,
+    transporter,
+    transporterId,
+    lrNo,
+    lrDate,
     pos,
     lines,
     terms,
@@ -317,9 +350,20 @@ async function updateDocument(id, updates, user) {
 
   if (date) doc.date = date;
   if (cust) doc.cust = { ...doc.cust, ...cust };
+  if (shipping) doc.shipping = { ...doc.shipping, ...shipping };
   if (vendor) doc.vendor = { ...doc.vendor, ...vendor };
   if (project !== undefined) doc.project = project;
+  if (projectCode !== undefined) doc.projectCode = projectCode;
   if (site !== undefined) doc.site = site;
+  if (poNo !== undefined) doc.poNo = poNo;
+  if (poDate !== undefined) doc.poDate = poDate;
+  if (vehicleNo !== undefined) doc.vehicleNo = vehicleNo;
+  if (ewayBillNo !== undefined) doc.ewayBillNo = ewayBillNo;
+  if (ewayBillDate !== undefined) doc.ewayBillDate = ewayBillDate;
+  if (transporter !== undefined) doc.transporter = transporter;
+  if (transporterId !== undefined) doc.transporterId = transporterId;
+  if (lrNo !== undefined) doc.lrNo = lrNo;
+  if (lrDate !== undefined) doc.lrDate = lrDate;
   if (pos !== undefined) doc.pos = pos;
   if (terms !== undefined) doc.terms = terms;
   if (notes !== undefined) doc.notes = notes;
