@@ -1,15 +1,15 @@
 {
-  "companies": 2,
-  "users": 4,
+  "companies": 3,
+  "users": 5,
   "customers": 3,
   "products": 13,
   "items": 13,
   "quotes": 5,
-  "profiles": 44,
-  "materials": 125,
-  "companySettings": 13,
-  "companySeq": 5,
-  "productTemplates": 32,
+  "profiles": 52,
+  "materials": 150,
+  "companySettings": 14,
+  "companySeq": 6,
+  "productTemplates": 42,
   "topLevelKeys": [
     "settings",
     "companies",
@@ -27,6 +27,6 @@
     "materials",
     "productTemplates"
   ],
-  "generatedAt": "2026-11-19T15:22:52.892Z",
+  "generatedAt": "2026-11-20T22:35:00.000Z",
   "source": "mongodb_atlas_sync"
 }
