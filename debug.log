@@ -1,0 +1,7 @@
+[1119/203512.805:WARNING:net\dns\dns_config_service_win.cc:607] Failed to read DnsConfig.
+[1119/203512.932:ERROR:ui\gl\angle_platform_impl.cc:34] vulkan_icd.cpp:157 (angle::vk::ScopedVkLoaderEnvironment::ScopedVkLoaderEnvironment): Error setting CWD for Vulkan layers init.
+[1119/203513.108:WARNING:ui\gl\angle_platform_impl.cc:39] vulkan_icd.cpp:391 (angle::vk::ChoosePhysicalDevice): Preferred device ICD not found. Using default physicalDevice instead.
+[1119/203516.953:ERROR:gpu\command_buffer\service\shared_image\shared_image_manager.cc:401] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[1119/203516.954:ERROR:gpu\command_buffer\service\shared_image\shared_image_manager.cc:401] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[1119/203516.954:ERROR:gpu\command_buffer\service\shared_image\shared_image_manager.cc:401] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[1119/203516.954:ERROR:gpu\command_buffer\service\shared_image\shared_image_manager.cc:401] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.

@@ -205,10 +205,10 @@
     .app {
       display: grid;
       grid-template-columns: 240px minmax(0, 1fr);
-      min-height: 100vh;
+      height: 100vh;
       width: 100%;
       max-width: 100vw;
-      overflow-x: hidden;
+      overflow: hidden;
     }
 
     /* Mobile Header and Drawer Controls (Hidden on Desktop) */
@@ -232,6 +232,7 @@
       position: sticky;
       top: 0;
       height: 100vh;
+      overflow: hidden;
       border-right: 1px solid #e2e8f0;
       box-shadow: 2px 0 12px rgba(15, 23, 42, 0.03);
       z-index: 40;
@@ -365,17 +366,38 @@
     }
 
     .main {
-      padding: 26px 30px 60px;
-      min-width: 0
+      padding: 0 30px 60px;
+      min-width: 0;
+      height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
+    /* ── Sticky frosted-glass top bar (iPhone-style) ── */
     .ph {
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 20px;
-      flex-wrap: wrap
+      padding: 18px 0 14px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(18px) saturate(180%);
+      -webkit-backdrop-filter: blur(18px) saturate(180%);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+      box-shadow: 0 2px 16px rgba(15, 23, 42, 0.06);
+      margin: 0 -30px 20px;
+      padding-left: 30px;
+      padding-right: 30px;
+    }
+
+    /* push page content inside .main to have its own padding */
+    .main > *:not(.ph) {
+      padding-left: 0;
+      padding-right: 0;
     }
 
     .acts {
@@ -392,6 +414,8 @@
         display: block !important;
         width: 100% !important;
         max-width: 100vw !important;
+        height: auto !important;
+        overflow: visible !important;
         overflow-x: hidden !important;
       }
 
@@ -573,11 +597,19 @@
 
       /* Main Content on Mobile */
       .main {
-        padding: 16px 12px 60px !important;
+        padding: 0 12px 60px !important;
         width: 100% !important;
         max-width: 100vw !important;
         box-sizing: border-box !important;
         overflow-x: hidden !important;
+        height: auto !important;
+        overflow-y: visible !important;
+      }
+
+      .ph {
+        margin: 0 -12px 0 !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
       }
 
       /* KPI Cards on Mobile (2 equal columns taking 100% width) */
@@ -2088,12 +2120,12 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) 330px;
       gap: 18px;
-      align-items: start
+      align-items: start;
     }
 
     .qside {
       position: sticky;
-      top: 16px
+      top: 80px
     }
 
     @media(max-width:1150px) {
