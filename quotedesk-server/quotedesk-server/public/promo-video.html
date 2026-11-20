@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MR_Quoter — Official Client Promotional Video Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Condensed:wght@700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #090e1c;
+      color: #ffffff;
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    /* Video Player Canvas Wrap */
+    .video-container {
+      position: relative;
+      width: 1280px;
+      height: 720px;
+      max-width: 96vw;
+      max-height: 85vh;
+      aspect-ratio: 16 / 9;
+      background: linear-gradient(135deg, #0b1120 0%, #172554 100%);
+      border-radius: 14px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Stage Area */
+    .stage {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    /* Scene Container */
+    .scene {
+      position: absolute;
+      inset: 0;
+      padding: 40px 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      opacity: 0;
+      transform: translateY(20px) scale(0.98);
+      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .scene.active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    /* Header Bar inside Video */
+    .top-brand-bar {
+      position: absolute;
+      top: 24px;
+      left: 36px;
+      right: 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.5px;
+    }
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      display: grid;
+      place-items: center;
+      font-family: "IBM Plex Sans Condensed", sans-serif;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    }
+    .domain-pill {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #67e8f9;
+      border: 1px solid rgba(103, 232, 249, 0.3);
+    }
+
+    /* Mockup Visual Cards */
+    .mock-card {
+      background: rgba(255, 255, 255, 0.96);
+      color: #0f172a;
+      border-radius: 12px;
+      padding: 24px 28px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    /* Subtitle Overlay */
+    .subtitle-bar {
+      position: absolute;
+      bottom: 24px;
+      left: 40px;
+      right: 40px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 12px 24px;
+      text-align: center;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #f8fafc;
+      letter-spacing: 0.2px;
+      line-height: 1.4;
+      z-index: 20;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+    .subtitle-bar b { color: #38bdf8; }
+
+    /* Video Player Controls (Bottom) */
+    .controls-bar {
+      height: 54px;
+      background: rgba(15, 23, 42, 0.95);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 30;
+    }
+    .ctrl-btns {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn-ctrl {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-ctrl:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .progress-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+      margin: 0 20px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #38bdf8, #818cf8);
+      transition: width 0.2s linear;
+    }
+
+    /* Badges & Chips */
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .pill.blue { background: #e0f2fe; color: #0284c7; }
+    .pill.green { background: #dcfce7; color: #15803d; }
+    .pill.purple { background: #f3e8ff; color: #7e22ce; }
+
+    /* Scene specifics */
+    .hero-title {
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -1px;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      font-size: 1.25rem;
+      color: #94a3b8;
+      max-width: 720px;
+      line-height: 1.5;
+    }
+
+    .pulse-glow {
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.4);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); }
+      50% { box-shadow: 0 0 35px rgba(56, 189, 248, 0.6); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="video-container" id="videoContainer">
+    <!-- Top Watermark & Brand -->
+    <div class="top-brand-bar">
+      <div class="logo-badge">
+        <div class="logo-icon">M</div>
+        <span>MR_Quoter</span>
+      </div>
+      <div class="domain-pill">🌐 mrquoter.in</div>
+    </div>
+
+    <!-- Video Stage Scenes -->
+    <div class="stage">
+
+      <!-- SCENE 1: Introduction -->
+      <div class="scene active" id="scene-0">
+        <div style="text-align:center;max-width:850px;margin:0 auto">
+          <span class="pill blue" style="margin-bottom:16px">Enterprise Glazing &amp; Fabrication Platform</span>
+          <h1 class="hero-title">Close Projects 5X Faster with Precision Costing</h1>
+          <p class="hero-sub" style="margin:0 auto">
+            Generate millimetre-accurate window &amp; door quotes, on-site measurement variation statements, and statutory GST invoices in under 60 seconds.
+          </p>
+          <div style="display:flex;justify-content:center;gap:16px;margin-top:32px">
+            <span class="pill green" style="padding:8px 16px;font-size:0.85rem">⚡ 60-Second Quoting</span>
+            <span class="pill purple" style="padding:8px 16px;font-size:0.85rem">📐 Site M-Sheet</span>
+            <span class="pill blue" style="padding:8px 16px;font-size:0.85rem">📑 100% GST Statutory</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 2: Automated Costing Engine -->
+      <div class="scene" id="scene-1">
+        <div class="mock-card" style="width:100%;max-width:980px;margin:0 auto">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:2px solid #f1f5f9;padding-bottom:10px">
+            <div>
+              <span class="pill blue">Automated Bill of Materials (BOM)</span>
+              <h2 style="font-size:1.4rem;font-weight:800;color:#0f172a;margin-top:4px">Domal 27 Sliding Window &bull; 4'0" x 5'0"</h2>
+            </div>
+            <div style="font-size:1.3rem;font-weight:800;color:#0284c7">₹ 14,850 <small style="font-size:0.75rem;color:#64748b">+ 18% GST</small></div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.85rem;color:#334155">
+            <thead>
+              <tr style="background:#f8fafc;text-align:left;color:#475569">
+                <th style="padding:8px">Component</th>
+                <th style="padding:8px">Profile Code / Spec</th>
+                <th style="padding:8px">Brand</th>
+                <th style="padding:8px;text-align:right">Req Qty</th>
+                <th style="padding:8px;text-align:right">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #e2e8f0">
+                <td style="padding:8px">Outer Frame 2-Track</td>
+                <td style="padding:8px;font-family:monospace;font-weight:700;color:#0284c7">5045 (1.18 kg/m)</td>
+                <td style="padding:8px;font-weight:600">Domal 27</td>
+                <td style="padding:8px;text-align:right">5.50 mtr</td>
+                <td style="padding:8px;text-align:right">₹ 2,420</td>
+              </tr>
+              <tr style="border-bottom:1px solid #e2e8f0">
+                <td style="padding:8px">Shutter Profile</td>
+                <td style="padding:8px;font-family:monospace;font-weight:700;color:#0284c7">5046 (0.85 kg/m)</td>
+                <td style="padding:8px;font-weight:600">Domal 27</td>
+                <td style="padding:8px;text-align:right">7.30 mtr</td>
+                <td style="padding:8px;text-align:right">₹ 3,150</td>
+              </tr>
+              <tr style="border-bottom:1px solid #e2e8f0">
+                <td style="padding:8px">5mm Toughened Clear Glass</td>
+                <td style="padding:8px;font-family:monospace">GL-5MM-CLR</td>
+                <td style="padding:8px;font-weight:600">Saint-Gobain</td>
+                <td style="padding:8px;text-align:right">18.5 sq ft</td>
+                <td style="padding:8px;text-align:right">₹ 2,775</td>
+              </tr>
+              <tr>
+                <td style="padding:8px">Heavy Bearing Rollers &amp; Lock</td>
+                <td style="padding:8px;font-family:monospace">HW-ROL-LOK</td>
+                <td style="padding:8px;font-weight:600">Standard / Kinlong</td>
+                <td style="padding:8px;text-align:right">2 sets</td>
+                <td style="padding:8px;text-align:right">₹ 1,200</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SCENE 3: Site Measurement Sheet (M-Sheet) -->
+      <div class="scene" id="scene-2">
+        <div class="mock-card" style="width:100%;max-width:980px;margin:0 auto">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:2px solid #f1f5f9;padding-bottom:10px">
+            <div>
+              <span class="pill green">Site Measurement Sheet (M-Sheet)</span>
+              <h2 style="font-size:1.35rem;font-weight:800;color:#0f172a;margin-top:4px">DLF Cybercity &bull; Tower 4 Site Dimensions</h2>
+            </div>
+            <span class="pill blue">Auto Variation Statement Linked</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-bottom:14px">
+            <div style="background:#f8fafc;padding:10px;border-radius:6px;border:1px solid #e2e8f0">
+              <div style="font-size:0.75rem;color:#64748b">Opening Tag</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#0f172a">W1 - Master Bedroom</div>
+            </div>
+            <div style="background:#f8fafc;padding:10px;border-radius:6px;border:1px solid #e2e8f0">
+              <div style="font-size:0.75rem;color:#64748b">Contract Dimension</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#0f172a">1200 x 1500 mm</div>
+            </div>
+            <div style="background:#f8fafc;padding:10px;border-radius:6px;border:1px solid #e2e8f0">
+              <div style="font-size:0.75rem;color:#64748b">Actual Site Measured</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#15803d">1250 x 1550 mm</div>
+            </div>
+            <div style="background:#ecfdf5;padding:10px;border-radius:6px;border:1px solid #a7f3d0">
+              <div style="font-size:0.75rem;color:#065f46">Scope Variation</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#059669">+ 1.85 sq ft (Billed)</div>
+            </div>
+          </div>
+          <div style="background:#f1f5f9;padding:10px;border-radius:6px;font-size:0.85rem;color:#475569">
+            💡 <b>Zero Lost Revenue:</b> Every deviation from architectural drawings is captured on site and billed automatically.
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 4: 1-Click WhatsApp & PDF Sharing -->
+      <div class="scene" id="scene-3">
+        <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:24px;width:100%;max-width:1020px;margin:0 auto">
+          <div class="mock-card">
+            <span class="pill blue" style="margin-bottom:8px">Executive Client Presentation</span>
+            <h3 style="font-size:1.25rem;font-weight:800;color:#0f172a;margin:6px 0 12px">Company Letterhead &bull; Digital Watermark &bull; Terms</h3>
+            <div style="border:1px dashed #cbd5e1;padding:14px;border-radius:6px;background:#f8fafc;font-size:0.85rem;margin-bottom:12px">
+              <div><b>Quotation:</b> MRQ/2026-27/0042 &bull; Rev 0</div>
+              <div><b>Client:</b> Prestige Estates Projects Ltd</div>
+              <div style="color:#15803d;font-weight:800;font-size:1.1rem;margin-top:6px">Grand Total: ₹ 4,85,600</div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <span class="pill green">Direct WhatsApp Share</span>
+              <span class="pill purple">Instant PDF Download</span>
+            </div>
+          </div>
+          <div style="background:rgba(22, 101, 52, 0.9);border-radius:12px;padding:24px;display:flex;flex-direction:column;justify-content:center;color:#fff">
+            <div style="font-size:2rem;margin-bottom:8px">📱</div>
+            <h3 style="font-size:1.3rem;font-weight:800">1-Click WhatsApp Sharing</h3>
+            <p style="font-size:0.9rem;opacity:0.9;margin-top:8px;line-height:1.4">
+              Send professional PDF estimates directly to client phones in seconds. Close deals while your competitor is still opening Excel.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 5: Complete GST Statutory Billing Suite -->
+      <div class="scene" id="scene-4">
+        <div class="mock-card" style="width:100%;max-width:980px;margin:0 auto">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:2px solid #0f172a;padding-bottom:8px">
+            <h2 style="font-size:1.35rem;font-weight:800;color:#0f172a">TAX INVOICE &bull; Section 31 CGST Act</h2>
+            <span class="pill blue">Statutory Invoicing</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+            <div style="background:#f8fafc;padding:10px 12px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.82rem">
+              <div style="font-weight:800;color:#475569;text-transform:uppercase;font-size:0.72rem;margin-bottom:4px">Details of Receiver &bull; Billed To</div>
+              <div><b>DLF Cybercity Ltd</b> (Head Office)</div>
+              <div style="color:#334155">100 Business Parkway, Chennai, Tamil Nadu (33)</div>
+              <div><b>GSTIN:</b> 33AABCD1234E1Z1 &bull; <b>PAN:</b> AABCD1234E</div>
+            </div>
+            <div style="background:#f8fafc;padding:10px 12px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.82rem">
+              <div style="font-weight:800;color:#475569;text-transform:uppercase;font-size:0.72rem;margin-bottom:4px">Details of Consignee &bull; Shipped To</div>
+              <div><b>DLF Site Store &bull; Tower 4 Project</b></div>
+              <div style="color:#334155">Plot 7 Industrial Zone, Chennai, Tamil Nadu (33)</div>
+              <div><b>Shipping GSTIN:</b> 33AABCD1234E1Z1</div>
+            </div>
+          </div>
+          <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;padding:8px 12px;font-size:0.8rem;display:grid;grid-template-columns:repeat(4, 1fr);gap:6px">
+            <div>PO No: <b>PO-DLF-9988</b></div>
+            <div>Vehicle No: <b>TN-09-CD-5678</b></div>
+            <div>E-Way Bill: <b style="color:#15803d">998877665544</b></div>
+            <div>Transporter: <b>SafeX (LR-12)</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 6: Material Requisition (MRL) -->
+      <div class="scene" id="scene-5">
+        <div class="mock-card" style="width:100%;max-width:980px;margin:0 auto">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:2px solid #0f172a;padding-bottom:8px">
+            <div>
+              <span class="pill green">Workshop Fabrication Indent</span>
+              <h2 style="font-size:1.35rem;font-weight:800;color:#0f172a;margin-top:2px">Material Requisition Voucher (MRL)</h2>
+            </div>
+            <span class="pill purple">Profile Codes &amp; Brand Breakdown</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+            <thead>
+              <tr style="background:#0f172a;color:#fff">
+                <th style="padding:6px 10px;text-align:center">Code</th>
+                <th style="padding:6px 10px">Brand / Series</th>
+                <th style="padding:6px 10px">Material Description</th>
+                <th style="padding:6px 10px;text-align:center">Category</th>
+                <th style="padding:6px 10px;text-align:right">Req Qty</th>
+                <th style="padding:6px 10px;text-align:center">Unit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #cbd5e1">
+                <td style="padding:6px 10px;text-align:center;font-family:monospace;font-weight:700;color:#0284c7">5045</td>
+                <td style="padding:6px 10px;font-weight:600">Domal 27</td>
+                <td style="padding:6px 10px">Outer Frame 2-Track Profile</td>
+                <td style="padding:6px 10px;text-align:center"><span class="pill blue">Profile</span></td>
+                <td style="padding:6px 10px;text-align:right;font-weight:700">128.5</td>
+                <td style="padding:6px 10px;text-align:center">mtr</td>
+              </tr>
+              <tr style="border-bottom:1px solid #cbd5e1">
+                <td style="padding:6px 10px;text-align:center;font-family:monospace;font-weight:700;color:#0284c7">5046</td>
+                <td style="padding:6px 10px;font-weight:600">Domal 27</td>
+                <td style="padding:6px 10px">Interlock Shutter Profile</td>
+                <td style="padding:6px 10px;text-align:center"><span class="pill blue">Profile</span></td>
+                <td style="padding:6px 10px;text-align:right;font-weight:700">184.2</td>
+                <td style="padding:6px 10px;text-align:center">mtr</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 10px;text-align:center;font-family:monospace;font-weight:700;color:#0284c7">GL-05</td>
+                <td style="padding:6px 10px;font-weight:600">Saint-Gobain</td>
+                <td style="padding:6px 10px">5mm Clear Toughened Glass</td>
+                <td style="padding:6px 10px;text-align:center"><span class="pill green">Glass</span></td>
+                <td style="padding:6px 10px;text-align:right;font-weight:700">312.0</td>
+                <td style="padding:6px 10px;text-align:center">sq ft</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:10px;font-size:0.8rem;color:#475569;text-align:right">
+            ✅ Automatically grouped from Quotation BOM &bull; Hand directly to factory store keeper.
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 7: Call to Action -->
+      <div class="scene" id="scene-6">
+        <div style="text-align:center;max-width:850px;margin:0 auto">
+          <div class="logo-icon pulse-glow" style="width:72px;height:72px;font-size:2.5rem;margin:0 auto 20px;border-radius:18px">M</div>
+          <h1 class="hero-title" style="font-size:3.2rem">Elevate Your Business with MR_Quoter</h1>
+          <p class="hero-sub" style="margin:0 auto 28px;font-size:1.35rem">
+            Fast quotes. Zero calculation errors. Happy clients. Higher project win rates.
+          </p>
+          <div style="background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0f172a;display:inline-block;padding:14px 36px;border-radius:30px;font-weight:800;font-size:1.3rem;box-shadow:0 10px 30px rgba(56,189,248,0.4)">
+            🌐 Visit mrquoter.in Today
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- On-Screen Subtitle Bar -->
+    <div class="subtitle-bar" id="subtitles">
+      Loading promotional presentation...
+    </div>
+
+    <!-- Video Controls Bar -->
+    <div class="controls-bar">
+      <div class="ctrl-btns">
+        <button class="btn-ctrl" id="btnPlayPause">⏸ Pause</button>
+        <button class="btn-ctrl" id="btnRestart">🔄 Replay</button>
+        <button class="btn-ctrl" id="btnMute">🔊 Sound</button>
+      </div>
+
+      <div class="progress-bar-wrap" id="progressWrap">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div style="font-size:0.85rem;font-weight:700;color:#94a3b8;font-family:monospace" id="timeDisplay">
+        0:00 / 2:30
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:18px;text-align:center;font-size:0.85rem;color:#64748b">
+    🎥 <b>Screen Recording Tip:</b> Press <b>Win + G</b> (Windows Game Bar) or use <b>OBS Studio</b> to record this window in Full HD (1080p 60fps) for sending to clients!
+  </div>
+
+  <script>
+    // Storyboard Configuration (7 scenes, 150 seconds total, ~21s each)
+    const SCENES = [
+      {
+        id: 0,
+        duration: 18,
+        sub: "Welcome to <b>MR_Quoter</b> — the enterprise estimation &amp; billing suite engineered for modern contractors."
+      },
+      {
+        id: 1,
+        duration: 24,
+        sub: "Create accurate quotes in <b>under 60 seconds</b> with intelligent profile, glass &amp; hardware Bill of Materials (BOM)."
+      },
+      {
+        id: 2,
+        duration: 22,
+        sub: "Track on-site opening dimensions with the <b>Site Measurement Sheet (M-Sheet)</b> &amp; auto-compute scope variations."
+      },
+      {
+        id: 3,
+        duration: 20,
+        sub: "Impress clients with branded letterhead proposals &amp; share directly to their <b>WhatsApp or Email</b> in 1 click."
+      },
+      {
+        id: 4,
+        duration: 24,
+        sub: "Statutory GST Billing — generate <b>Tax Invoices &amp; Delivery Challans</b> with separate Billing &amp; Shipping addresses &amp; E-Way Bills."
+      },
+      {
+        id: 5,
+        duration: 22,
+        sub: "Streamline factory fabrication with <b>Material Requisition Vouchers (MRL)</b> grouped by profile code and brand."
+      },
+      {
+        id: 6,
+        duration: 20,
+        sub: "Win more clients and close projects faster. Experience MR_Quoter today at <b>mrquoter.in</b>!"
+      }
+    ];
+
+    let currentSceneIdx = 0;
+    let isPlaying = true;
+    let timer = null;
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    const totalSeconds = SCENES.reduce((sum, s) => sum + s.duration, 0);
+    let elapsedSeconds = 0;
+
+    function playBeep(freq = 440, type = 'sine', duration = 0.12) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function showScene(idx) {
+      document.querySelectorAll('.scene').forEach((el, i) => {
+        el.classList.toggle('active', i === idx);
+      });
+      document.getElementById('subtitles').innerHTML = SCENES[idx].sub;
+      playBeep(idx === 6 ? 587 : 440, 'triangle', 0.15);
+    }
+
+    function formatTime(secs) {
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function tick() {
+      if (!isPlaying) return;
+      elapsedSeconds += 0.25;
+
+      // Find current scene based on elapsed seconds
+      let acc = 0;
+      let targetIdx = 0;
+      for (let i = 0; i < SCENES.length; i++) {
+        acc += SCENES[i].duration;
+        if (elapsedSeconds < acc) {
+          targetIdx = i;
+          break;
+        }
+      }
+
+      if (targetIdx !== currentSceneIdx) {
+        currentSceneIdx = targetIdx;
+        showScene(currentSceneIdx);
+      }
+
+      if (elapsedSeconds >= totalSeconds) {
+        elapsedSeconds = totalSeconds;
+        isPlaying = false;
+        document.getElementById('btnPlayPause').innerText = '▶ Play';
+      }
+
+      // Update Progress
+      const pct = (elapsedSeconds / totalSeconds) * 100;
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('timeDisplay').innerText = `${formatTime(elapsedSeconds)} / ${formatTime(totalSeconds)}`;
+    }
+
+    showScene(0);
+    setInterval(tick, 250);
+
+    // Play / Pause Toggle
+    document.getElementById('btnPlayPause').onclick = () => {
+      isPlaying = !isPlaying;
+      document.getElementById('btnPlayPause').innerText = isPlaying ? '⏸ Pause' : '▶ Play';
+      if (isPlaying && elapsedSeconds >= totalSeconds) {
+        elapsedSeconds = 0;
+        currentSceneIdx = 0;
+        showScene(0);
+      }
+    };
+
+    // Replay
+    document.getElementById('btnRestart').onclick = () => {
+      elapsedSeconds = 0;
+      currentSceneIdx = 0;
+      isPlaying = true;
+      document.getElementById('btnPlayPause').innerText = '⏸ Pause';
+      showScene(0);
+    };
+
+    // Mute / Unmute
+    document.getElementById('btnMute').onclick = (e) => {
+      soundEnabled = !soundEnabled;
+      e.target.innerText = soundEnabled ? '🔊 Sound' : '🔇 Muted';
+    };
+
+    // Scrub in progress bar
+    document.getElementById('progressWrap').onclick = (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const pct = clickX / rect.width;
+      elapsedSeconds = pct * totalSeconds;
+      tick();
+    };
+  </script>
+</body>
+</html>
