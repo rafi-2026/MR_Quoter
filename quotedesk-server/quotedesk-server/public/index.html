@@ -1389,66 +1389,417 @@
       will-change: opacity, transform;
     }
 
-    /* auth - centered glassmorphic card with animated background */
+    /* ==========================================================================
+       RAFIQ — Premium SaaS Authentication & 3D Stage Styling
+       ========================================================================== */
     .auth-wrap {
       min-height: 100vh;
       position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 24px;
-      background: var(--theme-bg, linear-gradient(135deg, #090e1c 0%, #151b30 50%, #0d1222 100%));
-      overflow: hidden;
-      font-family: "IBM Plex Sans", system-ui, sans-serif;
-      transition: background 0.8s ease;
-    }
-
-    /* Classic Simple Login Card */
-    .auth-classic-box {
-      width: 100%;
-      max-width: 440px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 16px;
-      box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
-      padding: 36px 32px;
-      position: relative;
-      z-index: 10;
-    }
-
-    .auth-classic-header {
-      text-align: center;
-      margin-bottom: 26px;
-    }
-
-    .auth-classic-badge {
-      width: 54px;
-      height: 54px;
-      background: linear-gradient(135deg, #1e3a8a, #2563eb);
+      justify-content: flex-start;
+      padding: 0;
+      background: radial-gradient(circle at 50% 10%, #1e1b4b 0%, #090e1c 55%, #050811 100%);
+      overflow-x: hidden;
+      font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
       color: #ffffff;
+    }
+
+    /* 1. TOP BRANDING NAVIGATION HEADER */
+    .auth-top-header {
+      width: 100%;
+      height: 74px;
+      padding: 0 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(9, 14, 28, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .auth-brand-col {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .auth-brand-logo {
+      height: 48px;
+      width: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #000;
+      object-fit: contain;
+    }
+
+    .auth-brand-details {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .auth-brand-title {
+      font-size: 1.25rem;
       font-weight: 800;
-      font-size: 1.35rem;
-      border-radius: 14px;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .auth-verified-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(14, 165, 233, 0.2);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .auth-brand-email {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      text-decoration: none;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: color 0.2s;
+    }
+
+    .auth-brand-email:hover {
+      color: #38bdf8;
+    }
+
+    .auth-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .auth-nav-btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
       display: inline-flex;
       align-items: center;
+      gap: 8px;
+      border: none;
+      outline: none;
+    }
+
+    .auth-demo-btn {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
+    }
+
+    .auth-demo-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.5);
+    }
+
+    .auth-pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 10px #38bdf8;
+      animation: pulseDot 2s infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .auth-reg-btn {
+      background: rgba(255, 255, 255, 0.07);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(10px);
+    }
+
+    .auth-reg-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .auth-login-btn {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid transparent;
+    }
+
+    .auth-login-btn:hover {
+      color: #ffffff;
+    }
+
+    /* 2. 3D STAGE & FLOATING SOFTWARE PANELS */
+    .auth-stage-3d {
+      width: 100%;
+      flex: 1;
+      display: flex;
+      align-items: center;
       justify-content: center;
-      box-shadow: 0 8px 16px -4px rgba(37, 99, 235, 0.4);
-      margin-bottom: 14px;
+      position: relative;
+      perspective: 1400px;
+      padding: 40px 24px;
+      min-height: calc(100vh - 74px);
     }
 
-    .auth-classic-title {
-      font-size: 1.6rem;
+    .auth-grid-3d {
+      position: absolute;
+      inset: 0;
+      background-size: 60px 60px;
+      background-image:
+        linear-gradient(to right, rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+      mask-image: radial-gradient(ellipse at 50% 50%, #000 45%, transparent 90%);
+      -webkit-mask-image: radial-gradient(ellipse at 50% 50%, #000 45%, transparent 90%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .auth-glow-orbit {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(95px);
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.55;
+    }
+    .orbit-1 {
+      width: 550px;
+      height: 550px;
+      background: radial-gradient(circle, #38bdf8 0%, #6366f1 70%, transparent 100%);
+      top: -100px;
+      left: 10%;
+      animation: orbFloatA 22s ease-in-out infinite alternate;
+    }
+    .orbit-2 {
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, #8b5cf6 0%, #4f46e5 70%, transparent 100%);
+      bottom: -120px;
+      right: 10%;
+      animation: orbFloatB 26s ease-in-out infinite alternate;
+    }
+
+    @keyframes orbFloatA {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(80px, 60px) scale(1.12); }
+    }
+    @keyframes orbFloatB {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(-70px, -50px) scale(1.08); }
+    }
+
+    /* Floating Feature Cards (Real Software Modules) */
+    .float-card {
+      position: absolute;
+      width: 320px;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      z-index: 5;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: default;
+      user-select: none;
+    }
+
+    .float-card:hover {
+      transform: translateY(-6px) scale(1.03) !important;
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6), 0 0 25px rgba(56, 189, 248, 0.25);
+    }
+
+    .card-bom {
+      top: 10%;
+      left: calc(50% - 620px);
+      animation: floatSlowA 8s ease-in-out infinite;
+    }
+    .card-msheet {
+      top: 12%;
+      right: calc(50% - 620px);
+      animation: floatSlowB 9s ease-in-out infinite;
+    }
+    .card-gst {
+      bottom: 12%;
+      left: calc(50% - 620px);
+      animation: floatSlowB 8.5s ease-in-out infinite;
+    }
+    .card-mrl {
+      bottom: 10%;
+      right: calc(50% - 620px);
+      animation: floatSlowA 9.5s ease-in-out infinite;
+    }
+
+    @keyframes floatSlowA {
+      0%, 100% { transform: translateY(0px) rotate(-1deg); }
+      50% { transform: translateY(-14px) rotate(1deg); }
+    }
+    @keyframes floatSlowB {
+      0%, 100% { transform: translateY(0px) rotate(1deg); }
+      50% { transform: translateY(-16px) rotate(-1deg); }
+    }
+
+    .fc-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .fc-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .fc-badge.blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .fc-badge.green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .fc-badge.purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .fc-badge.cyan { background: rgba(6, 182, 212, 0.2); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.3); }
+
+    .fc-tag {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+    .fc-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 8px;
+    }
+    .fc-spec {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .fc-price {
+      margin-top: 10px;
+      font-size: 1.1rem;
       font-weight: 800;
-      color: #0f172a;
-      margin: 0 0 6px;
-      letter-spacing: -0.02em;
+      color: #38bdf8;
+    }
+    .fc-price small {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .fc-diff {
+      display: flex;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+    }
+    .fc-var-badge {
+      margin-top: 8px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .fc-gst-row {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .fc-gst-row b { color: #f8fafc; }
+
+    /* 3. CENTER OFFICIAL LOGIN CARD */
+    .auth-center-wrap {
+      position: relative;
+      z-index: 20;
+      width: 100%;
+      max-width: 440px;
+      margin: 0 auto;
     }
 
-    .auth-classic-sub {
-      font-size: 0.88rem;
-      color: #64748b;
+    .auth-glass-card {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 20px;
+      padding: 36px 32px;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .auth-glass-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+    }
+
+    .auth-card-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .auth-card-logo {
+      height: 64px;
+      width: auto;
+      border-radius: 12px;
+      margin: 0 auto 14px;
+      display: block;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: #000000;
+    }
+
+    .auth-card-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      margin: 0 0 6px;
+    }
+
+    .auth-card-subtitle {
+      font-size: 0.84rem;
+      color: #94a3b8;
       margin: 0;
+      line-height: 1.4;
     }
 
     .auth-field-group {
@@ -1458,10 +1809,10 @@
 
     .auth-field-label {
       display: block;
-      font-size: 0.84rem;
+      font-size: 0.82rem;
       font-weight: 600;
-      color: #334155;
-      margin-bottom: 7px;
+      color: #cbd5e1;
+      margin-bottom: 6px;
     }
 
     .auth-input-container {
@@ -1470,23 +1821,36 @@
       align-items: center;
     }
 
+    .auth-input-icon {
+      position: absolute;
+      left: 12px;
+      font-size: 1rem;
+      color: #64748b;
+      pointer-events: none;
+    }
+
     .auth-input-field {
       width: 100%;
       padding: 12px 14px;
       font-size: 0.95rem;
-      border: 1px solid #cbd5e1;
-      border-radius: 9px;
-      background: #f8fafc;
-      color: #0f172a;
-      transition: all 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.6);
+      color: #ffffff;
       outline: none;
       box-sizing: border-box;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .auth-input-field.has-icon {
+      padding-left: 38px;
     }
 
     .auth-input-field:focus {
-      background: #ffffff;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      background: rgba(15, 23, 42, 0.95);
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
     }
 
     .auth-pw-toggle {
@@ -1495,61 +1859,211 @@
       background: none;
       border: none;
       font-size: 1.15rem;
-      color: #64748b;
+      color: #94a3b8;
       cursor: pointer;
       padding: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 4px;
+      border-radius: 6px;
+    }
+    .auth-pw-toggle:hover { color: #ffffff; }
+
+    .auth-options-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      font-size: 0.8rem;
     }
 
-    .auth-pw-toggle:hover {
-      color: #0f172a;
-    }
-
-    .auth-submit-btn {
-      width: 100%;
-      padding: 13px;
-      background: #2563eb;
-      color: #ffffff;
-      font-size: 0.98rem;
-      font-weight: 700;
-      border: none;
-      border-radius: 9px;
-      cursor: pointer;
-      margin-top: 10px;
-      transition: all 0.2s ease;
+    .auth-remember-label {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+      gap: 7px;
+      color: #cbd5e1;
+      cursor: pointer;
+      user-select: none;
+    }
+    .auth-remember-label input[type="checkbox"] {
+      accent-color: #0284c7;
+      cursor: pointer;
     }
 
-    .auth-submit-btn:hover:not(:disabled) {
-      background: #1d4ed8;
-      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
-      transform: translateY(-1px);
+    .auth-forgot-link {
+      background: none;
+      border: none;
+      color: #38bdf8;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: none;
     }
+    .auth-forgot-link:hover { text-decoration: underline; }
 
-    .auth-submit-btn:disabled {
-      opacity: 0.65;
-      cursor: not-allowed;
+    .auth-secure-shield {
+      color: #94a3b8;
+      font-size: 0.74rem;
+      font-weight: 600;
     }
 
     .auth-err-banner {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
       border-radius: 9px;
-      color: #b91c1c;
+      color: #fca5a5;
       padding: 11px 14px;
-      font-size: 0.86rem;
+      font-size: 0.84rem;
       font-weight: 600;
       margin-bottom: 16px;
       display: none;
       line-height: 1.4;
       text-align: left;
+    }
+
+    .auth-submit-btn {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff;
+      font-size: 0.98rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 18px rgba(2, 132, 199, 0.4);
+    }
+    .auth-submit-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.6);
+    }
+    .auth-submit-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .auth-card-footer {
+      text-align: center;
+      margin-top: 22px;
+      font-size: 0.84rem;
+      color: #94a3b8;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 16px;
+    }
+    .auth-link-bold {
+      color: #38bdf8;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .auth-link-bold:hover { text-decoration: underline; }
+    .auth-link-sub {
+      color: #cbd5e1;
+      font-weight: 600;
+      text-decoration: underline;
+    }
+
+    /* 4. MODALS (REQUEST DEMO & REGISTRATION) */
+    .auth-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 17, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-y: auto;
+      animation: modalFadeIn 0.25s ease-out;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .auth-modal-box {
+      width: 100%;
+      max-width: 820px;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 18px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      color: #f8fafc;
+      animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(20px) scale(0.97); }
+      to { transform: translateY(0) scale(1); }
+    }
+
+    .auth-modal-header {
+      padding: 20px 24px;
+      background: rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .auth-modal-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .auth-modal-close {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #cbd5e1;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+      transition: all 0.2s;
+    }
+    .auth-modal-close:hover {
+      background: rgba(239, 68, 68, 0.3);
+      color: #ffffff;
+    }
+
+    .auth-modal-body {
+      padding: 24px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    /* Responsiveness */
+    @media (max-width: 1280px) {
+      .float-card { display: none; }
+    }
+    @media (max-width: 768px) {
+      .auth-top-header { padding: 0 16px; height: 64px; }
+      .auth-brand-logo { height: 38px; }
+      .auth-brand-title { font-size: 1.05rem; }
+      .auth-brand-email { display: none; }
+      .auth-nav-actions { gap: 6px; }
+      .auth-nav-btn { padding: 7px 10px; font-size: 0.76rem; }
+      .auth-stage-3d { padding: 20px 14px; }
+      .auth-glass-card { padding: 26px 18px; }
     }
 
     /* Animated architectural blueprint drafting grid */
@@ -4135,7 +4649,7 @@
         ['accounting', '📖 Accounting & Books']
       ];
       if (isAdmin() || isMaster()) { nav.push(['users', '👤 Users'], ['settings', '⚙️ Settings']); }
-      if (isMaster()) { nav.push(['companies', '🏢 Companies'], ['audit', '🛡️ Security Logs']); }
+      if (isMaster()) { nav.push(['companies', '🏢 Companies'], ['registrations', '📝 Registrations'], ['audit', '🛡️ Security Logs']); }
       const name = r.name === 'quote' ? 'quotes' : (r.name === 'document' ? 'documents' : r.name);
       const coName = (db && db.settings && db.settings.company) || 'MR_Quoter';
       root.innerHTML = `<div class="app">
@@ -4192,13 +4706,14 @@
         users: viewUsers,
         settings: viewSettings,
         companies: viewCompanies,
+        registrations: viewRegistrations,
         audit: viewAudit,
         documents: window.viewDocuments || viewDash,
         document: window.viewDocument || viewDash,
         accounting: window.viewAccounting || viewDash
       }[r.name];
       if ((r.name === 'users' || r.name === 'settings') && !isAdmin() && !isMaster()) { go('#/dash'); return }
-      if ((r.name === 'companies' || r.name === 'audit') && !isMaster()) { go('#/dash'); return }
+      if ((r.name === 'companies' || r.name === 'audit' || r.name === 'registrations') && !isMaster()) { go('#/dash'); return }
       (v || viewDash)(r.arg);
       window.scrollTo(0, 0);
       const mainEl = $('#main');
@@ -4625,47 +5140,531 @@
       };
     }
 
-    function viewLogin() {
-      root.innerHTML = `
-        <div class="auth-wrap">
-          <div class="auth-grid-bg"></div>
-          <div class="auth-classic-box">
-            <div class="auth-classic-header">
-              <div class="auth-classic-badge">MQ</div>
-              <h1 class="auth-classic-title">MR_Quoter</h1>
-              <p class="auth-classic-sub">Interior &amp; Windows Quotation Portal</p>
-            </div>
+    function openDemoModal() {
+      const existing = document.querySelector('.auth-modal-overlay');
+      if (existing) existing.remove();
 
-            <form id="af" autocomplete="on">
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="l_un">Email or Username</label>
-                <div class="auth-input-container">
-                  <input id="l_un" class="auth-input-field" name="username" type="text" placeholder="e.g. name@company.com or username" required autofocus autocomplete="username" autocapitalize="none">
+      const ov = document.createElement('div');
+      ov.className = 'auth-modal-overlay';
+      ov.innerHTML = `
+        <div class="auth-modal-box" style="max-width:920px">
+          <div class="auth-modal-header">
+            <h2 class="auth-modal-title">
+              <span>🎥 Experience MR_Quoter in Action</span>
+              <span class="auth-verified-badge">By RAFIQ</span>
+            </h2>
+            <button class="auth-modal-close" id="btnModalClose">&times;</button>
+          </div>
+          <div class="auth-modal-body">
+            <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:24px" class="demo-grid-wrap">
+              <!-- Left: Video Player & Features -->
+              <div>
+                <div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.15);box-shadow:0 10px 25px rgba(0,0,0,0.5)">
+                  <iframe src="/promo-video.html" style="width:100%;height:100%;border:none" title="MR_Quoter 59-Sec Showcase Video"></iframe>
+                </div>
+                <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:8px 12px;border-radius:8px;font-size:0.78rem">
+                    ⚡ <b>60-Sec BOM Costing</b><br><span style="color:#94a3b8">Domal 27, Saint-Gobain, Kinlong</span>
+                  </div>
+                  <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:8px 12px;border-radius:8px;font-size:0.78rem">
+                    📐 <b>Site M-Sheet Tracker</b><br><span style="color:#94a3b8">Auto-calculates billable variations</span>
+                  </div>
+                  <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:8px 12px;border-radius:8px;font-size:0.78rem">
+                    📑 <b>100% Statutory GST</b><br><span style="color:#94a3b8">Dual GSTINs, Vehicle No, E-Way</span>
+                  </div>
+                  <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:8px 12px;border-radius:8px;font-size:0.78rem">
+                    🏭 <b>Factory MRL Indent</b><br><span style="color:#94a3b8">Cutting profiles &amp; store stock</span>
+                  </div>
                 </div>
               </div>
 
-              <div class="auth-field-group">
-                <label class="auth-field-label" for="l_pw">Password</label>
-                <div class="auth-input-container">
-                  <input id="l_pw" class="auth-input-field" name="password" type="password" placeholder="••••••••••••" required autocomplete="current-password" style="padding-right:44px">
-                  <button type="button" class="auth-pw-toggle" onclick="togglePwVisibility('l_pw', this)" title="Show / Hide Password" aria-label="Toggle password visibility">👁️</button>
+              <!-- Right: Demo Request Form -->
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:20px;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                  <h3 style="font-size:1.1rem;font-weight:700;color:#ffffff;margin:0 0 6px">Request Live Demonstration</h3>
+                  <p style="font-size:0.8rem;color:#94a3b8;margin:0 0 16px">Our technical team will arrange a customized 1-on-1 walkthrough for your business.</p>
+                  
+                  <form id="demoReqForm">
+                    <div style="margin-bottom:12px">
+                      <label style="display:block;font-size:0.78rem;font-weight:600;color:#cbd5e1;margin-bottom:4px">Your Name *</label>
+                      <input id="dm_name" type="text" placeholder="e.g. Rajesh Kumar" required style="width:100%;padding:9px 12px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#fff;font-size:0.88rem;box-sizing:border-box">
+                    </div>
+                    <div style="margin-bottom:12px">
+                      <label style="display:block;font-size:0.78rem;font-weight:600;color:#cbd5e1;margin-bottom:4px">Business Email *</label>
+                      <input id="dm_email" type="email" placeholder="name@company.com" required style="width:100%;padding:9px 12px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#fff;font-size:0.88rem;box-sizing:border-box">
+                    </div>
+                    <div style="margin-bottom:12px">
+                      <label style="display:block;font-size:0.78rem;font-weight:600;color:#cbd5e1;margin-bottom:4px">Phone / WhatsApp *</label>
+                      <input id="dm_phone" type="tel" placeholder="+91 98765 43210" required style="width:100%;padding:9px 12px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#fff;font-size:0.88rem;box-sizing:border-box">
+                    </div>
+                    <div style="margin-bottom:12px">
+                      <label style="display:block;font-size:0.78rem;font-weight:600;color:#cbd5e1;margin-bottom:4px">Company Name</label>
+                      <input id="dm_company" type="text" placeholder="e.g. Prestige Glass & Aluminium" style="width:100%;padding:9px 12px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#fff;font-size:0.88rem;box-sizing:border-box">
+                    </div>
+                    <div style="margin-bottom:16px">
+                      <label style="display:block;font-size:0.78rem;font-weight:600;color:#cbd5e1;margin-bottom:4px">Specific Requirements / Notes</label>
+                      <textarea id="dm_msg" rows="2" placeholder="e.g. Looking to cost UPVC and Aluminum projects..." style="width:100%;padding:8px 12px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:7px;color:#fff;font-size:0.85rem;box-sizing:border-box"></textarea>
+                    </div>
+                    <button type="submit" id="btnDemoSubmit" style="width:100%;padding:11px;background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.92rem;cursor:pointer;box-shadow:0 4px 14px rgba(2,132,199,0.4)">
+                      Submit Demo Request &rarr;
+                    </button>
+                  </form>
+                </div>
+
+                <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);text-align:center">
+                  <a href="https://wa.me/919092315029?text=Hello%20RAFIQ,%20I%20would%20like%20to%20request%20a%20demo%20of%20MR_Quoter" target="_blank" style="display:inline-flex;align-items:center;gap:6px;color:#22c55e;font-size:0.84rem;font-weight:700;text-decoration:none">
+                    <span>💬 Or Instant WhatsApp:</span> <u>+91 9092315029</u>
+                  </a>
                 </div>
               </div>
-
-              <div class="auth-err-banner" id="aerr" role="alert"></div>
-
-              <button class="auth-submit-btn" id="login_btn" type="submit">
-                <span>Sign In</span>
-              </button>
-            </form>
-
-            <div style="text-align:center;margin-top:24px;font-size:0.78rem;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:16px">
-              MR_Quoter &bull; Precision Architectural Costing &amp; Invoicing
             </div>
           </div>
         </div>
       `;
 
+      document.body.appendChild(ov);
+      ov.querySelector('#btnModalClose').onclick = () => ov.remove();
+      ov.onclick = e => { if (e.target === ov) ov.remove(); };
+
+      ov.querySelector('#demoReqForm').onsubmit = async e => {
+        e.preventDefault();
+        const btn = ov.querySelector('#btnDemoSubmit');
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+
+        try {
+          const payload = {
+            name: ov.querySelector('#dm_name').value.trim(),
+            email: ov.querySelector('#dm_email').value.trim(),
+            phone: ov.querySelector('#dm_phone').value.trim(),
+            company: ov.querySelector('#dm_company').value.trim(),
+            message: ov.querySelector('#dm_msg').value.trim()
+          };
+
+          const res = await apiPost('/api/request-demo', payload);
+          if (res && res.ok) {
+            ov.querySelector('.auth-modal-body').innerHTML = `
+              <div style="text-align:center;padding:48px 24px">
+                <div style="width:64px;height:64px;border-radius:50%;background:rgba(34,197,94,0.15);color:#22c55e;display:grid;place-items:center;font-size:2rem;margin:0 auto 16px;border:1px solid rgba(34,197,94,0.3)">✓</div>
+                <h2 style="font-size:1.6rem;font-weight:800;color:#fff;margin:0 0 8px">Demo Request Received!</h2>
+                <p style="color:#94a3b8;font-size:0.95rem;max-width:480px;margin:0 auto 24px;line-height:1.5">
+                  Thank you, <b>${esc(payload.name)}</b>! Your request has been forwarded to <b>RAFIQ</b> (rafiqtn70@gmail.com). We will reach out shortly to schedule your personalized live demonstration.
+                </p>
+                <button class="btn pri" id="btnDoneDemo" style="padding:10px 28px;border-radius:8px">Close</button>
+              </div>
+            `;
+            ov.querySelector('#btnDoneDemo').onclick = () => ov.remove();
+          } else {
+            throw new Error((res && res.error) || 'Could not submit demo request.');
+          }
+        } catch (err) {
+          alert('Error: ' + err.message);
+          btn.disabled = false;
+          btn.textContent = 'Submit Demo Request \u2192';
+        }
+      };
+    }
+
+    function openRegisterModal() {
+      const existing = document.querySelector('.auth-modal-overlay');
+      if (existing) existing.remove();
+
+      const ov = document.createElement('div');
+      ov.className = 'auth-modal-overlay';
+      ov.innerHTML = `
+        <div class="auth-modal-box" style="max-width:760px">
+          <div class="auth-modal-header">
+            <h2 class="auth-modal-title">
+              <span>📝 New User Registration</span>
+              <span class="auth-verified-badge">Admin Approval Required</span>
+            </h2>
+            <button class="auth-modal-close" id="btnRegClose">&times;</button>
+          </div>
+          <div class="auth-modal-body">
+            <p style="font-size:0.84rem;color:#94a3b8;margin:0 0 20px;line-height:1.5">
+              Submit your registration to request enterprise access. All new accounts are reviewed and activated by <b>RAFIQ</b>. You will receive an official activation confirmation email upon approval.
+            </p>
+
+            <form id="regForm">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="reg-2col">
+                <div>
+                  <label class="auth-field-label">Full Name *</label>
+                  <input id="rg_name" type="text" placeholder="e.g. Tariq Hussain" required class="auth-input-field">
+                </div>
+                <div>
+                  <label class="auth-field-label">Official Email ID *</label>
+                  <input id="rg_email" type="email" placeholder="name@company.com" required class="auth-input-field">
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px" class="reg-2col">
+                <div>
+                  <label class="auth-field-label">Create Password *</label>
+                  <input id="rg_pw" type="password" placeholder="At least 6 characters" required class="auth-input-field">
+                </div>
+                <div>
+                  <label class="auth-field-label">Confirm Password *</label>
+                  <input id="rg_cpw" type="password" placeholder="Repeat your password" required class="auth-input-field">
+                </div>
+              </div>
+
+              <div style="margin-top:14px">
+                <label class="auth-field-label">Registration Type *</label>
+                <div style="display:flex;gap:20px;align-items:center;background:rgba(255,255,255,0.03);padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.1)">
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.88rem;color:#fff">
+                    <input type="radio" name="rg_type" value="Company" checked style="accent-color:#0284c7">
+                    <span>Company / Enterprise Fabricator</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.88rem;color:#cbd5e1">
+                    <input type="radio" name="rg_type" value="Individual" style="accent-color:#0284c7">
+                    <span>Individual Contractor / Estimator</span>
+                  </label>
+                </div>
+              </div>
+
+              <div id="rg_co_wrap" style="margin-top:14px">
+                <label class="auth-field-label">Company Name *</label>
+                <input id="rg_company" type="text" placeholder="e.g. Alumate Architectural Glazing Ltd" class="auth-input-field">
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px" class="reg-2col">
+                <div>
+                  <label class="auth-field-label">Mobile / WhatsApp Number *</label>
+                  <input id="rg_mobile" type="tel" placeholder="+91 90923 15029" required class="auth-input-field">
+                </div>
+                <div>
+                  <label class="auth-field-label">Country *</label>
+                  <input id="rg_country" type="text" value="India" required class="auth-input-field">
+                </div>
+              </div>
+
+              <div style="margin-top:14px">
+                <label class="auth-field-label">Business / Office Address</label>
+                <input id="rg_address" type="text" placeholder="City, State, Pincode" class="auth-input-field">
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px" class="reg-2col">
+                <div>
+                  <label class="auth-field-label">Interested Software / Service</label>
+                  <select id="rg_service" class="auth-input-field" style="background:#0f172a">
+                    <option value="Architectural Aluminum & Glazing">Architectural Aluminum &amp; Glazing</option>
+                    <option value="UPVC Doors & Windows Solution">UPVC Doors &amp; Windows Solution</option>
+                    <option value="Interior Partitioning & Fit-out ERP">Interior Partitioning &amp; Fit-out ERP</option>
+                    <option value="Complete MR_Quoter Enterprise Edition">Complete MR_Quoter Enterprise Edition</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="auth-field-label">Additional Requirements</label>
+                  <input id="rg_req" type="text" placeholder="e.g. Domal 27, Saint-Gobain rates, etc." class="auth-input-field">
+                </div>
+              </div>
+
+              <div style="margin-top:18px;display:flex;align-items:flex-start;gap:10px">
+                <input type="checkbox" id="rg_terms" required style="margin-top:3px;accent-color:#0284c7">
+                <label for="rg_terms" style="font-size:0.8rem;color:#cbd5e1;line-height:1.4;cursor:pointer">
+                  I accept the <b>Terms &amp; Conditions</b> and agree that my account activation is subject to verification and approval by Platform Administrator RAFIQ.
+                </label>
+              </div>
+
+              <div id="rg_err" style="display:none;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:8px;padding:10px 14px;color:#fca5a5;font-size:0.84rem;margin-top:14px"></div>
+
+              <button type="submit" id="btnRegSubmit" class="auth-submit-btn" style="margin-top:20px;padding:14px">
+                <span>Submit Registration for Approval</span> &rarr;
+              </button>
+            </form>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(ov);
+      ov.querySelector('#btnRegClose').onclick = () => ov.remove();
+      ov.onclick = e => { if (e.target === ov) ov.remove(); };
+
+      // Toggle company field
+      const radios = ov.querySelectorAll('input[name="rg_type"]');
+      radios.forEach(r => {
+        r.onchange = () => {
+          const isCo = ov.querySelector('input[name="rg_type"]:checked').value === 'Company';
+          ov.querySelector('#rg_co_wrap').style.display = isCo ? 'block' : 'none';
+        };
+      });
+
+      ov.querySelector('#regForm').onsubmit = async e => {
+        e.preventDefault();
+        const errBox = ov.querySelector('#rg_err');
+        errBox.style.display = 'none';
+
+        const pw = ov.querySelector('#rg_pw').value;
+        const cpw = ov.querySelector('#rg_cpw').value;
+        if (pw !== cpw) {
+          errBox.textContent = 'Passwords do not match. Please re-enter.';
+          errBox.style.display = 'block';
+          return;
+        }
+
+        const isCo = ov.querySelector('input[name="rg_type"]:checked').value === 'Company';
+        const coName = ov.querySelector('#rg_company').value.trim();
+        if (isCo && !coName) {
+          errBox.textContent = 'Please enter your Company Name.';
+          errBox.style.display = 'block';
+          return;
+        }
+
+        const btn = ov.querySelector('#btnRegSubmit');
+        btn.disabled = true;
+        btn.textContent = 'Submitting registration...';
+
+        try {
+          const payload = {
+            fullName: ov.querySelector('#rg_name').value.trim(),
+            email: ov.querySelector('#rg_email').value.trim(),
+            password: pw,
+            confirmPassword: cpw,
+            type: isCo ? 'Company' : 'Individual',
+            companyName: isCo ? coName : '',
+            mobile: ov.querySelector('#rg_mobile').value.trim(),
+            country: ov.querySelector('#rg_country').value.trim(),
+            address: ov.querySelector('#rg_address').value.trim(),
+            service: ov.querySelector('#rg_service').value,
+            additionalRequirements: ov.querySelector('#rg_req').value.trim(),
+            termsAccepted: ov.querySelector('#rg_terms').checked
+          };
+
+          const res = await apiPost('/api/register', payload);
+          if (res && res.ok) {
+            ov.querySelector('.auth-modal-body').innerHTML = `
+              <div style="text-align:center;padding:40px 20px">
+                <div style="width:64px;height:64px;border-radius:50%;background:rgba(34,197,94,0.15);color:#22c55e;display:grid;place-items:center;font-size:2rem;margin:0 auto 16px;border:1px solid rgba(34,197,94,0.3)">✓</div>
+                <h2 style="font-size:1.6rem;font-weight:800;color:#fff;margin:0 0 10px">Application Submitted!</h2>
+                <p style="color:#e2e8f0;font-size:1rem;max-width:520px;margin:0 auto 14px;line-height:1.5">
+                  Thank you, <b>${esc(payload.fullName)}</b>! Your registration details have been securely recorded and dispatched to <b>RAFIQ</b> (RAFIQTN70@GMAIL.COM).
+                </p>
+                <div style="background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.3);border-radius:10px;padding:16px;max-width:480px;margin:0 auto 24px;text-align:left;font-size:0.86rem;color:#bae6fd">
+                  <b>Status: PENDING APPROVAL</b><br>
+                  • An administrator will review your application.<br>
+                  • You will receive an official activation email once approved.<br>
+                  • You can then log in using your registered email and password.
+                </div>
+                <button class="btn pri" id="btnCloseSuccess" style="padding:10px 32px;border-radius:8px;font-weight:700">Return to Login</button>
+              </div>
+            `;
+            ov.querySelector('#btnCloseSuccess').onclick = () => ov.remove();
+          } else {
+            throw new Error((res && res.error) || 'Registration submission failed.');
+          }
+        } catch (err) {
+          errBox.textContent = err.message || 'Registration failed. Please try again.';
+          errBox.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Submit Registration for Approval \u2192';
+        }
+      };
+    }
+
+    function openForgotPwModal() {
+      modal({
+        title: '🔑 Password Recovery & Support',
+        wide: false,
+        noFooter: true,
+        body: `
+          <div style="text-align:center;padding:12px 6px">
+            <div style="font-size:2.2rem;margin-bottom:12px">🛡️</div>
+            <h4 style="margin:0 0 8px;font-size:1.15rem;color:#0f172a">Security Verified Recovery</h4>
+            <p style="font-size:0.88rem;color:#475569;margin:0 0 20px;line-height:1.5">
+              To protect enterprise quotes and sensitive pricing data, password resets require verification by Platform Owner <b>RAFIQ</b>.
+            </p>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;text-align:left;font-size:0.88rem;margin-bottom:20px">
+              <div style="margin-bottom:8px">✉️ <b>Email Support:</b> <a href="mailto:rafiqtn70@gmail.com" style="color:#0284c7;font-weight:600">rafiqtn70@gmail.com</a></div>
+              <div>📞 <b>Direct / WhatsApp:</b> <a href="https://wa.me/919092315029" target="_blank" style="color:#16a34a;font-weight:600">+91 9092315029</a></div>
+            </div>
+            <button class="btn pri w100" data-close>Understood</button>
+          </div>
+        `
+      });
+    }
+
+    function viewLogin() {
+      root.innerHTML = `
+        <div class="auth-wrap">
+          <!-- 1. TOP BRANDING NAVIGATION HEADER -->
+          <header class="auth-top-header">
+            <div class="auth-brand-col">
+              <img src="/img/mr-quoter-logo.jpg" alt="MR Quoter the one" class="auth-brand-logo">
+              <div class="auth-brand-details">
+                <div class="auth-brand-title">RAFIQ <span class="auth-verified-badge">✔ Official</span></div>
+                <a href="mailto:RAFIQTN70@GMAIL.COM" class="auth-brand-email">✉ RAFIQTN70@GMAIL.COM</a>
+              </div>
+            </div>
+            <div class="auth-nav-actions">
+              <button class="auth-nav-btn auth-demo-btn" id="btnHeaderDemo">
+                <span class="auth-pulse-dot"></span> Request a Demo
+              </button>
+              <button class="auth-nav-btn auth-reg-btn" id="btnHeaderRegister">
+                New User Registration
+              </button>
+              <button class="auth-nav-btn auth-login-btn" id="btnHeaderLogin">
+                Official Login
+              </button>
+            </div>
+          </header>
+
+          <!-- 2. 3D STAGE WITH FLOATING SOFTWARE FEATURE CARDS -->
+          <div class="auth-stage-3d">
+            <div class="auth-grid-3d"></div>
+            <div class="auth-glow-orbit orbit-1"></div>
+            <div class="auth-glow-orbit orbit-2"></div>
+
+            <!-- Floating Card 1: 60-Sec Auto Costing BOM -->
+            <div class="float-card card-bom">
+              <div class="fc-head">
+                <span class="fc-badge blue">⚡ 60-Sec Auto Costing</span>
+                <span class="fc-tag">Domal 27 Series</span>
+              </div>
+              <div class="fc-body">
+                <div class="fc-title">2-Track Sliding Window &bull; 4'0" x 5'0"</div>
+                <div class="fc-spec">
+                  <span>• 5045 Outer Frame: 5.50 mtr</span>
+                  <span>• 5046 Shutter: 7.30 mtr</span>
+                  <span>• Saint-Gobain 5mm Toughened Clear</span>
+                </div>
+                <div class="fc-price">₹ 14,850 <small>+ 18% GST (BOM generated)</small></div>
+              </div>
+            </div>
+
+            <!-- Floating Card 2: Site M-Sheet Variation Tracker -->
+            <div class="float-card card-msheet">
+              <div class="fc-head">
+                <span class="fc-badge green">📐 Site M-Sheet Tracker</span>
+                <span class="fc-tag">DLF Cybercity Tower 4</span>
+              </div>
+              <div class="fc-body">
+                <div class="fc-title">Opening W1 &bull; Master Bedroom</div>
+                <div class="fc-diff">
+                  <div>Contract: <b>1200 x 1500 mm</b></div>
+                  <div>Site Actual: <b style="color:#10b981">1250 x 1550 mm</b></div>
+                </div>
+                <div class="fc-var-badge">+ 1.85 sq ft Scope Variation (Auto-Billed)</div>
+              </div>
+            </div>
+
+            <!-- Floating Card 3: Statutory GST Tax Invoicing -->
+            <div class="float-card card-gst">
+              <div class="fc-head">
+                <span class="fc-badge purple">📑 Statutory GST Billing</span>
+                <span class="fc-tag">Section 31 CGST Act</span>
+              </div>
+              <div class="fc-body">
+                <div class="fc-title">Tax Invoice &amp; Delivery Challan</div>
+                <div class="fc-gst-row">
+                  <div>Dual GSTINs: <b>33AABCD1234E1Z1</b></div>
+                  <div>E-Way Bill: <b style="color:#0284c7">998877665544</b></div>
+                  <div>Vehicle: <b>TN-09-CD-5678</b></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Floating Card 4: Factory Material Requisition MRL -->
+            <div class="float-card card-mrl">
+              <div class="fc-head">
+                <span class="fc-badge cyan">🏭 Factory Indent (MRL)</span>
+                <span class="fc-tag">MRL #0042</span>
+              </div>
+              <div class="fc-body">
+                <div class="fc-title">Workshop Profile Requisition</div>
+                <div class="fc-spec">
+                  <span>• 5045 Outer Frame Profile: <b>128.5 mtr</b></span>
+                  <span>• 5046 Interlock Shutter: <b>184.2 mtr</b></span>
+                  <span>• Saint-Gobain 5mm Glass: <b>312.0 sq ft</b></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. CENTER OFFICIAL LOGIN CARD -->
+            <div class="auth-center-wrap">
+              <div class="auth-glass-card">
+                <div class="auth-card-header">
+                  <img src="/img/mr-quoter-logo.jpg" alt="MR Quoter the one" class="auth-card-logo">
+                  <h1 class="auth-card-title">Welcome to MR_Quoter</h1>
+                  <p class="auth-card-subtitle">Precision Architectural Costing, Site M-Sheets &amp; GST Invoicing</p>
+                </div>
+
+                <form id="af" autocomplete="on">
+                  <div class="auth-field-group">
+                    <label class="auth-field-label" for="l_un">Username or Official Email</label>
+                    <div class="auth-input-container">
+                      <span class="auth-input-icon">👤</span>
+                      <input id="l_un" class="auth-input-field has-icon" name="username" type="text" placeholder="e.g. name@company.com or username" required autofocus autocomplete="username" autocapitalize="none">
+                    </div>
+                  </div>
+
+                  <div class="auth-field-group">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                      <label class="auth-field-label" for="l_pw" style="margin-bottom:0">Password</label>
+                      <button type="button" class="auth-forgot-link" id="btnForgotPw">Forgot Password?</button>
+                    </div>
+                    <div class="auth-input-container">
+                      <span class="auth-input-icon">🔒</span>
+                      <input id="l_pw" class="auth-input-field has-icon" name="password" type="password" placeholder="••••••••••••" required autocomplete="current-password" style="padding-right:44px">
+                      <button type="button" class="auth-pw-toggle" id="btnTogglePw" title="Show / Hide Password" aria-label="Toggle password visibility">👁️</button>
+                    </div>
+                  </div>
+
+                  <div class="auth-options-row">
+                    <label class="auth-remember-label">
+                      <input type="checkbox" id="chkRememberMe">
+                      <span>Remember Me</span>
+                    </label>
+                    <span class="auth-secure-shield">🛡️ 256-Bit SSL Encrypted</span>
+                  </div>
+
+                  <div class="auth-err-banner" id="aerr" role="alert"></div>
+
+                  <button class="auth-submit-btn" id="login_btn" type="submit">
+                    <span>Official Software Sign In</span> &rarr;
+                  </button>
+                </form>
+
+                <div class="auth-card-footer">
+                  <div>New to MR_Quoter? <a href="javascript:void(0)" id="cardRegisterLink" class="auth-link-bold">Register Here for Access &rarr;</a></div>
+                  <div style="margin-top:8px">Need a live walkthrough? <a href="javascript:void(0)" id="cardDemoLink" class="auth-link-sub">Request a Live Demo</a></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Auto-fill Remembered Username
+      try {
+        const savedUn = localStorage.getItem('mq_remember_user');
+        if (savedUn) {
+          $('#l_un').value = savedUn;
+          $('#chkRememberMe').checked = true;
+        }
+      } catch (e) {}
+
+      // Interactive Event Listeners
+      $('#btnTogglePw').onclick = () => {
+        const field = $('#l_pw');
+        const isPw = field.type === 'password';
+        field.type = isPw ? 'text' : 'password';
+        $('#btnTogglePw').textContent = isPw ? '🔒' : '👁️';
+      };
+
+      $('#btnHeaderDemo').onclick = openDemoModal;
+      $('#cardDemoLink').onclick = openDemoModal;
+      $('#btnHeaderRegister').onclick = openRegisterModal;
+      $('#cardRegisterLink').onclick = openRegisterModal;
+      $('#btnForgotPw').onclick = openForgotPwModal;
+      $('#btnHeaderLogin').onclick = () => {
+        const unInput = $('#l_un');
+        if (unInput) {
+          unInput.focus();
+          unInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      };
+
+      // Form submission
       $('#af').onsubmit = async e => {
         e.preventDefault();
         const un = $('#l_un').value.trim().toLowerCase();
@@ -4680,6 +5679,15 @@
           errBox.style.display = 'block';
           return;
         }
+
+        // Save or remove Remember Me
+        try {
+          if ($('#chkRememberMe').checked) {
+            localStorage.setItem('mq_remember_user', un);
+          } else {
+            localStorage.removeItem('mq_remember_user');
+          }
+        } catch (e) {}
 
         btn.disabled = true;
         btn.textContent = 'Signing in...';
@@ -4711,7 +5719,7 @@
               errBox.textContent = 'User account not found or deactivated.';
               errBox.style.display = 'block';
               btn.disabled = false;
-              btn.textContent = 'Sign In';
+              btn.textContent = 'Official Software Sign In \u2192';
               return;
             }
 
@@ -4723,26 +5731,25 @@
             errBox.textContent = errMsg;
             errBox.style.display = 'block';
             btn.disabled = false;
-            btn.textContent = 'Sign In';
+            btn.textContent = 'Official Software Sign In \u2192';
           }
           return;
         }
 
         // Offline / local fallback
-
         const u = (db.users || []).find(x => (x.username && x.username.toLowerCase() === un) || (x.email && x.email.toLowerCase() === un));
         if (!u || !(await checkPw(u, pw))) {
           errBox.textContent = 'Incorrect email/username or password.';
           errBox.style.display = 'block';
           btn.disabled = false;
-          btn.textContent = 'Sign In';
+          btn.textContent = 'Official Software Sign In \u2192';
           return;
         }
         if (!u.active && u.active !== undefined) {
           errBox.textContent = 'Your account is disabled. Please contact your administrator.';
           errBox.style.display = 'block';
           btn.disabled = false;
-          btn.textContent = 'Sign In';
+          btn.textContent = 'Official Software Sign In \u2192';
           return;
         }
         me = u;
@@ -7925,6 +8932,401 @@
         </tr>`;
       }).join('');
     }
+
+    /* ========== Registrations & Approvals (RAFIQ SaaS Platform) ========== */
+    let _registrationsData = [];
+    let _demoRequestsData = [];
+    let _regActiveTab = 'registrations';
+
+    async function viewRegistrations() {
+      const m = $('#main');
+      if (!m) return;
+      m.innerHTML = `<div class="ph">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:9999px;background:rgba(56,189,248,0.12);color:#38bdf8;font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;border:1px solid rgba(56,189,248,0.3)">
+              ⚡ RAFIQ SaaS Security Portal
+            </span>
+            <span class="mute sm">Official Admin: RAFIQTN70@GMAIL.COM</span>
+          </div>
+          <h1 style="display:flex;align-items:center;gap:10px">
+            <span>Client Registrations &amp; Account Approval Hub</span>
+          </h1>
+          <div class="mute">Review self-registration requests, approve B2B accounts, track activation emails, and respond to demo inquiries.</div>
+        </div>
+        <div class="acts">
+          <button class="btn" id="regRefreshBtn">🔄 Refresh Data</button>
+        </div>
+      </div>
+
+      <div class="kpis" id="regKpis" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:14px">
+        <div class="kpi" style="border-left:4px solid #6366f1"><small>Total Registrations</small><b id="regKpiTotal">0</b><span>All-time applicants</span></div>
+        <div class="kpi" style="border-left:4px solid #f59e0b;background:rgba(245,158,11,0.04)"><small>Pending Approvals</small><b id="regKpiPending" style="color:#f59e0b">0</b><span>Awaiting authorization</span></div>
+        <div class="kpi" style="border-left:4px solid #10b981"><small>Approved Clients</small><b id="regKpiApproved" style="color:#10b981">0</b><span>Active software accounts</span></div>
+        <div class="kpi" style="border-left:4px solid #ef4444"><small>Rejected Applications</small><b id="regKpiRejected" style="color:#ef4444">0</b><span>Declined requests</span></div>
+        <div class="kpi" style="border-left:4px solid #64748b"><small>Suspended Accounts</small><b id="regKpiSuspended" style="color:#64748b">0</b><span>Temporarily locked</span></div>
+        <div class="kpi" style="border-left:4px solid #38bdf8"><small>Demo Inquiries</small><b id="regKpiDemo">0</b><span>Pending sales demos</span></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:10px">
+        <button class="btn" id="regTabBtn" style="background:var(--p, #6366f1);color:#fff;font-weight:700">📝 Registrations (<span id="regCountBadge">0</span>)</button>
+        <button class="btn" id="demoTabBtn" style="background:var(--card, #fff);border:1px solid var(--line);font-weight:600">🎥 Demo Requests (<span id="demoCountBadge">0</span>)</button>
+      </div>
+
+      <!-- Registrations View -->
+      <div id="regTabContainer">
+        <div class="card" style="padding:14px 18px;margin-bottom:16px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+            <input id="regSearchInput" placeholder="🔍 Search applicant name, email, company, or mobile..." style="flex:1;min-width:240px;padding:9px 14px;border:1px solid var(--line);border-radius:6px;font-size:0.92rem">
+            <select id="regStatusSelect" style="padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.92rem">
+              <option value="">All Statuses</option>
+              <option value="PENDING">Pending Approval Only</option>
+              <option value="APPROVED">Approved Only</option>
+              <option value="REJECTED">Rejected Only</option>
+              <option value="SUSPENDED">Suspended Only</option>
+            </select>
+            <select id="regTypeSelect" style="padding:9px 12px;border:1px solid var(--line);border-radius:6px;font-size:0.92rem">
+              <option value="">All Types</option>
+              <option value="Company">Company</option>
+              <option value="Individual">Individual</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden;border:1px solid var(--line)">
+          <div style="overflow-x:auto">
+            <table class="tbl" style="width:100%;margin:0">
+              <thead>
+                <tr>
+                  <th style="width:140px">Registered Date</th>
+                  <th>Applicant Name</th>
+                  <th>Entity / Company</th>
+                  <th>Contact Info</th>
+                  <th>Interested Service</th>
+                  <th style="width:130px;text-align:center">Status</th>
+                  <th style="width:220px;text-align:right">Admin Actions</th>
+                </tr>
+              </thead>
+              <tbody id="regTableRows">
+                <tr><td colspan="7" style="text-align:center;padding:30px"><div class="mute">Loading registration applications...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Demo Inquiries View -->
+      <div id="demoTabContainer" style="display:none">
+        <div class="card" style="padding:0;overflow:hidden;border:1px solid var(--line)">
+          <div style="overflow-x:auto">
+            <table class="tbl" style="width:100%;margin:0">
+              <thead>
+                <tr>
+                  <th style="width:140px">Received Date</th>
+                  <th>Client Name</th>
+                  <th>Company</th>
+                  <th>Email &amp; Mobile</th>
+                  <th>Preferred Date / Time</th>
+                  <th>Message / Notes</th>
+                  <th style="width:140px;text-align:right">Connect</th>
+                </tr>
+              </thead>
+              <tbody id="demoTableRows">
+                <tr><td colspan="7" style="text-align:center;padding:30px"><div class="mute">Loading demo inquiries...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+
+      $('#regRefreshBtn').addEventListener('click', loadRegistrationsData);
+      $('#regSearchInput').addEventListener('input', renderRegTableRows);
+      $('#regStatusSelect').addEventListener('change', renderRegTableRows);
+      $('#regTypeSelect').addEventListener('change', renderRegTableRows);
+
+      $('#regTabBtn').addEventListener('click', () => switchRegTab('registrations'));
+      $('#demoTabBtn').addEventListener('click', () => switchRegTab('demos'));
+
+      await loadRegistrationsData();
+    }
+
+    function switchRegTab(tab) {
+      _regActiveTab = tab;
+      const regCont = $('#regTabContainer');
+      const demoCont = $('#demoTabContainer');
+      const regBtn = $('#regTabBtn');
+      const demoBtn = $('#demoTabBtn');
+      if (tab === 'registrations') {
+        if (regCont) regCont.style.display = 'block';
+        if (demoCont) demoCont.style.display = 'none';
+        if (regBtn) { regBtn.style.background = 'var(--p, #6366f1)'; regBtn.style.color = '#fff'; }
+        if (demoBtn) { demoBtn.style.background = 'var(--card, #fff)'; demoBtn.style.color = 'inherit'; }
+      } else {
+        if (regCont) regCont.style.display = 'none';
+        if (demoCont) demoCont.style.display = 'block';
+        if (regBtn) { regBtn.style.background = 'var(--card, #fff)'; regBtn.style.color = 'inherit'; }
+        if (demoBtn) { demoBtn.style.background = 'var(--p, #6366f1)'; demoBtn.style.color = '#fff'; }
+      }
+    }
+
+    async function loadRegistrationsData() {
+      const tbody = $('#regTableRows');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px"><div class="mute">Contacting RAFIQ approval backend...</div></td></tr>';
+      try {
+        const res = await apiGet('/api/admin/registrations');
+        _registrationsData = (res && res.registrations) || [];
+        _demoRequestsData = (res && res.demoRequests) || [];
+        updateRegKpis(res && res.stats);
+        renderRegTableRows();
+        renderDemoTableRows();
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--bad)">Failed to fetch registrations: ${esc(err.message)}</td></tr>`;
+        toast('Failed to load registrations: ' + err.message, 'bad');
+      }
+    }
+
+    function updateRegKpis(stats) {
+      const list = _registrationsData;
+      const total = stats ? stats.total : list.length;
+      const pend = stats ? stats.pending : list.filter(r => r.status === 'PENDING').length;
+      const apprv = stats ? stats.approved : list.filter(r => r.status === 'APPROVED').length;
+      const rej = stats ? stats.rejected : list.filter(r => r.status === 'REJECTED').length;
+      const susp = stats ? stats.suspended : list.filter(r => r.status === 'SUSPENDED').length;
+      const demos = _demoRequestsData.length;
+
+      if ($('#regKpiTotal')) $('#regKpiTotal').textContent = total;
+      if ($('#regKpiPending')) $('#regKpiPending').textContent = pend;
+      if ($('#regKpiApproved')) $('#regKpiApproved').textContent = apprv;
+      if ($('#regKpiRejected')) $('#regKpiRejected').textContent = rej;
+      if ($('#regKpiSuspended')) $('#regKpiSuspended').textContent = susp;
+      if ($('#regKpiDemo')) $('#regKpiDemo').textContent = demos;
+
+      if ($('#regCountBadge')) $('#regCountBadge').textContent = total;
+      if ($('#demoCountBadge')) $('#demoCountBadge').textContent = demos;
+    }
+
+    function renderRegTableRows() {
+      const tbody = $('#regTableRows');
+      if (!tbody) return;
+
+      const q = ($('#regSearchInput') ? $('#regSearchInput').value.trim().toLowerCase() : '');
+      const stat = ($('#regStatusSelect') ? $('#regStatusSelect').value : '');
+      const type = ($('#regTypeSelect') ? $('#regTypeSelect').value : '');
+
+      let filtered = _registrationsData.filter(r => {
+        if (stat && r.status !== stat) return false;
+        if (type && r.registrationType !== type) return false;
+        if (!q) return true;
+        return (
+          (r.fullName || '').toLowerCase().includes(q) ||
+          (r.email || '').toLowerCase().includes(q) ||
+          (r.companyName || '').toLowerCase().includes(q) ||
+          (r.mobile || '').toLowerCase().includes(q) ||
+          (r.address || '').toLowerCase().includes(q) ||
+          (r.service || '').toLowerCase().includes(q)
+        );
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px"><div class="empty">No registration applications match the criteria.</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(r => {
+        let badge = '';
+        if (r.status === 'PENDING') {
+          badge = '<span class="bd" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:700;display:inline-flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;display:inline-block"></span>PENDING</span>';
+        } else if (r.status === 'APPROVED') {
+          badge = '<span class="bd" style="background:#d1fae5;color:#065f46;border:1px solid #a7f3d0;font-weight:700">✓ APPROVED</span>';
+        } else if (r.status === 'REJECTED') {
+          badge = '<span class="bd" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;font-weight:700">✕ REJECTED</span>';
+        } else if (r.status === 'SUSPENDED') {
+          badge = '<span class="bd" style="background:#e2e8f0;color:#334155;border:1px solid #cbd5e1;font-weight:700">⏸ SUSPENDED</span>';
+        } else {
+          badge = `<span class="bd">${esc(r.status || 'PENDING')}</span>`;
+        }
+
+        const dateStr = r.registeredAt ? new Date(r.registeredAt).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '-';
+        const typeBadge = r.registrationType === 'Company' 
+          ? '<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(99,102,241,0.1);color:#6366f1;font-size:0.78rem;font-weight:700">🏢 Company</span>' 
+          : '<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(14,165,233,0.1);color:#0ea5e9;font-size:0.78rem;font-weight:700">👤 Individual</span>';
+
+        return `<tr>
+          <td class="nowrap sm"><b>${esc(dateStr)}</b></td>
+          <td>
+            <div style="font-weight:700;font-size:0.95rem">${esc(r.fullName)}</div>
+            <div class="sm mute">${esc(r.country || 'India')}</div>
+          </td>
+          <td>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              ${typeBadge}
+              <div style="font-weight:600;font-size:0.88rem">${esc(r.companyName || 'Individual Account')}</div>
+            </div>
+          </td>
+          <td>
+            <div><a href="mailto:${esc(r.email)}" style="color:#6366f1;font-weight:600;text-decoration:none">${esc(r.email)}</a></div>
+            <div class="sm mute">📞 ${esc(r.mobile || '-')}</div>
+          </td>
+          <td>
+            <div style="font-size:0.88rem;font-weight:600">${esc(r.service || 'Full SaaS Suite')}</div>
+            ${r.additionalReqs ? `<div class="sm mute" style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(r.additionalReqs)}">📝 ${esc(r.additionalReqs)}</div>` : ''}
+          </td>
+          <td style="text-align:center">${badge}</td>
+          <td style="text-align:right">
+            <div style="display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap">
+              <button class="btn sm" onclick="window._viewRegDetail('${esc(r.id)}')" title="View complete registration details">👁️</button>
+              ${r.status === 'PENDING' ? `
+                <button class="btn sm" style="background:#10b981;color:#fff;border:none;font-weight:700" onclick="window._approveReg('${esc(r.id)}')" title="Approve and activate client account">✓ Approve</button>
+                <button class="btn sm bad" onclick="window._rejectReg('${esc(r.id)}')" title="Reject application with reason">✕ Reject</button>
+              ` : ''}
+              ${r.status === 'APPROVED' ? `
+                <button class="btn sm" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1" onclick="window._suspendReg('${esc(r.id)}')" title="Temporarily suspend client access">⏸ Suspend</button>
+              ` : ''}
+              ${r.status === 'SUSPENDED' ? `
+                <button class="btn sm" style="background:#10b981;color:#fff;border:none;font-weight:600" onclick="window._suspendReg('${esc(r.id)}')" title="Re-activate account">▶ Unsuspend</button>
+              ` : ''}
+              <button class="btn sm bad" onclick="window._deleteReg('${esc(r.id)}')" title="Delete application record">🗑️</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderDemoTableRows() {
+      const tbody = $('#demoTableRows');
+      if (!tbody) return;
+      if (!_demoRequestsData.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px"><div class="empty">No demo requests submitted yet.</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = _demoRequestsData.map(d => {
+        const dateStr = d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '-';
+        const cleanPhone = (d.phone || '').replace(/[^0-9]/g, '');
+        return `<tr>
+          <td class="nowrap sm"><b>${esc(dateStr)}</b></td>
+          <td><b>${esc(d.name || '-')}</b></td>
+          <td>${esc(d.company || 'Direct Client')}</td>
+          <td>
+            <div><a href="mailto:${esc(d.email)}" style="color:#6366f1;text-decoration:none;font-weight:600">${esc(d.email || '-')}</a></div>
+            <div class="sm mute">📞 ${esc(d.phone || '-')}</div>
+          </td>
+          <td>${esc(d.preferredDate || 'Earliest Available')}</td>
+          <td class="sm mute" style="max-width:240px">${esc(d.message || 'No additional note provided')}</td>
+          <td style="text-align:right">
+            <div style="display:flex;justify-content:flex-end;gap:6px">
+              <a class="btn sm" href="mailto:${esc(d.email)}?subject=MR%20Quoter%20Platform%20Demo%20Schedule" style="text-decoration:none">✉️ Email</a>
+              ${cleanPhone ? `<a class="btn sm" style="background:#25d366;color:#fff;text-decoration:none;font-weight:700" target="_blank" href="https://wa.me/${cleanPhone}?text=Hello%20${encodeURIComponent(d.name || 'Sir')},%20this%20is%20RAFIQ%20from%20MR%20Quoter.">💬 WhatsApp</a>` : ''}
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    /* Registration Action Handlers */
+    window._viewRegDetail = function(id) {
+      const r = _registrationsData.find(x => x.id === id);
+      if (!r) return;
+      const dateStr = r.registeredAt ? new Date(r.registeredAt).toLocaleString() : '-';
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+      overlay.innerHTML = `<div style="background:var(--card, #fff);border:1px solid var(--line);border-radius:14px;max-width:640px;width:100%;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;animation:fadeIn 0.2s ease">
+        <div style="padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:rgba(99,102,241,0.04)">
+          <div style="font-size:1.15rem;font-weight:700;color:var(--text, #1e293b)">Applicant Profile: ${esc(r.fullName)}</div>
+          <button class="btn sm" id="closeRegDetailBtn" style="border:none;background:transparent;font-size:1.2rem;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:24px;max-height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px;font-size:0.92rem">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div><small class="mute">Status</small><div style="font-weight:700;margin-top:2px">${esc(r.status)}</div></div>
+            <div><small class="mute">Registration Date</small><div style="font-weight:600;margin-top:2px">${esc(dateStr)}</div></div>
+            <div><small class="mute">Email Address</small><div style="font-weight:600;color:#6366f1;margin-top:2px">${esc(r.email)}</div></div>
+            <div><small class="mute">Mobile Number</small><div style="font-weight:600;margin-top:2px">${esc(r.mobile || '-')}</div></div>
+            <div><small class="mute">Registration Type</small><div style="font-weight:600;margin-top:2px">${esc(r.registrationType)}</div></div>
+            <div><small class="mute">Company / Org Name</small><div style="font-weight:600;margin-top:2px">${esc(r.companyName || 'N/A')}</div></div>
+            <div><small class="mute">Country</small><div style="font-weight:600;margin-top:2px">${esc(r.country || 'India')}</div></div>
+            <div><small class="mute">Interested Service</small><div style="font-weight:600;margin-top:2px">${esc(r.service || 'Full Software')}</div></div>
+          </div>
+          <div>
+            <small class="mute">Registered Address / Location</small>
+            <div style="font-weight:500;margin-top:4px;background:rgba(0,0,0,0.03);padding:8px 12px;border-radius:6px;border:1px solid var(--line)">${esc(r.address || 'No address specified')}</div>
+          </div>
+          <div>
+            <small class="mute">Additional Requirements &amp; Notes</small>
+            <div style="font-weight:500;margin-top:4px;background:rgba(0,0,0,0.03);padding:8px 12px;border-radius:6px;border:1px solid var(--line)">${esc(r.additionalReqs || 'None')}</div>
+          </div>
+          ${r.rejectionReason ? `
+            <div>
+              <small class="mute" style="color:#ef4444">Rejection Reason</small>
+              <div style="font-weight:600;color:#ef4444;background:#fee2e2;padding:8px 12px;border-radius:6px;margin-top:4px">${esc(r.rejectionReason)}</div>
+            </div>
+          ` : ''}
+          ${r.approvedAt ? `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:8px">
+              <div><small class="mute">Approved By</small><div style="font-weight:600">${esc(r.approvedBy || 'Master Admin')}</div></div>
+              <div><small class="mute">Approved Date</small><div style="font-weight:600">${esc(new Date(r.approvedAt).toLocaleString())}</div></div>
+            </div>
+          ` : ''}
+        </div>
+        <div style="padding:16px 24px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;background:rgba(0,0,0,0.02)">
+          <button class="btn" id="closeRegDetailBottomBtn">Close</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      overlay.querySelector('#closeRegDetailBtn').onclick = close;
+      overlay.querySelector('#closeRegDetailBottomBtn').onclick = close;
+    };
+
+    window._approveReg = async function(id) {
+      const r = _registrationsData.find(x => x.id === id);
+      const name = r ? r.fullName : 'this applicant';
+      if (!confirm(`Are you sure you want to approve registration for ${name}?\n\nThis will automatically:\n1. Activate their software account.\n2. Provision company & user records.\n3. Dispatch official welcome & activation email to ${r ? r.email : ''}.`)) return;
+
+      try {
+        const res = await apiPost('/api/admin/registrations/' + id + '/approve', {});
+        toast(res.message || 'Registration approved and account activated successfully!', 'good');
+        await loadRegistrationsData();
+      } catch (err) {
+        toast('Approval failed: ' + err.message, 'bad');
+      }
+    };
+
+    window._rejectReg = async function(id) {
+      const r = _registrationsData.find(x => x.id === id);
+      const reason = prompt('Please specify the reason for rejecting registration of ' + (r ? r.fullName : '') + ':', 'Documentation / requirements incomplete');
+      if (reason === null) return;
+
+      try {
+        const res = await apiPost('/api/admin/registrations/' + id + '/reject', { reason: reason || 'Application declined by administrator' });
+        toast('Application marked as rejected', 'good');
+        await loadRegistrationsData();
+      } catch (err) {
+        toast('Rejection failed: ' + err.message, 'bad');
+      }
+    };
+
+    window._suspendReg = async function(id) {
+      try {
+        const res = await apiPost('/api/admin/registrations/' + id + '/suspend', {});
+        toast(res.message || 'Account status updated', 'good');
+        await loadRegistrationsData();
+      } catch (err) {
+        toast('Suspension toggle failed: ' + err.message, 'bad');
+      }
+    };
+
+    window._deleteReg = async function(id) {
+      const r = _registrationsData.find(x => x.id === id);
+      if (!confirm(`Are you sure you want to permanently delete registration record for ${r ? r.fullName : 'this user'}?`)) return;
+
+      try {
+        const res = await apiDelete('/api/admin/registrations/' + id);
+        toast(res.message || 'Registration record deleted', 'good');
+        await loadRegistrationsData();
+      } catch (err) {
+        toast('Delete failed: ' + err.message, 'bad');
+      }
+    };
+
 
     /* ========== users ========== */
     function viewUsers() {

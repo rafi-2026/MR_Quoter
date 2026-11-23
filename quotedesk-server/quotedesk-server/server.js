@@ -474,6 +474,270 @@ async function sendCompanyCredentialsEmail({ companyName, companyCode, gstin, st
   return { success: false, error: 'No email transport configured', recipients };
 }
 
+// Generic Email Dispatch Helper (Resend HTTPS -> Brevo -> Nodemailer SMTP)
+async function dispatchGenericEmail({ recipients, subject, htmlContent }) {
+  if (!recipients || recipients.length === 0) return { success: false, error: 'No recipients' };
+
+  // 1. Resend API (HTTPS Port 443)
+  if (RESEND_API_KEY && typeof fetch === 'function') {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'MR_Quoter <onboarding@resend.dev>',
+          to: recipients,
+          subject,
+          html: htmlContent
+        })
+      });
+      if (res.ok) {
+        console.log(`✅ [Resend API] Email delivered to: ${recipients.join(', ')}`);
+        return { success: true };
+      }
+    } catch (e) {
+      console.warn('[Resend API Exception]:', e.message);
+    }
+  }
+
+  // 2. Brevo API
+  if (BREVO_API_KEY && typeof fetch === 'function') {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': BREVO_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: 'MR_Quoter Platform', email: SMTP_USER },
+          to: recipients.map(em => ({ email: em })),
+          subject,
+          htmlContent
+        })
+      });
+      if (res.ok) {
+        console.log(`✅ [Brevo API] Email delivered to: ${recipients.join(', ')}`);
+        return { success: true };
+      }
+    } catch (e) {
+      console.warn('[Brevo API Exception]:', e.message);
+    }
+  }
+
+  // 3. Nodemailer SMTP Fallback
+  const transporter = getTransporter();
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: `"MR_Quoter Platform" <${SMTP_USER}>`,
+        to: recipients.join(', '),
+        subject,
+        html: htmlContent
+      });
+      console.log(`✅ [SMTP] Email sent to: ${recipients.join(', ')}`);
+      return { success: true };
+    } catch (err) {
+      console.error(`⚠️ [SMTP Warning] Could not deliver:`, err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: false, error: 'No email transport configured' };
+}
+
+// Master Admin: Dispatch Notification Alert when a New User Registers
+async function sendAdminRegistrationNotification(reg) {
+  const recipients = ['rafiqtn70@gmail.com'];
+  ADMIN_EMAILS.forEach(em => {
+    if (!recipients.includes(em)) recipients.push(em);
+  });
+
+  const portalUrl = BASE_URL || 'https://www.mrquoter.in';
+  const approveUrl = portalUrl.replace(/\/+$/, '') + '/#/registrations';
+
+  console.log(`\n=============================================================`);
+  console.log(`📝 [NEW USER REGISTRATION ALERT]`);
+  console.log(`👤 Applicant: ${reg.fullName} (${reg.email})`);
+  console.log(`🏢 Type: ${reg.type} | Company: ${reg.companyName || 'Individual'}`);
+  console.log(`📱 Phone: ${reg.mobile} | Country: ${reg.country}`);
+  console.log(`💼 Service: ${reg.service}`);
+  console.log(`📧 Target Recipients: ${recipients.join(', ')}`);
+  console.log(`=============================================================\n`);
+
+  const htmlContent = `
+  <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:0;border:1px solid #e2e8f0;border-radius:14px;background:#ffffff;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.05);">
+    <div style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:28px 24px;text-align:center;color:#ffffff;">
+      <h1 style="margin:0;font-size:22px;letter-spacing:1px;font-weight:700;color:#38bdf8;">NEW USER REGISTRATION</h1>
+      <p style="margin:6px 0 0;font-size:14px;color:#94a3b8;">MR_Quoter Platform Security &bull; Pending Admin Approval</p>
+    </div>
+    
+    <div style="padding:28px 24px;">
+      <p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.5;">
+        Hello <b>RAFIQ</b>,
+      </p>
+      <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.6;">
+        A new client application has been submitted and is waiting for your review and approval.
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr>
+            <td style="padding:8px 0;color:#64748b;width:160px;">Applicant Name:</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:700;">${reg.fullName}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Registered Email:</td>
+            <td style="padding:8px 0;color:#0284c7;font-weight:600;"><a href="mailto:${reg.email}">${reg.email}</a></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Mobile Number:</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:600;"><a href="tel:${reg.mobile}">${reg.mobile}</a></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Registration Type:</td>
+            <td style="padding:8px 0;">
+              <span style="background:${reg.type === 'Company' ? '#e0f2fe' : '#f3e8ff'};color:${reg.type === 'Company' ? '#0284c7' : '#7e22ce'};padding:3px 10px;border-radius:12px;font-weight:700;font-size:12px;">${reg.type}</span>
+            </td>
+          </tr>
+          ${reg.companyName ? `<tr>
+            <td style="padding:8px 0;color:#64748b;">Company Name:</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:600;">${reg.companyName}</td>
+          </tr>` : ''}
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Country / Address:</td>
+            <td style="padding:8px 0;color:#334155;">${reg.country || 'India'} &bull; ${reg.address || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Requested Software:</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:600;">${reg.service || 'Window & Door Estimation Suite'}</td>
+          </tr>
+          ${reg.additionalRequirements ? `<tr>
+            <td style="padding:8px 0;color:#64748b;">Additional Needs:</td>
+            <td style="padding:8px 0;color:#334155;">${reg.additionalRequirements}</td>
+          </tr>` : ''}
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Registration Date:</td>
+            <td style="padding:8px 0;color:#64748b;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${approveUrl}" target="_blank" style="background:#0284c7;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 32px;border-radius:8px;display:inline-block;box-shadow:0 4px 12px rgba(2,132,199,0.3);">
+          Review &amp; Approve in Admin Portal &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+  `;
+
+  return await dispatchGenericEmail({
+    recipients,
+    subject: `New User Registration: ${reg.fullName} (${reg.type}) - Action Required`,
+    htmlContent
+  });
+}
+
+// Client: Dispatch Official Account Activation Email upon Admin Approval
+async function sendUserActivationEmail(reg) {
+  const recipients = [reg.email.trim()];
+  const portalUrl = BASE_URL || 'https://www.mrquoter.in';
+  const loginUrl = portalUrl.replace(/\/+$/, '') + '/#/login';
+
+  console.log(`\n=============================================================`);
+  console.log(`🎉 [ACCOUNT ACTIVATION EMAIL] Dispatching welcome email to ${reg.email}`);
+  console.log(`=============================================================\n`);
+
+  const htmlContent = `
+  <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:0;border:1px solid #e2e8f0;border-radius:14px;background:#ffffff;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.05);">
+    <div style="background:linear-gradient(135deg,#0284c7 0%,#0f172a 100%);padding:30px 24px;text-align:center;color:#ffffff;">
+      <h1 style="margin:0;font-size:24px;letter-spacing:1px;font-weight:800;">WELCOME TO MR_QUOTER</h1>
+      <p style="margin:8px 0 0;font-size:15px;color:#e0f2fe;">Your Account Has Been Officially Approved &amp; Activated</p>
+    </div>
+
+    <div style="padding:28px 24px;">
+      <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.5;">
+        Dear <b>${reg.fullName}</b>,
+      </p>
+      <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.6;">
+        We are pleased to inform you that your registration for <b>MR_Quoter</b> has been reviewed and officially approved by <b>RAFIQ</b>. Your enterprise architectural costing &amp; billing workspace is now active.
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <h4 style="margin:0 0 12px;font-size:14px;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;">Your Account Information</h4>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:150px;">Official Username:</td>
+            <td style="padding:6px 0;color:#0f172a;font-weight:700;"><code>${reg.email}</code></td>
+          </tr>
+          ${reg.companyName ? `<tr>
+            <td style="padding:6px 0;color:#64748b;">Company Workspace:</td>
+            <td style="padding:6px 0;color:#0f172a;font-weight:600;">${reg.companyName}</td>
+          </tr>` : ''}
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Account Status:</td>
+            <td style="padding:6px 0;"><span style="color:#15803d;font-weight:700;">● ACTIVE &amp; APPROVED</span></td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Password:</td>
+            <td style="padding:6px 0;color:#64748b;font-style:italic;">Use the secure password you created during registration</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${loginUrl}" target="_blank" style="background:#0284c7;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 34px;border-radius:8px;display:inline-block;box-shadow:0 4px 12px rgba(2,132,199,0.3);">
+          Login to MR_Quoter &rarr;
+        </a>
+      </div>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;font-size:13px;color:#166534;line-height:1.5;">
+        💡 <b>Need assistance getting started?</b> Contact our support team anytime at <a href="mailto:rafiqtn70@gmail.com" style="color:#15803d;font-weight:600;">rafiqtn70@gmail.com</a> or WhatsApp <a href="https://wa.me/919092315029" style="color:#15803d;font-weight:600;">+91 9092315029</a>.
+      </div>
+    </div>
+  </div>
+  `;
+
+  return await dispatchGenericEmail({
+    recipients,
+    subject: `Welcome to MR_Quoter — Your Account is Activated!`,
+    htmlContent
+  });
+}
+
+// Master Admin: Dispatch Notification when a Demo is Requested
+async function sendDemoEnquiryNotification(demo) {
+  const recipients = ['rafiqtn70@gmail.com'];
+  ADMIN_EMAILS.forEach(em => {
+    if (!recipients.includes(em)) recipients.push(em);
+  });
+
+  const htmlContent = `
+  <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
+    <h2 style="color:#0f172a;margin-top:0;">🎥 New Software Demo Requested</h2>
+    <p style="color:#475569;font-size:14px;">A potential client has requested a live demonstration of MR_Quoter.</p>
+    <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #cbd5e1;font-size:14px;line-height:1.6;">
+      <p style="margin:4px 0;"><b>Name:</b> ${demo.name}</p>
+      <p style="margin:4px 0;"><b>Email:</b> <a href="mailto:${demo.email}">${demo.email}</a></p>
+      <p style="margin:4px 0;"><b>Phone:</b> <a href="tel:${demo.phone}">${demo.phone}</a></p>
+      <p style="margin:4px 0;"><b>Company:</b> ${demo.company || 'Individual / Not specified'}</p>
+      <p style="margin:4px 0;"><b>Enquiry Note:</b> ${demo.message || 'Interested in live software demonstration'}</p>
+      <p style="margin:4px 0;color:#64748b;font-size:12px;">Requested at: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
+    </div>
+  </div>
+  `;
+
+  return await dispatchGenericEmail({
+    recipients,
+    subject: `Live Demo Request: ${demo.name} (${demo.company || 'Client'}) - MR_Quoter`,
+    htmlContent
+  });
+}
+
 
 // Ensure data directory exists
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -571,6 +835,8 @@ function writeJson(file, data) {
 
 function getDb() {
   if (memoryDb) {
+    memoryDb.registrations = memoryDb.registrations || [];
+    memoryDb.demoRequests = memoryDb.demoRequests || [];
     let mod = false;
     if (memoryDb.settings && memoryDb.settings.company === 'Crescent Technobuild Pvt Ltd') {
       memoryDb.settings.company = 'MR_Quoter';
@@ -1296,6 +1562,166 @@ app.post('/api/setup', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── NEW USER SELF-REGISTRATION (Pending Admin Approval) ────────────────────────
+app.post('/api/register', authLimiter, async (req, res) => {
+  try {
+    const {
+      fullName,
+      email,
+      password,
+      confirmPassword,
+      type,
+      companyName,
+      mobile,
+      country,
+      address,
+      service,
+      additionalRequirements,
+      termsAccepted
+    } = req.body || {};
+
+    const clientIp = getClientIp(req);
+
+    // 1. Validation
+    if (!fullName || !fullName.trim()) {
+      return res.status(400).json({ error: 'Full name is required.' });
+    }
+    if (!email || !email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'A valid email address is required.' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+    if (confirmPassword && password !== confirmPassword) {
+      return res.status(400).json({ error: 'Passwords do not match.' });
+    }
+    if (!mobile || !mobile.trim()) {
+      return res.status(400).json({ error: 'Mobile number is required.' });
+    }
+    if (!termsAccepted) {
+      return res.status(400).json({ error: 'You must accept the Terms & Conditions to register.' });
+    }
+    if (type === 'Company' && (!companyName || !companyName.trim())) {
+      return res.status(400).json({ error: 'Company name is required when registering as a Company.' });
+    }
+
+    const emailClean = email.trim().toLowerCase();
+    const data = getDb();
+    data.registrations = data.registrations || [];
+    data.users = data.users || [];
+
+    // 2. Duplicate Check (Existing Users & Active/Pending Registrations)
+    const existingUser = data.users.find(u =>
+      (u.email && u.email.toLowerCase() === emailClean) ||
+      (u.username && u.username.toLowerCase() === emailClean)
+    );
+    if (existingUser) {
+      return res.status(409).json({ error: 'An account with this email address already exists. Please log in.' });
+    }
+
+    const existingReg = data.registrations.find(r =>
+      r.email && r.email.toLowerCase() === emailClean && (r.status === 'PENDING' || r.status === 'APPROVED')
+    );
+    if (existingReg) {
+      if (existingReg.status === 'PENDING') {
+        return res.status(409).json({ error: 'A registration with this email is already submitted and pending admin approval.' });
+      }
+      return res.status(409).json({ error: 'An approved account with this email already exists. Please log in.' });
+    }
+
+    // 3. Secure Password Hashing with Salt
+    const salt = crypto.randomBytes(16).toString('hex');
+    const raw = salt + ':' + password;
+    const hash = crypto.createHash('sha256').update(raw).digest('hex');
+
+    const regId = 'reg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const newReg = {
+      id: regId,
+      fullName: fullName.trim(),
+      email: emailClean,
+      username: emailClean,
+      salt: salt,
+      pass: hash,
+      type: type === 'Company' ? 'Company' : 'Individual',
+      companyName: type === 'Company' ? companyName.trim() : '',
+      mobile: mobile.trim(),
+      country: (country || 'India').trim(),
+      address: (address || '').trim(),
+      service: (service || 'Window & Door Estimation Suite').trim(),
+      additionalRequirements: (additionalRequirements || '').trim(),
+      termsAccepted: true,
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+      ip: clientIp,
+      approvedAt: null,
+      approvedBy: null,
+      rejectedAt: null,
+      rejectionReason: null
+    };
+
+    data.registrations.unshift(newReg);
+    saveDb(data);
+
+    // 4. Automated Notification Email to RAFIQTN70@GMAIL.COM
+    sendAdminRegistrationNotification(newReg).catch(err => {
+      console.warn('[Registration Email Alert Warning]:', err.message);
+    });
+
+    res.status(201).json({
+      ok: true,
+      message: 'Registration submitted successfully! Your account is pending admin approval. You will receive an official activation email once approved by RAFIQ.'
+    });
+  } catch (err) {
+    console.error('[Registration Error]:', err);
+    res.status(500).json({ error: 'Registration failed: ' + err.message });
+  }
+});
+
+// ── REQUEST A DEMO ENQUIRY ────────────────────────────────────────────────────
+app.post('/api/request-demo', authLimiter, async (req, res) => {
+  try {
+    const { name, email, phone, company, message } = req.body || {};
+    const clientIp = getClientIp(req);
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Your name is required.' });
+    }
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Your email address is required.' });
+    }
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ error: 'Your contact phone number is required.' });
+    }
+
+    const data = getDb();
+    data.demoRequests = data.demoRequests || [];
+    const demoReq = {
+      id: 'demo_' + Date.now().toString(36),
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      company: (company || '').trim(),
+      message: (message || '').trim(),
+      createdAt: new Date().toISOString(),
+      ip: clientIp
+    };
+
+    data.demoRequests.unshift(demoReq);
+    saveDb(data);
+
+    sendDemoEnquiryNotification(demoReq).catch(err => {
+      console.warn('[Demo Email Alert Warning]:', err.message);
+    });
+
+    res.json({
+      ok: true,
+      message: 'Thank you for your interest! Your demo request has been received. RAFIQ will contact you shortly to schedule a live demonstration.'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to submit demo request: ' + err.message });
+  }
+});
+
 // Login with IP tracking & Multi-Company support
 app.post('/api/login', rateLimitLogin, async (req, res) => {
   const { username, password, companyCode } = req.body || {};
@@ -1390,12 +1816,84 @@ app.post('/api/login', rateLimitLogin, async (req, res) => {
   }
 
   if (!user) {
+    const pendingReg = (data.registrations || []).find(r =>
+      (r.email && r.email.toLowerCase() === un) ||
+      (r.username && r.username.toLowerCase() === un)
+    );
+    if (pendingReg) {
+      if (pendingReg.status === 'PENDING') {
+        recordLoginLog(req, {
+          username: un,
+          status: 'BLOCKED',
+          reason: 'Registration pending admin approval'
+        });
+        return res.status(403).json({
+          error: 'Your registration is currently pending admin approval. You will receive an official activation email once approved by RAFIQ.'
+        });
+      }
+      if (pendingReg.status === 'REJECTED') {
+        recordLoginLog(req, {
+          username: un,
+          status: 'BLOCKED',
+          reason: 'Registration rejected'
+        });
+        return res.status(403).json({
+          error: `Your registration application was not approved. ${pendingReg.rejectionReason ? 'Reason: ' + pendingReg.rejectionReason : 'Please contact rafiqtn70@gmail.com for details.'}`
+        });
+      }
+      if (pendingReg.status === 'SUSPENDED') {
+        recordLoginLog(req, {
+          username: un,
+          status: 'BLOCKED',
+          reason: 'Registration suspended'
+        });
+        return res.status(403).json({
+          error: 'Your account has been suspended by the administrator.'
+        });
+      }
+    }
+
     recordLoginLog(req, {
       username: un,
       status: 'FAILED',
       reason: 'User not found'
     });
     return res.status(401).json({ error: 'Incorrect email/username or password.' });
+  }
+
+  // Check approval status on existing user account
+  if (user.approvalStatus === 'PENDING') {
+    recordLoginLog(req, {
+      userId: user.id,
+      username: user.username,
+      status: 'BLOCKED',
+      reason: 'User pending approval'
+    });
+    return res.status(403).json({
+      error: 'Your registration is currently pending admin approval. You will receive an official activation email once approved by RAFIQ.'
+    });
+  }
+  if (user.approvalStatus === 'REJECTED') {
+    recordLoginLog(req, {
+      userId: user.id,
+      username: user.username,
+      status: 'BLOCKED',
+      reason: 'User rejected'
+    });
+    return res.status(403).json({
+      error: `Your registration application was not approved. ${user.rejectionReason ? 'Reason: ' + user.rejectionReason : 'Please contact rafiqtn70@gmail.com for details.'}`
+    });
+  }
+  if (user.approvalStatus === 'SUSPENDED') {
+    recordLoginLog(req, {
+      userId: user.id,
+      username: user.username,
+      status: 'BLOCKED',
+      reason: 'User suspended'
+    });
+    return res.status(403).json({
+      error: 'Your account has been suspended by the administrator.'
+    });
   }
 
   // Verify password hash
@@ -1944,6 +2442,159 @@ app.post('/api/admin/users/:id/reset-password', auth, async (req, res) => {
   });
 
   res.json({ ok: true, message: `Password for ${u.username} reset successfully.` });
+});
+
+// ── Master Admin: Registrations & Applicants Management ───────────────────────
+app.get('/api/admin/registrations', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const data = getDb();
+  const regs = data.registrations || [];
+  const metrics = {
+    total: regs.length,
+    pending: regs.filter(r => r.status === 'PENDING').length,
+    approved: regs.filter(r => r.status === 'APPROVED').length,
+    rejected: regs.filter(r => r.status === 'REJECTED').length,
+    suspended: regs.filter(r => r.status === 'SUSPENDED').length
+  };
+  res.json({ ok: true, metrics, registrations: regs, demoRequests: data.demoRequests || [] });
+});
+
+// Master Admin: Approve Registration
+app.post('/api/admin/registrations/:id/approve', auth, async (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const data = getDb();
+  data.registrations = data.registrations || [];
+  data.companies = data.companies || [];
+  data.users = data.users || [];
+
+  const reg = data.registrations.find(r => r.id === req.params.id);
+  if (!reg) return res.status(404).json({ error: 'Registration application not found.' });
+
+  reg.status = 'APPROVED';
+  reg.approvedAt = new Date().toISOString();
+  reg.approvedBy = 'master';
+
+  // Check or provision Company & User
+  let existingUser = data.users.find(u => u.email && u.email.toLowerCase() === reg.email.toLowerCase());
+  if (!existingUser) {
+    let companyId = 'k88ft5zx1un'; // default company fallback
+    if (reg.type === 'Company') {
+      companyId = 'co_' + Date.now().toString(36);
+      const companyCode = (reg.companyName.replace(/[^A-Za-z0-9]/g, '').slice(0, 4) || 'MRQ').toUpperCase() + Math.floor(100 + Math.random() * 900);
+      const newCompany = {
+        id: companyId,
+        name: reg.companyName || (reg.fullName + ' Enterprise'),
+        code: companyCode,
+        address: reg.address || '',
+        phone: reg.mobile || '',
+        email: reg.email,
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      data.companies.push(newCompany);
+    } else if (data.companies.length > 0) {
+      companyId = data.companies[0].id;
+    }
+
+    const newUser = {
+      id: 'u_' + Date.now().toString(36),
+      companyId: companyId,
+      name: reg.fullName,
+      username: reg.email,
+      email: reg.email,
+      role: reg.type === 'Company' ? 'admin' : 'estimator',
+      salt: reg.salt,
+      pass: reg.pass,
+      active: true,
+      approvalStatus: 'APPROVED',
+      registrationId: reg.id,
+      createdAt: new Date().toISOString()
+    };
+    data.users.push(newUser);
+  } else {
+    existingUser.active = true;
+    existingUser.approvalStatus = 'APPROVED';
+  }
+
+  saveDb(data);
+
+  // Send official account activation email
+  sendUserActivationEmail(reg).catch(err => {
+    console.warn('[Activation Email Warning]:', err.message);
+  });
+
+  res.json({ ok: true, message: `Applicant ${reg.fullName} approved and account activated successfully!` });
+});
+
+// Master Admin: Reject Registration
+app.post('/api/admin/registrations/:id/reject', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const data = getDb();
+  data.registrations = data.registrations || [];
+  const reg = data.registrations.find(r => r.id === req.params.id);
+  if (!reg) return res.status(404).json({ error: 'Registration application not found.' });
+
+  reg.status = 'REJECTED';
+  reg.rejectedAt = new Date().toISOString();
+  reg.rejectionReason = req.body.reason || 'Application does not meet current verification criteria.';
+
+  if (data.users) {
+    const linkedUser = data.users.find(u => u.email && u.email.toLowerCase() === reg.email.toLowerCase());
+    if (linkedUser) {
+      linkedUser.active = false;
+      linkedUser.approvalStatus = 'REJECTED';
+      linkedUser.rejectionReason = reg.rejectionReason;
+    }
+  }
+
+  saveDb(data);
+  res.json({ ok: true, message: `Registration application for ${reg.fullName} has been rejected.` });
+});
+
+// Master Admin: Suspend Registration / User Account
+app.post('/api/admin/registrations/:id/suspend', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const data = getDb();
+  data.registrations = data.registrations || [];
+  const reg = data.registrations.find(r => r.id === req.params.id);
+  if (!reg) return res.status(404).json({ error: 'Registration application not found.' });
+
+  const willSuspend = reg.status !== 'SUSPENDED';
+  reg.status = willSuspend ? 'SUSPENDED' : 'APPROVED';
+
+  if (data.users) {
+    const linkedUser = data.users.find(u => u.email && u.email.toLowerCase() === reg.email.toLowerCase());
+    if (linkedUser) {
+      linkedUser.active = !willSuspend;
+      linkedUser.approvalStatus = willSuspend ? 'SUSPENDED' : 'APPROVED';
+    }
+  }
+
+  saveDb(data);
+  res.json({ ok: true, message: `Registration status updated to ${reg.status}.` });
+});
+
+// Master Admin: Delete Registration
+app.delete('/api/admin/registrations/:id', auth, (req, res) => {
+  if (req.userId !== 'master') {
+    return res.status(403).json({ error: 'Master Admin privileges required.' });
+  }
+  const data = getDb();
+  data.registrations = data.registrations || [];
+  const idx = data.registrations.findIndex(r => r.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Registration not found.' });
+
+  data.registrations.splice(idx, 1);
+  saveDb(data);
+  res.json({ ok: true, message: 'Registration record removed.' });
 });
 
 // AI Diagnostic & Troubleshooting Co-Pilot
