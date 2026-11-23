@@ -1,5 +1,6 @@
 'use strict';
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const { generateQuotationPdf } = require('./server-pdf.js');
 const cookieParser = require('cookie-parser');
 const path = require('path');
@@ -757,45 +758,59 @@ app.use((req, res, next) => {
   next();
 });
 
-// 4. Brute Force Protection (Rate Limiter per IP)
-const loginRateLimitMap = new Map();
-function rateLimitLogin(req, res, next) {
-  const ip = getClientIp(req);
-  const now = Date.now();
-  const entry = loginRateLimitMap.get(ip) || { count: 0, firstAttempt: now, blockedUntil: 0 };
+// 4. Rate Limiting Shield (DDoS, Brute Force & CPU Exhaustion Defense)
+const isTestEnv = process.env.NODE_ENV === 'test';
 
-  if (entry.blockedUntil && entry.blockedUntil > now) {
-    const waitSec = Math.ceil((entry.blockedUntil - now) / 1000);
-    return res.status(429).json({
-      error: `Too many login attempts. Your IP has been temporarily locked for security. Please try again in ${waitSec} seconds.`
-    });
-  }
+// Tier A: Global API Rate Limiter (Max 300 requests per 15 minutes per IP)
+const globalApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => isTestEnv || req.path.startsWith('/public') || req.path.endsWith('.css') || req.path.endsWith('.js'),
+  keyGenerator: (req) => getClientIp(req),
+  message: {
+    error: 'Too many requests from this IP. Please slow down and try again shortly.'
+  },
+  validate: { trustProxy: false, xForwardedForHeader: false }
+});
 
-  // Reset window every 15 minutes
-  if (now - entry.firstAttempt > 15 * 60 * 1000) {
-    entry.count = 0;
-    entry.firstAttempt = now;
-    entry.blockedUntil = 0;
-  }
-
-  entry.count++;
-  if (entry.count > 20) {
-    entry.blockedUntil = now + 15 * 60 * 1000; // Block for 15 minutes
-    loginRateLimitMap.set(ip, entry);
+// Tier B: Strict Authentication & OTP Rate Limiter (Max 15 attempts per 15 minutes per IP)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => isTestEnv,
+  keyGenerator: (req) => getClientIp(req),
+  handler: (req, res) => {
     recordLoginLog(req, {
       username: (req.body && req.body.username) || '-',
       role: 'security_shield',
       status: 'BLOCKED',
-      reason: 'Rate limit exceeded: 20+ login attempts'
+      reason: 'Rate limit exceeded: 15+ auth attempts'
     });
-    return res.status(429).json({
-      error: 'Security alert: Rate limit exceeded. IP blocked for 15 minutes.'
+    res.status(429).json({
+      error: 'Security alert: Too many login or verification attempts. Your IP has been temporarily locked for 15 minutes.'
     });
-  }
+  },
+  validate: { trustProxy: false, xForwardedForHeader: false }
+});
+const rateLimitLogin = authLimiter;
 
-  loginRateLimitMap.set(ip, entry);
-  next();
-}
+// Tier C: Heavy Document Generation Limiter (Max 30 PDF renders per minute per IP)
+const pdfLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => isTestEnv,
+  keyGenerator: (req) => getClientIp(req),
+  message: {
+    error: 'Document generation rate limit reached. Please wait a moment before downloading more PDFs.'
+  },
+  validate: { trustProxy: false, xForwardedForHeader: false }
+});
 
 // 5. Sitemap & Robots SEO routes
 app.get('/robots.txt', (req, res) => {
@@ -816,6 +831,7 @@ app.get('/google568b31d06bc40311.html', (req, res) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/api/', globalApiLimiter);
 
 function auth(req, res, next) {
   const token = req.cookies.qdsession;
@@ -1508,7 +1524,7 @@ app.post('/api/admin/verify-otp', rateLimitLogin, async (req, res) => {
 });
 
 // Resend Admin OTP
-app.post('/api/admin/resend-otp', async (req, res) => {
+app.post('/api/admin/resend-otp', authLimiter, async (req, res) => {
   const clientIp = getClientIp(req);
   const pending = await getPendingOtp();
   if (pending && Date.now() - (pending.lastSent || 0) < 15000) {
@@ -2037,7 +2053,7 @@ async function handlePdfDownload(quote, settings, req, res) {
   }
 }
 
-app.get('/api/quotes/:id/pdf', async (req, res) => {
+app.get('/api/quotes/:id/pdf', pdfLimiter, async (req, res) => {
   const data = getDb();
   if (!data || !data.quotes) return res.status(404).json({ error: 'No data' });
   const quote = data.quotes.find(q => q.id === req.params.id);
@@ -2046,7 +2062,7 @@ app.get('/api/quotes/:id/pdf', async (req, res) => {
 });
 
 // Spec alias: /api/quotations/:id/pdf
-app.get('/api/quotations/:id/pdf', async (req, res) => {
+app.get('/api/quotations/:id/pdf', pdfLimiter, async (req, res) => {
   const data = getDb();
   if (!data || !data.quotes) return res.status(404).json({ error: 'No data' });
   const quote = data.quotes.find(q => q.id === req.params.id);
@@ -2055,7 +2071,7 @@ app.get('/api/quotations/:id/pdf', async (req, res) => {
 });
 
 // Public PDF download for customers viewing /q/:token (no login required)
-app.get('/q/:token/pdf', async (req, res) => {
+app.get('/q/:token/pdf', pdfLimiter, async (req, res) => {
   const data = getDb();
   if (!data || !data.quotes) return res.status(404).send('No data');
   const quote = data.quotes.find(q => q.shareToken === req.params.token);
@@ -3079,7 +3095,7 @@ const challanModule = require('./challan.js');
 const ewaybillModule = require('./ewaybill.js');
 
 // 10. Delivery Challan PDF Download (With Value or Without Value)
-app.get('/api/documents/:id/challan/pdf', auth, async (req, res) => {
+app.get('/api/documents/:id/challan/pdf', pdfLimiter, auth, async (req, res) => {
   try {
     const doc = await docEngine.getDocumentById(req.params.id);
     if (!doc) return res.status(404).send('Document not found');
@@ -3235,7 +3251,7 @@ app.post('/api/documents/:id/measurement', auth, async (req, res) => {
 });
 
 // 16. Download Measurement Sheet PDF Annexure
-app.get('/api/documents/:id/measurement/pdf', auth, async (req, res) => {
+app.get('/api/documents/:id/measurement/pdf', pdfLimiter, auth, async (req, res) => {
   try {
     const doc = await docEngine.getDocumentById(req.params.id);
     if (!doc) return res.status(404).send('Document not found');
