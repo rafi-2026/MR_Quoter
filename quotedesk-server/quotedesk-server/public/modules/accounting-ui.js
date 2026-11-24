@@ -64,6 +64,8 @@
         <button class="chip ${activeTab === 'trialbalance' ? 'on' : ''}" data-acctab="trialbalance">⚖️ Trial Balance</button>
         <button class="chip ${activeTab === 'pnl' ? 'on' : ''}" data-acctab="pnl">📈 Profit &amp; Loss</button>
         <button class="chip ${activeTab === 'balancesheet' ? 'on' : ''}" data-acctab="balancesheet">🏦 Balance Sheet</button>
+        <button class="chip ${activeTab === 'payroll' ? 'on' : ''}" data-acctab="payroll">👥 Payroll &amp; Salaries</button>
+        <button class="chip ${activeTab === 'budgets' ? 'on' : ''}" data-acctab="budgets">🎯 Budgets</button>
         <button class="chip ${activeTab === 'pdc' ? 'on' : ''}" data-acctab="pdc">🎫 Post-Dated Cheques (PDC)</button>
         <button class="chip ${activeTab === 'stocksummary' ? 'on' : ''}" data-acctab="stocksummary">📦 Stock Summary</button>
         <button class="chip ${activeTab === 'reportshub' ? 'on' : ''}" data-acctab="reportshub">📊 Financial Reports Hub</button>
@@ -121,6 +123,8 @@
     else if (activeTab === 'trialbalance') renderTrialBalanceTab(area);
     else if (activeTab === 'pnl') renderPnlTab(area);
     else if (activeTab === 'balancesheet') renderBalanceSheetTab(area);
+    else if (activeTab === 'payroll') renderPayrollTab(area);
+    else if (activeTab === 'budgets') renderBudgetsTab(area);
     else if (activeTab === 'pdc') renderPdcTab(area);
     else if (activeTab === 'stocksummary') renderStockSummaryTab(area);
     else if (activeTab === 'reportshub') renderReportsHubTab(area);
@@ -1735,6 +1739,280 @@
       $('#btnZohoCoa').onclick = () => {
         window.open('/api/exports/zoho/csv?type=chart_of_accounts', '_blank');
       };
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 19. Payroll & Employee Salary Management (M7)
+  async function renderPayrollTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading Employee Payroll...</div>`;
+    try {
+      const employees = await apiGet('/api/payroll/employees');
+      const totalMonthlyGross = employees.reduce((acc, e) => acc + (e.basicSalary || 0) + (e.hra || 0) + (e.allowances || 0), 0);
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" style="padding:16px;background:linear-gradient(135deg,#047857,#065f46);color:#fff">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <h3 style="margin:0 0 4px;color:#fff">👥 Contractor &amp; Staff Payroll Engine</h3>
+                <div class="mute sm" style="color:#a7f3d0">
+                  Manage salary structures, automated Provident Fund (PF 12%), ESI, and monthly salary disbursement vouchers.
+                </div>
+              </div>
+              <div style="text-align:right">
+                <div class="mute sm" style="color:#a7f3d0">Active Payroll Roster</div>
+                <div style="font-size:1.6rem;font-weight:700;color:#fff">${employees.length} Staff (${rs(totalMonthlyGross)}/mo)</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <button class="btn pri sm" id="btnNewEmployee">+ Add Employee</button>
+            <button class="btn sm" id="btnRunPayroll" style="background:#047857;color:#fff;border-color:#065f46">⚡ Run Monthly Payroll</button>
+          </div>
+
+          <div class="card" style="padding:16px">
+            <div style="overflow-x:auto">
+              <table class="tbl sm" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Emp Code</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th style="text-align:right">Basic</th>
+                    <th style="text-align:right">HRA</th>
+                    <th style="text-align:right">Allowances</th>
+                    <th style="text-align:right">Gross Salary</th>
+                    <th style="text-align:center">PF / ESI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${employees.length === 0 ? '<tr><td colspan="8" class="mute" style="text-align:center;padding:16px">No employees configured. Click "+ Add Employee".</td></tr>' :
+                    employees.map(e => `
+                      <tr>
+                        <td><code>${esc(e.empCode)}</code></td>
+                        <td><b>${esc(e.name)}</b></td>
+                        <td>${esc(e.designation)}</td>
+                        <td style="text-align:right">${rs(e.basicSalary)}</td>
+                        <td style="text-align:right">${rs(e.hra)}</td>
+                        <td style="text-align:right">${rs(e.allowances)}</td>
+                        <td style="text-align:right;font-weight:700">${rs((e.basicSalary || 0) + (e.hra || 0) + (e.allowances || 0))}</td>
+                        <td style="text-align:center">
+                          <span class="bd" style="background:#f1f5f9">${e.pfApplicable ? 'PF (12%)' : 'No PF'}</span>
+                        </td>
+                      </tr>
+                    `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      $('#btnNewEmployee').onclick = () => {
+        modal({
+          title: '✨ Add New Employee to Payroll Roster',
+          html: `
+            <div style="display:flex;flex-direction:column;gap:10px;max-width:520px">
+              <div class="grid g2" style="gap:10px">
+                <div class="fld">
+                  <label>Employee Code *</label>
+                  <input type="text" id="emp_code" placeholder="e.g. EMP101" required>
+                </div>
+                <div class="fld">
+                  <label>Full Name *</label>
+                  <input type="text" id="emp_name" placeholder="Staff Name" required>
+                </div>
+              </div>
+              <div class="grid g2" style="gap:10px">
+                <div class="fld">
+                  <label>Designation</label>
+                  <input type="text" id="emp_desig" placeholder="e.g. Site Supervisor">
+                </div>
+                <div class="fld">
+                  <label>Department</label>
+                  <input type="text" id="emp_dept" placeholder="e.g. Execution">
+                </div>
+              </div>
+              <div class="grid g3" style="gap:10px">
+                <div class="fld">
+                  <label>Basic Salary (₹)</label>
+                  <input type="number" id="emp_basic" placeholder="0.00" min="0">
+                </div>
+                <div class="fld">
+                  <label>HRA (₹)</label>
+                  <input type="number" id="emp_hra" placeholder="0.00" min="0">
+                </div>
+                <div class="fld">
+                  <label>Allowances (₹)</label>
+                  <input type="number" id="emp_allow" placeholder="0.00" min="0">
+                </div>
+              </div>
+            </div>
+          `,
+          okText: 'Save Employee',
+          onOk: async () => {
+            const empCode = $('#emp_code').value.trim();
+            const name = $('#emp_name').value.trim();
+            if (!empCode || !name) { toast('Code and Name are required', 'bad'); return false; }
+            try {
+              await apiPost('/api/payroll/employees', {
+                empCode,
+                name,
+                designation: $('#emp_desig').value.trim(),
+                department: $('#emp_dept').value.trim(),
+                basicSalary: parseFloat($('#emp_basic').value) || 0,
+                hra: parseFloat($('#emp_hra').value) || 0,
+                allowances: parseFloat($('#emp_allow').value) || 0
+              });
+              toast('✅ Employee saved to payroll');
+              renderPayrollTab(area);
+              return true;
+            } catch (e) { toast(e.message, 'bad'); return false; }
+          }
+        });
+      };
+
+      $('#btnRunPayroll').onclick = async () => {
+        if (!confirm('Execute monthly payroll and post disbursement payment voucher to accounts?')) return;
+        try {
+          const res = await apiPost('/api/payroll/process', { month: 'Current', year: '2026' });
+          toast(`✅ Payroll executed for ${res.employeeCount} staff! Voucher ${res.voucherNo} posted.`);
+        } catch (e) { toast(e.message, 'bad'); }
+      };
+
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 20. Budgets & Variance Analysis Tab (M7)
+  async function renderBudgetsTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading Budgets...</div>`;
+    try {
+      const budgetList = await apiGet('/api/budgets');
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" style="padding:16px;background:linear-gradient(135deg,#831843,#9d174d);color:#fff">
+            <h3 style="margin:0 0 4px;color:#fff">🎯 Financial Budgets &amp; Variance Analysis</h3>
+            <div class="mute sm" style="color:#fbcfe8">
+              Set expenditure caps on raw materials, fabrication, and overheads. Monitor real-time Budget vs Actual variances.
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <button class="btn pri sm" id="btnNewBudget">+ Set New Budget</button>
+            <button class="btn sm" id="btnExportFullBackup" style="border:1px solid #cbd5e1">💾 Export Full Backup JSON</button>
+          </div>
+
+          <div class="card" style="padding:16px">
+            <div style="overflow-x:auto">
+              <table class="tbl sm" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Budget Name</th>
+                    <th>Financial Year</th>
+                    <th>Allocations</th>
+                    <th style="text-align:center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${budgetList.length === 0 ? '<tr><td colspan="4" class="mute" style="text-align:center;padding:16px">No budgets configured. Click "+ Set New Budget".</td></tr>' :
+                    budgetList.map(b => `
+                      <tr>
+                        <td><b>${esc(b.name)}</b></td>
+                        <td>${esc(b.financialYear)}</td>
+                        <td>${b.allocations ? b.allocations.length : 0} Ledgers</td>
+                        <td style="text-align:center">
+                          <button class="btn sm xs" onclick="window.viewBudgetVariance('${b.id}')">View Variance &rarr;</button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                </tbody>
+              </table>
+            </div>
+            <div id="budgetVarianceView" style="margin-top:14px"></div>
+          </div>
+        </div>
+      `;
+
+      $('#btnExportFullBackup').onclick = () => window.open('/api/backup/export-all', '_blank');
+
+      window.viewBudgetVariance = async (id) => {
+        const vBox = $('#budgetVarianceView');
+        vBox.innerHTML = '<div class="mute sm" style="padding:12px">Calculating variance vs actual ledger spends...</div>';
+        try {
+          const v = await apiGet(`/api/budgets/${id}/variance`);
+          vBox.innerHTML = `
+            <div class="card" style="padding:16px;background:#f8fafc;border:1px solid #e2e8f0">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <h4 style="margin:0">${esc(v.budgetName)} — Budget vs Actual Variance</h4>
+                <div>Net Variance: <b style="color:${v.netVariance >= 0 ? '#15803d' : '#b91c1c'}">${rs(v.netVariance)}</b></div>
+              </div>
+              <table class="tbl sm" style="width:100%">
+                <thead><tr><th>Ledger Name</th><th style="text-align:right">Budget Cap</th><th style="text-align:right">Actual Spend</th><th style="text-align:right">Variance</th><th style="text-align:center">% Used</th></tr></thead>
+                <tbody>
+                  ${v.lines.map(l => `
+                    <tr>
+                      <td><b>${esc(l.ledgerName)}</b></td>
+                      <td style="text-align:right">${rs(l.budgetAmount)}</td>
+                      <td style="text-align:right;color:#0f172a">${rs(l.actualAmount)}</td>
+                      <td style="text-align:right;font-weight:700;color:${l.variance >= 0 ? '#15803d' : '#b91c1c'}">${rs(l.variance)}</td>
+                      <td style="text-align:center"><span class="bd" style="background:${l.isOverBudget ? '#fee2e2;color:#b91c1c' : '#dcfce7;color:#15803d'}">${l.pctUsed}%</span></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        } catch (e) { vBox.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+      };
+
+      $('#btnNewBudget').onclick = () => {
+        modal({
+          title: '✨ Create Financial Year Budget',
+          html: `
+            <div style="display:flex;flex-direction:column;gap:10px;max-width:520px">
+              <div class="fld">
+                <label>Budget Title *</label>
+                <input type="text" id="bg_name" placeholder="e.g. FY 26-27 Site Procurement Budget" required>
+              </div>
+              <div class="grid g2" style="gap:10px">
+                <div class="fld">
+                  <label>Financial Year</label>
+                  <input type="text" id="bg_fy" value="26-27">
+                </div>
+                <div class="fld">
+                  <label>Raw Materials Cap (₹)</label>
+                  <input type="number" id="bg_cap_raw" placeholder="e.g. 500000" min="0">
+                </div>
+              </div>
+            </div>
+          `,
+          okText: 'Save Budget',
+          onOk: async () => {
+            const name = $('#bg_name').value.trim();
+            const cap = parseFloat($('#bg_cap_raw').value) || 0;
+            if (!name) { toast('Budget name is required', 'bad'); return false; }
+            try {
+              await apiPost('/api/budgets', {
+                name,
+                financialYear: $('#bg_fy').value.trim(),
+                allocations: [
+                  { ledgerId: 'led_purchases_raw', ledgerName: 'Raw Material Purchases', budgetAmount: cap }
+                ]
+              });
+              toast('✅ Budget saved');
+              renderBudgetsTab(area);
+              return true;
+            } catch (e) { toast(e.message, 'bad'); return false; }
+          }
+        });
+      };
+
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }

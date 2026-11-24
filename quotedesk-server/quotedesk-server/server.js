@@ -4791,6 +4791,88 @@ app.get('/api/bank/payment-advice/:voucherId', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── M7: Payroll, Budgets & System Backup Routes ───
+const payrollModule = require('./payroll.js');
+const budgetsModule = require('./budgets.js');
+
+// 1. Employees CRUD & List
+app.get('/api/payroll/employees', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await payrollModule.listEmployees(ctx.companyId));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/payroll/employees', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await payrollModule.saveEmployee(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 2. Process Monthly Salary Run
+app.post('/api/payroll/process', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await payrollModule.processMonthlyPayroll(ctx.companyId, {
+      ...req.body,
+      user: ctx.user || {}
+    });
+    res.json(result);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 3. Budgets CRUD & Variance Analysis
+app.get('/api/budgets', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await budgetsModule.listBudgets(ctx.companyId));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/budgets', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await budgetsModule.saveBudget(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/budgets/:id/variance', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await budgetsModule.getBudgetVariance(ctx.companyId, req.params.id));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 4. System Backup Export
+app.get('/api/backup/export-all', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const { getCollection } = require('./db.js');
+    const [vouchers, accounts, items, movements, pdcs] = await Promise.all([
+      (await getCollection('vouchers')).find({ companyId: ctx.companyId }).toArray(),
+      (await getCollection('accounts')).find({ companyId: ctx.companyId }).toArray(),
+      (await getCollection('stockItems')).find({ companyId: ctx.companyId }).toArray(),
+      (await getCollection('stock_movements')).find({ companyId: ctx.companyId }).toArray(),
+      (await getCollection('pdc_cheques')).find({ companyId: ctx.companyId }).toArray()
+    ]);
+
+    const backupPayload = {
+      backupDate: new Date().toISOString(),
+      companyId: ctx.companyId,
+      vouchers,
+      accounts,
+      stockItems: items,
+      stockMovements: movements,
+      pdcCheques: pdcs
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="QuoteDesk_Backup_${new Date().toISOString().slice(0, 10)}.json"`);
+    res.send(JSON.stringify(backupPayload, null, 2));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Phase 7: Exports (Tally Prime XML & Zoho Books) & Settings ──────────
 const exportsModule = require('./exports.js');
 
