@@ -4524,6 +4524,58 @@ app.get('/api/accounts/opening-balances/verify', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── M2: Bill-by-Bill Allocations & Year-End Closing Routes ───
+const billAllocationsModule = require('./bill-allocations.js');
+const yearEndModule = require('./year-end.js');
+
+// 1. Get Outstanding Summary across parties
+app.get('/api/outstanding/summary', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const summary = await billAllocationsModule.getOutstandingSummary(ctx.companyId, req.query.type || 'all');
+    res.json(summary);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Get Open Bills & Outstanding for a Specific Party
+app.get('/api/outstanding/party/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const bills = await billAllocationsModule.getPartyOutstanding(ctx.companyId, req.params.id);
+    res.json(bills);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Post a Manual Bill Allocation
+app.post('/api/outstanding/allocate', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await billAllocationsModule.recordAllocation(ctx.companyId, req.body || {});
+    res.json(result);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 4. Year-End Financial Year Closing & Retained Earnings Transfer
+app.post('/api/year-end/close', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await yearEndModule.closeFinancialYear(ctx.companyId, {
+      ...req.body,
+      user: ctx.user || {}
+    });
+    res.json(result);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 5. Get Year-End Close Audit History
+app.get('/api/year-end/history', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const history = await yearEndModule.getYearEndHistory(ctx.companyId);
+    res.json(history);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Phase 7: Exports (Tally Prime XML & Zoho Books) & Settings ──────────
 const exportsModule = require('./exports.js');
 

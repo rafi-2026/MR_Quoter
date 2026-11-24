@@ -64,6 +64,8 @@
         <button class="chip ${activeTab === 'trialbalance' ? 'on' : ''}" data-acctab="trialbalance">⚖️ Trial Balance</button>
         <button class="chip ${activeTab === 'pnl' ? 'on' : ''}" data-acctab="pnl">📈 Profit &amp; Loss</button>
         <button class="chip ${activeTab === 'balancesheet' ? 'on' : ''}" data-acctab="balancesheet">🏦 Balance Sheet</button>
+        <button class="chip ${activeTab === 'outstanding' ? 'on' : ''}" data-acctab="outstanding">💰 Bill Allocation &amp; AR/AP</button>
+        <button class="chip ${activeTab === 'yearend' ? 'on' : ''}" data-acctab="yearend">🔒 Year-End Close</button>
         <button class="chip ${activeTab === 'masters' ? 'on' : ''}" data-acctab="masters">📦 Tally Masters</button>
         <button class="chip ${activeTab === 'gst' ? 'on' : ''}" data-acctab="gst">📑 GST Working Sheet</button>
         <button class="chip ${activeTab === 'exports' ? 'on' : ''}" data-acctab="exports">🔄 Tally &amp; Zoho Exports</button>
@@ -116,6 +118,8 @@
     else if (activeTab === 'trialbalance') renderTrialBalanceTab(area);
     else if (activeTab === 'pnl') renderPnlTab(area);
     else if (activeTab === 'balancesheet') renderBalanceSheetTab(area);
+    else if (activeTab === 'outstanding') renderOutstandingTab(area);
+    else if (activeTab === 'yearend') renderYearEndTab(area);
     else if (activeTab === 'masters') renderMastersTab(area);
     else if (activeTab === 'gst') renderGstTab(area);
     else if (activeTab === 'exports') renderExportsTab(area);
@@ -1718,6 +1722,168 @@
       $('#btnZohoCoa').onclick = () => {
         window.open('/api/exports/zoho/csv?type=chart_of_accounts', '_blank');
       };
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 14. Bill-by-Bill Allocation & AR/AP Outstanding Tab (M2)
+  async function renderOutstandingTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading Outstanding Receivables &amp; Payables...</div>`;
+    try {
+      const summary = await apiGet('/api/outstanding/summary');
+      const totalPending = summary.reduce((acc, s) => acc + (s.netPending || 0), 0);
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" style="padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border:1px solid #cbd5e1">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <h3 style="margin:0 0 4px">💰 Bill-by-Bill Allocation &amp; Outstanding (AR / AP)</h3>
+                <div class="mute sm">Tally-style Agst Ref settlement tracking against tax invoices and purchase bills.</div>
+              </div>
+              <div style="text-align:right">
+                <div class="mute sm">Total Net Outstanding</div>
+                <div style="font-size:1.4rem;font-weight:700;color:${totalPending >= 0 ? '#0f172a' : '#b91c1c'}">${rs(totalPending)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding:16px">
+            <div style="overflow-x:auto">
+              <table class="tbl sm" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Party Name</th>
+                    <th style="text-align:right">Total Invoiced</th>
+                    <th style="text-align:right">Total Settled (Agst Ref)</th>
+                    <th style="text-align:right">Pending Outstanding</th>
+                    <th style="text-align:center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${summary.length === 0 ? '<tr><td colspan="5" class="mute" style="text-align:center;padding:16px">No open bills or allocations recorded yet.</td></tr>' :
+                    summary.map(s => `
+                      <tr>
+                        <td><b>${esc(s.partyName || s.partyId)}</b></td>
+                        <td style="text-align:right">${rs(s.totalInvoiced)}</td>
+                        <td style="text-align:right;color:#15803d">${rs(s.totalSettled)}</td>
+                        <td style="text-align:right;font-weight:700;color:${s.netPending > 0 ? '#b91c1c' : '#0f172a'}">${rs(s.netPending)}</td>
+                        <td style="text-align:center">
+                          <span class="bd" style="background:${s.netPending <= 0 ? '#dcfce7;color:#15803d' : '#fee2e2;color:#b91c1c'}">
+                            ${s.netPending <= 0 ? 'Fully Cleared' : 'Open Balance'}
+                          </span>
+                        </td>
+                      </tr>
+                    `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 15. Year-End Financial Closing Tab (M2)
+  async function renderYearEndTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading Year-End Audit Logs...</div>`;
+    try {
+      const history = await apiGet('/api/year-end/history');
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" style="padding:16px;background:#fef2f2;border:1px solid #fecaca">
+            <h4 style="margin:0 0 6px;color:#991b1b">🔒 Financial Year Closing &amp; Retained Earnings Transfer</h4>
+            <div class="mute sm" style="color:#7f1d1d;margin-bottom:12px">
+              Closing a Financial Year will calculate Net Profit/Loss, transfer nominal balances into Capital / Retained Earnings, reset revenue/expense ledgers, and carry forward Balance Sheet accounts.
+            </div>
+
+            <div class="grid g3" style="gap:10px;margin-bottom:12px">
+              <div class="fld">
+                <label>Closing FY Start Date</label>
+                <input type="date" id="ye_from" value="2025-04-01">
+              </div>
+              <div class="fld">
+                <label>Closing FY End Date (Books Locked)</label>
+                <input type="date" id="ye_to" value="2026-03-31">
+              </div>
+              <div class="fld">
+                <label>Next FY Start Date</label>
+                <input type="date" id="ye_next" value="2026-04-01">
+              </div>
+            </div>
+
+            <button class="btn sm" id="btnRunYearEnd" style="background:#b91c1c;color:#fff;border-color:#991b1b">
+              ⚡ Execute Statutory Year-End Close
+            </button>
+            <div id="yeResultArea" style="margin-top:10px;display:none"></div>
+          </div>
+
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 10px">📜 Audit Log of Closed Financial Years</h4>
+            <div style="overflow-x:auto">
+              <table class="tbl sm" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Closed FY Ending</th>
+                    <th>Closed Date &amp; Time</th>
+                    <th>Closed By</th>
+                    <th style="text-align:right">Total Revenue</th>
+                    <th style="text-align:right">Total Expenses</th>
+                    <th style="text-align:right">Net Profit / (Loss)</th>
+                    <th style="text-align:right">Ledgers Carried</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${history.length === 0 ? '<tr><td colspan="7" class="mute" style="text-align:center;padding:16px">No prior years closed yet.</td></tr>' :
+                    history.map(h => `
+                      <tr>
+                        <td><b>${fmtDate(h.toDate)}</b></td>
+                        <td>${new Date(h.closedAt).toLocaleString()}</td>
+                        <td>${esc(h.closedBy || 'Admin')}</td>
+                        <td style="text-align:right;color:#15803d">${rs(h.totalIncome)}</td>
+                        <td style="text-align:right;color:#b91c1c">${rs(h.totalExpense)}</td>
+                        <td style="text-align:right;font-weight:700">${rs(h.netProfit)}</td>
+                        <td style="text-align:right">${h.carryForwardCount}</td>
+                      </tr>
+                    `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      $('#btnRunYearEnd').onclick = async () => {
+        const toDate = $('#ye_to').value;
+        const fromDate = $('#ye_from').value;
+        const nextFyStart = $('#ye_next').value;
+        if (!toDate) { toast('Closing date is required', 'bad'); return; }
+
+        if (!confirm(`Are you sure you want to permanently lock and close Financial Year ending ${toDate}? This will transfer Net Profit to Capital.`)) {
+          return;
+        }
+
+        const resBox = $('#yeResultArea');
+        resBox.style.display = 'block';
+        resBox.innerHTML = '<div class="mute sm">Calculating Net Profit and transferring Retained Earnings...</div>';
+
+        try {
+          const res = await apiPost('/api/year-end/close', { fromDate, toDate, nextFyStart });
+          resBox.innerHTML = `
+            <div class="note ok" style="margin:0">
+              <b>✅ FY Closed Successfully:</b> Net Profit of <b>${rs(res.netProfit)}</b> transferred to Capital. ${res.carryForwardCount} Balance Sheet accounts carried forward to new FY!
+            </div>
+          `;
+          renderYearEndTab(area);
+        } catch (e) {
+          resBox.innerHTML = `<div class="note bad" style="margin:0">${esc(e.message)}</div>`;
+        }
+      };
+
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }

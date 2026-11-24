@@ -20,14 +20,21 @@ const { getCollection } = require('./db.js');
 const { getCompanyLedgers } = require('./accounts.js');
 
 const VOUCHER_TYPES = {
-  sales: { name: 'Sales Invoice', prefix: 'SLS' },
-  purchase: { name: 'Purchase Bill', prefix: 'PUR' },
-  receipt: { name: 'Receipt Voucher', prefix: 'RCP' },
-  payment: { name: 'Payment Voucher', prefix: 'PMT' },
-  journal: { name: 'Journal Voucher', prefix: 'JRN' },
-  contra: { name: 'Contra Voucher', prefix: 'CTR' },
-  debit_note: { name: 'Debit Note', prefix: 'DBN' },
-  credit_note: { name: 'Credit Note', prefix: 'CRN' }
+  sales: { name: 'Sales Invoice', prefix: 'SLS', posting: true },
+  purchase: { name: 'Purchase Bill', prefix: 'PUR', posting: true },
+  receipt: { name: 'Receipt Voucher', prefix: 'RCP', posting: true },
+  payment: { name: 'Payment Voucher', prefix: 'PMT', posting: true },
+  journal: { name: 'Journal Voucher', prefix: 'JRN', posting: true },
+  contra: { name: 'Contra Voucher', prefix: 'CTR', posting: true },
+  debit_note: { name: 'Debit Note', prefix: 'DBN', posting: true },
+  credit_note: { name: 'Credit Note', prefix: 'CRN', posting: true },
+  sales_order: { name: 'Sales Order', prefix: 'SO', posting: false },
+  purchase_order: { name: 'Purchase Order', prefix: 'PO', posting: false },
+  delivery_note: { name: 'Delivery Note', prefix: 'DN', posting: true },
+  receipt_note: { name: 'Receipt Note (GRN)', prefix: 'RN', posting: true },
+  stock_journal: { name: 'Stock Journal', prefix: 'STK', posting: true },
+  memorandum: { name: 'Memorandum Voucher', prefix: 'MEM', posting: false },
+  reversing_journal: { name: 'Reversing Journal', prefix: 'REV', posting: true }
 };
 
 function round(val) {
@@ -161,6 +168,33 @@ async function createVoucher(data, user = {}) {
   };
 
   await vchCol.insertOne(voucher);
+
+  // Bill-by-bill allocation hook: if partyId is present, track allocation
+  if (partyId && (data.allocationType || data.refNo || voucherType === 'sales' || voucherType === 'purchase' || voucherType === 'receipt' || voucherType === 'payment')) {
+    try {
+      const billAllocations = require('./bill-allocations.js');
+      await billAllocations.recordAllocation(companyId, {
+        voucherId: voucher.id,
+        voucherNo: voucher.voucherNo,
+        voucherType: voucher.voucherType,
+        date: voucher.date,
+        partyId,
+        partyName,
+        type: data.allocationType || (voucherType === 'sales' || voucherType === 'purchase' ? 'New Ref' : 'Agst Ref'),
+        refNo: data.refNo || docRef || voucher.voucherNo,
+        againstVoucherId: data.againstVoucherId || null,
+        amount: totalDebit
+      });
+    } catch (e) {
+      console.warn('[Voucher Allocation Warning]:', e.message);
+    }
+  }
+
+  // Non-posting vouchers (e.g. Sales Order, Purchase Order, Memorandum) do not post ledger entries
+  const typeCfg = VOUCHER_TYPES[voucherType];
+  if (typeCfg && typeCfg.posting === false) {
+    return voucher;
+  }
 
   // Post individual ledger postings to ledger_entries collection
   const ledgerCol = await getCollection('ledger_entries');
