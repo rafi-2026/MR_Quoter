@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateDeliveryChallanPdf, getPendingDeliveryQuantities } from '../../challan.js';
 import { generateOfficialEwayBillJson, validateEwayBillPrerequisites, calculateValidityDays, estimateDistanceKm } from '../../ewaybill.js';
-import { createDocument } from '../../documents.js';
+import { createDocument, updateDocument } from '../../documents.js';
 
 describe('Phase 2: Delivery Challan & E-Way Bill Engine', () => {
 
@@ -11,6 +11,7 @@ describe('Phase 2: Delivery Challan & E-Way Bill Engine', () => {
     no: 'CTBD/26-27/0001',
     date: '2026-11-18',
     docType: 'dc',
+    subject: 'Supply of Domal 27 Sliding Windows & Toughened Glass for Site',
     cust: {
       name: 'Bismillah Project',
       address: '108 Site Avenue, Hosur',
@@ -48,7 +49,7 @@ describe('Phase 2: Delivery Challan & E-Way Bill Engine', () => {
     pincode: '635109'
   };
 
-  it('generates non-empty Delivery Challan PDF in WITH VALUE mode (> 10 KB)', async () => {
+  it('generates non-empty Delivery Challan PDF in WITH VALUE mode with subject (> 10 KB)', async () => {
     const pdfBuf = await generateDeliveryChallanPdf(sampleDoc, sampleSettings, true);
     expect(pdfBuf).toBeInstanceOf(Buffer);
     expect(pdfBuf.length).toBeGreaterThan(10000);
@@ -60,6 +61,24 @@ describe('Phase 2: Delivery Challan & E-Way Bill Engine', () => {
     expect(pdfBuf).toBeInstanceOf(Buffer);
     expect(pdfBuf.length).toBeGreaterThan(10000);
     expect(pdfBuf.slice(0, 4).toString()).toBe('%PDF');
+  });
+
+  it('persists and updates document subject field cleanly', async () => {
+    const doc = await createDocument({
+      companyId: 'test_subj_co',
+      companyCode: 'SUBJ',
+      docType: 'dc',
+      subject: 'Supply of Curtain Wall Mullions & Transoms',
+      cust: { name: 'Prestige Group' },
+      lines: [{ name: 'Profile 5045', qty: 10, rate: 800 }]
+    });
+
+    expect(doc.subject).toBe('Supply of Curtain Wall Mullions & Transoms');
+
+    const updated = await updateDocument(doc.id, {
+      subject: 'Revised Supply of Curtain Wall Mullions Phase 2'
+    });
+    expect(updated.subject).toBe('Revised Supply of Curtain Wall Mullions Phase 2');
   });
 
   it('validates and generates official NIC E-Way Bill JSON', () => {

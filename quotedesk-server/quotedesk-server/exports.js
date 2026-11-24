@@ -180,6 +180,47 @@ async function generateZohoCsv(companyId, entityType = 'invoices') {
     return csv;
   }
 
+  if (entityType === 'challans') {
+    const docCol = await getCollection('documents');
+    const challans = await docCol.find({ companyId, docType: 'dc', superseded: false }).toArray();
+    let csv = csvRow(['Challan Number', 'Recipient Name', 'Date', 'Vehicle Number', 'Item Name', 'Quantity', 'Unit', 'Rate', 'Total Value']);
+    challans.forEach(ch => {
+      const party = (ch.shipping && ch.shipping.name) || (ch.cust && ch.cust.name) || 'Site';
+      (ch.lines || []).forEach(l => {
+        const qty = Number(l.qty) || 1;
+        const rate = Number(l.rate) || 0;
+        csv += csvRow([
+          ch.no,
+          party,
+          ch.date,
+          ch.vehicleNo || '',
+          l.name || l.desc || 'Item',
+          qty,
+          l.unit || 'nos',
+          rate,
+          Math.round(qty * rate)
+        ]);
+      });
+    });
+    return csv;
+  }
+
+  if (entityType === 'bills') {
+    const vchCol = await getCollection('vouchers');
+    const bills = await vchCol.find({ companyId, voucherType: 'purchase', cancelled: false }).toArray();
+    let csv = csvRow(['Bill Number', 'Vendor Name', 'Date', 'Reference', 'Amount']);
+    bills.forEach(b => {
+      csv += csvRow([
+        b.voucherNo,
+        b.partyName || 'Vendor',
+        b.date,
+        b.docRef || '',
+        b.totalDebit || 0
+      ]);
+    });
+    return csv;
+  }
+
   throw new Error(`Unsupported Zoho entity type: ${entityType}`);
 }
 

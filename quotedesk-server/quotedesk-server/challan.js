@@ -191,7 +191,13 @@ function generateDeliveryChallanPdf(doc, settings = {}, withValue = true) {
       docPdf.moveDown(5);
 
       // Lines Table Header
-      const yTable = yMeta + 86;
+      let yOffset = 86;
+      if (doc.subject) {
+        docPdf.fontSize(8.5).fillColor('#0f172a');
+        docPdf.text(`Subject: ${doc.subject}`, 44, yMeta + 84, { width: 507 });
+        yOffset = 104;
+      }
+      const yTable = yMeta + yOffset;
       docPdf.rect(36, yTable, 523, 20).fillColor('#f1f5f9').fill();
       docPdf.rect(36, yTable, 523, 20).strokeColor('#cbd5e1').stroke();
 

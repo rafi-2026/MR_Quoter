@@ -260,6 +260,13 @@
           </div>
         </div>
 
+        ${d.subject ? `
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px 12px;margin-bottom:12px;background:#f8fafc;font-size:0.84rem;color:#0f172a">
+            <span style="color:#64748b;font-weight:700;text-transform:uppercase;font-size:0.75rem;margin-right:6px">Subject:</span>
+            <b>${esc(d.subject)}</b>
+          </div>
+        ` : ''}
+
         ${isMrl ? `
           <!-- MRL Raw Material Table with Code and Brand -->
           <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:0.82rem">

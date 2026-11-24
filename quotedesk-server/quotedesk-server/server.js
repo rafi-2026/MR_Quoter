@@ -3711,6 +3711,7 @@ app.post('/api/documents/convert-from-quote/:quoteId', auth, async (req, res) =>
         gstin: (quote.cust && quote.cust.gstin) || '',
         phone: (quote.cust && quote.cust.phone) || ''
       },
+      subject: quote.subject || '',
       project: quote.project || quote.projectName || '',
       projectCode: quote.projectCode || quote.projectNo || '',
       site: quote.site || '',

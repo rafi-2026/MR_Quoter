@@ -212,6 +212,7 @@ async function createDocument(data, user) {
     cust = {},
     shipping = null,
     vendor = {},
+    subject = '',
     project = '',
     projectCode = '',
     site = '',
@@ -267,6 +268,7 @@ async function createDocument(data, user) {
     cust,
     shipping: shipping || (cust ? { ...cust } : {}),
     vendor,
+    subject,
     project,
     projectCode,
     site,
@@ -324,6 +326,7 @@ async function updateDocument(id, updates, user) {
 
   const {
     date,
+    subject,
     cust,
     shipping,
     vendor,
@@ -352,6 +355,7 @@ async function updateDocument(id, updates, user) {
   if (cust) doc.cust = { ...doc.cust, ...cust };
   if (shipping) doc.shipping = { ...doc.shipping, ...shipping };
   if (vendor) doc.vendor = { ...doc.vendor, ...vendor };
+  if (subject !== undefined) doc.subject = subject;
   if (project !== undefined) doc.project = project;
   if (projectCode !== undefined) doc.projectCode = projectCode;
   if (site !== undefined) doc.site = site;

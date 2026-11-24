@@ -353,6 +353,10 @@
                 <input type="text" id="m_docPos" value="${esc(db.settings.state || 'Tamil Nadu')}">
               </label>
             </div>
+            <label class="f" style="margin-top:10px">
+              <span class="sm">Subject / Scope of Delivery</span>
+              <input type="text" id="m_docSubject" placeholder="e.g. Supply of Domal 27 Sliding Windows &amp; Toughened Glass to Site">
+            </label>
           </div>
 
           <!-- Billing Details -->
@@ -497,6 +501,7 @@
         const docType = $('#m_docType').value;
         const date = $('#m_docDate').value || today();
         const pos = $('#m_docPos').value.trim() || 'Tamil Nadu';
+        const subject = ($('#m_docSubject') && $('#m_docSubject').value.trim()) || '';
 
         const custId = $('#m_docCust').value;
         const selCust = (db.customers || []).find(c => c.id === custId) || {};
@@ -531,6 +536,7 @@
             docType,
             date,
             pos,
+            subject,
             project,
             projectCode,
             site,
@@ -806,6 +812,12 @@
           <!-- Project, Order & Transport Logistics Card -->
           <div class="card" style="margin-bottom:14px;background:#ffffff;border:1px solid #cbd5e1">
             <h3 style="margin:0 0 12px;color:#0f172a">🚚 Project, Order &amp; Transport Logistics</h3>
+            <div style="margin-bottom:10px">
+              <label class="f">
+                <span class="sm">Subject / Scope of Delivery</span>
+                <input type="text" id="ed_subject" value="${esc(d.subject || '')}" placeholder="e.g. Supply of Domal 27 Sliding Windows &amp; Toughened Glass to Site" ${isLocked ? 'disabled' : ''}>
+              </label>
+            </div>
             <div class="grid g3" style="gap:10px;margin-bottom:10px">
               <label class="f">
                 <span class="sm">Project Name</span>
@@ -946,10 +958,12 @@
 
     if (!isLocked) {
       $('#btnAddDocLine').onclick = () => {
+        collectFormLines();
         d.lines = d.lines || [];
+        const newId = 'line_' + Math.random().toString(36).slice(2, 8);
         if (d.docType === 'mrl') {
           d.lines.push({
-            id: 'line_' + Math.random().toString(36).slice(2, 8),
+            id: newId,
             code: '5045',
             brand: 'Domal 27',
             name: 'New Profile Section',
@@ -962,18 +976,20 @@
           });
         } else {
           d.lines.push({
-            id: 'line_' + Math.random().toString(36).slice(2, 8),
+            id: newId,
             name: 'New Item',
             desc: '',
             hsn: '7610',
             qty: 1,
-            unit: 'nos',
+            unit: (d.docType === 'dc' ? 'nos' : 'sqft'),
             rate: 1000,
             disc: 0,
             gstRate: 18
           });
         }
-        recalcAndDrawLines();
+        recalcDocTotals(d);
+        renderLinesTable(d, false);
+        renderTotalsBox(d);
       };
 
       // Copy Billing to Shipping button handler
@@ -1012,6 +1028,7 @@
               state: $('#ed_shipState').value.trim(),
               stateCode: $('#ed_shipStateCode').value.trim()
             },
+            subject: ($('#ed_subject') ? $('#ed_subject').value.trim() : ''),
             project: $('#ed_project').value.trim(),
             projectCode: $('#ed_projectCode').value.trim(),
             site: $('#ed_site').value.trim(),
@@ -1035,9 +1052,12 @@
       };
     }
 
-    $('#btnDocRevise').onclick = () => promptCreateRevision(d.id);
-    $('#btnDocHistory').onclick = () => openRevisionHistoryModal(d.id);
-    $('#btnDocCompare').onclick = () => openCompareModal(d.id);
+    const btnRev = $('#btnDocRevise');
+    if (btnRev) btnRev.onclick = () => promptCreateRevision(d.id);
+    const btnHist = $('#btnDocHistory');
+    if (btnHist) btnHist.onclick = () => openRevisionHistoryModal(d.id);
+    const btnCmp = $('#btnDocCompare');
+    if (btnCmp) btnCmp.onclick = () => openCompareModal(d.id);
 
     const btnChallan = $('#btnChallanPdf');
     if (btnChallan) btnChallan.onclick = () => openChallanPdfModal(d);
@@ -1160,29 +1180,32 @@
     });
   }
 
-  function recalcAndDrawLines() {
-    collectFormLines();
-    const isInterState = (activeDoc.pos && db.settings.state && activeDoc.pos.toLowerCase() !== db.settings.state.toLowerCase());
-    let subtotal = 0, totalDisc = 0, taxable = 0;
+  function recalcDocTotals(doc) {
+    let subtotal = 0, totalDisc = 0, taxable = 0, totalGst = 0;
 
-    activeDoc.lines.forEach(l => {
-      const gross = (l.qty || 0) * (l.rate || 0);
-      const d = (gross * (l.disc || 0) / 100);
+    (doc.lines || []).forEach(l => {
+      const gross = (Number(l.qty) || 0) * (Number(l.rate) || 0);
+      const d = gross * (Number(l.disc) || 0) / 100;
       const tax = gross - d;
+      const gst = tax * (Number(l.gstRate) || 18) / 100;
       subtotal += gross;
       totalDisc += d;
       taxable += tax;
+      totalGst += gst;
     });
 
-    const gst = Math.round(taxable * 0.18);
-    activeDoc.totals = {
+    doc.totals = {
       subtotal: Math.round(subtotal),
       discount: Math.round(totalDisc),
       taxable: Math.round(taxable),
-      totalTax: gst,
-      grandTotal: Math.round(taxable + gst)
+      totalTax: Math.round(totalGst),
+      grandTotal: Math.round(taxable + totalGst)
     };
+  }
 
+  function recalcAndDrawLines() {
+    collectFormLines();
+    recalcDocTotals(activeDoc);
     renderLinesTable(activeDoc, false);
     renderTotalsBox(activeDoc);
   }
@@ -1209,7 +1232,7 @@
             <td><input type="number" step="any" class="l_qty" value="${l.qty != null ? l.qty : 1}" style="width:65px;text-align:right;font-weight:700" ${isLocked ? 'disabled' : ''}></td>
             <td><input type="text" class="l_unit" value="${esc(l.unit || 'mtr')}" style="width:50px" ${isLocked ? 'disabled' : ''}></td>
             <td><input type="number" step="any" class="l_rate" value="${l.rate != null ? l.rate : 0}" style="width:75px;text-align:right" ${isLocked ? 'disabled' : ''}></td>
-            <td class="r nowrap"><b>${rs(Math.round(tax), 0)}</b></td>
+            <td class="r nowrap l_tax_val"><b>${rs(Math.round(tax), 0)}</b></td>
             ${!isLocked ? `
               <td class="r"><button class="btn sm bad" data-delline="${l.id || i}" style="padding:2px 8px">&times;</button></td>
             ` : ''}
@@ -1235,7 +1258,7 @@
               <option value="0" ${l.gstRate === 0 ? 'selected' : ''}>0%</option>
             </select>
           </td>
-          <td class="r nowrap"><b>${rs(Math.round(tot), 0)}</b></td>
+          <td class="r nowrap l_tot_val"><b>${rs(Math.round(tot), 0)}</b></td>
           ${!isLocked ? `
             <td class="r"><button class="btn sm bad" data-delline="${l.id || i}" style="padding:2px 8px">&times;</button></td>
           ` : ''}
@@ -1244,15 +1267,39 @@
     }).join('');
 
     if (!isLocked) {
-      $$('input, select', tbody).forEach(inp => {
-        inp.oninput = () => recalcAndDrawLines();
+      $('input, select', tbody).forEach(inp => {
+        inp.oninput = () => {
+          const tr = inp.closest('tr');
+          if (tr) {
+            const qty = Number($('.l_qty', tr)?.value) || 0;
+            const rate = Number($('.l_rate', tr)?.value) || 0;
+            const disc = Number($('.l_disc', tr)?.value) || 0;
+            const gstRate = Number($('.l_gst', tr)?.value) || 18;
+            const gross = qty * rate;
+            const discAmt = gross * disc / 100;
+            const tax = gross - discAmt;
+            const gstAmt = tax * gstRate / 100;
+            const tot = tax + gstAmt;
+
+            const taxEl = $('.l_tax_val', tr);
+            if (taxEl) taxEl.innerHTML = '<b>' + rs(Math.round(tax), 0) + '</b>';
+            const totEl = $('.l_tot_val', tr);
+            if (totEl) totEl.innerHTML = '<b>' + rs(Math.round(tot), 0) + '</b>';
+          }
+          collectFormLines();
+          recalcDocTotals(d);
+          renderTotalsBox(d);
+        };
       });
 
-      $$('[data-delline]', tbody).forEach(btn => {
+      $('[data-delline]', tbody).forEach(btn => {
         btn.onclick = () => {
+          collectFormLines();
           const lid = btn.dataset.delline;
           d.lines = d.lines.filter((l, i) => (l.id || String(i)) !== lid);
-          recalcAndDrawLines();
+          recalcDocTotals(d);
+          renderLinesTable(d, false);
+          renderTotalsBox(d);
         };
       });
     }

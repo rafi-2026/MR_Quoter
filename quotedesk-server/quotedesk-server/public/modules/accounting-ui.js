@@ -1861,13 +1861,18 @@
         const ewayBillNo = ($('#vch_ewayBillNo') && $('#vch_ewayBillNo').value.trim()) || '';
         const transporter = ($('#vch_transporter') && $('#vch_transporter').value.trim()) || '';
 
-        const trs = $$('tr[data-vidx]', $('#vchLinesTbody'));
-        const entries = trs.map(tr => ({
-          ledgerId: $('.v_ledger', tr).value,
-          ledgerName: $('.v_ledger option:checked', tr).text,
-          debit: parseFloat($('.v_dr', tr).value) || 0,
-          credit: parseFloat($('.v_cr', tr).value) || 0
-        }));
+        const trs = $('tr[data-vidx]', $('#vchLinesTbody'));
+        const entries = trs.map(tr => {
+          const sel = $('.v_ledger', tr);
+          const opt = (sel && sel.selectedIndex >= 0 && sel.options[sel.selectedIndex]) ? sel.options[sel.selectedIndex] : null;
+          const rawText = opt ? opt.text : 'Account';
+          return {
+            ledgerId: sel ? sel.value : '',
+            ledgerName: rawText.replace(/\s*\([^)]*\)$/, ''),
+            debit: parseFloat($('.v_dr', tr).value) || 0,
+            credit: parseFloat($('.v_cr', tr).value) || 0
+          };
+        });
 
         try {
           await apiPost('/api/vouchers', {
