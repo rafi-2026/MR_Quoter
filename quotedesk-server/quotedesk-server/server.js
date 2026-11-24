@@ -4692,6 +4692,56 @@ app.get('/api/inventory/reorder-alerts', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── M5: GST & Tax Compliance Routes (GSTR-1, GSTR-3B, GSTR-2B Recon, TDS/TCS) ───
+const gstReturnsModule = require('./gst-returns.js');
+
+// 1. Download Official GSTR-1 JSON Schema Payload
+app.get('/api/gst/gstr1', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = await gstReturnsModule.generateGstr1Json(ctx.companyId, req.query.period, req.query.from, req.query.to);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="GSTR1_${req.query.period || 'current'}.json"`);
+    res.send(JSON.stringify(data, null, 2));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Get GSTR-3B Formatted Data
+app.get('/api/gst/gstr3b', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = await gstReturnsModule.generateGstr3bData(ctx.companyId, req.query.from, req.query.to);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Upload & Reconcile GSTR-2B
+app.post('/api/gst/gstr2b-reconcile', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await gstReturnsModule.reconcileGstr2b(ctx.companyId, req.body.invoices || []);
+    res.json(result);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 4. Record TDS Deduction Entry
+app.post('/api/tax/tds', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await gstReturnsModule.recordTdsEntry(ctx.companyId, req.body || {});
+    res.json(result);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 5. Get TDS / TCS Register
+app.get('/api/tax/tds-register', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const data = await gstReturnsModule.getTdsRegister(ctx.companyId, req.query.from, req.query.to);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Phase 7: Exports (Tally Prime XML & Zoho Books) & Settings ──────────
 const exportsModule = require('./exports.js');
 

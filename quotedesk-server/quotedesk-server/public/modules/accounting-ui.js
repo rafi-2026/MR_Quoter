@@ -1531,10 +1531,13 @@
         <div style="display:flex;flex-direction:column;gap:14px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
             <div>
-              <h3 style="margin:0">📑 GST Working Sheet</h3>
-              <div class="mute sm">GSTR-1 Outward Supplies &amp; GSTR-3B Input Tax Credit (ITC)</div>
+              <h3 style="margin:0">📑 GST Working Sheet &amp; Returns Hub</h3>
+              <div class="mute sm">GSTR-1 Outward Supplies, GSTR-3B Summary, and GSTR-2B ITC Matching</div>
             </div>
-            <button class="btn sm" id="btnPrintGstSheet" style="border:1px solid #cbd5e1">🖨️ Print GST Sheet</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn pri sm" id="btnDownloadGstr1Json">📥 Download GSTR-1 JSON</button>
+              <button class="btn sm" id="btnPrintGstSheet" style="border:1px solid #cbd5e1">🖨️ Print GST Sheet</button>
+            </div>
           </div>
 
           <!-- GSTR-1 Outward Supplies -->
@@ -1603,6 +1606,10 @@
           </div>
         </div>
       `;
+
+      $('#btnDownloadGstr1Json').onclick = () => {
+        window.open('/api/gst/gstr1', '_blank');
+      };
 
       $('#btnPrintGstSheet').onclick = () => {
         if (!window.QuoteDeskPrint) return;
