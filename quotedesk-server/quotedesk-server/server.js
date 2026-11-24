@@ -4576,6 +4576,71 @@ app.get('/api/year-end/history', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── M3: Core Financial Reports Routes ───
+// 1. Cash Book
+app.get('/api/reports/cash-book', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await reportsModule.getCashBook(ctx.companyId, req.query.from, req.query.to));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Bank Book
+app.get('/api/reports/bank-book', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await reportsModule.getBankBook(ctx.companyId, req.query.from, req.query.to));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Sales Register
+app.get('/api/reports/sales-register', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await reportsModule.getSalesRegister(ctx.companyId, req.query.from, req.query.to));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 4. Purchase Register
+app.get('/api/reports/purchase-register', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await reportsModule.getPurchaseRegister(ctx.companyId, req.query.from, req.query.to));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 5. Ratio Analysis
+app.get('/api/reports/ratio-analysis', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await reportsModule.getRatioAnalysis(ctx.companyId, req.query.date || new Date().toISOString().slice(0, 10)));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 6. Cash Flow Statement
+app.get('/api/reports/cash-flow', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await reportsModule.getCashFlowStatement(ctx.companyId, req.query.from, req.query.to));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 7. Fund Flow Statement
+app.get('/api/reports/fund-flow', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await reportsModule.getFundFlowStatement(ctx.companyId, req.query.from, req.query.to));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 8. Ageing Analysis
+app.get('/api/reports/ageing', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await reportsModule.getBillAgeingAnalysis(ctx.companyId, req.query.date));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Phase 7: Exports (Tally Prime XML & Zoho Books) & Settings ──────────
 const exportsModule = require('./exports.js');
 

@@ -64,6 +64,7 @@
         <button class="chip ${activeTab === 'trialbalance' ? 'on' : ''}" data-acctab="trialbalance">⚖️ Trial Balance</button>
         <button class="chip ${activeTab === 'pnl' ? 'on' : ''}" data-acctab="pnl">📈 Profit &amp; Loss</button>
         <button class="chip ${activeTab === 'balancesheet' ? 'on' : ''}" data-acctab="balancesheet">🏦 Balance Sheet</button>
+        <button class="chip ${activeTab === 'reportshub' ? 'on' : ''}" data-acctab="reportshub">📊 Financial Reports Hub</button>
         <button class="chip ${activeTab === 'outstanding' ? 'on' : ''}" data-acctab="outstanding">💰 Bill Allocation &amp; AR/AP</button>
         <button class="chip ${activeTab === 'yearend' ? 'on' : ''}" data-acctab="yearend">🔒 Year-End Close</button>
         <button class="chip ${activeTab === 'masters' ? 'on' : ''}" data-acctab="masters">📦 Tally Masters</button>
@@ -118,6 +119,7 @@
     else if (activeTab === 'trialbalance') renderTrialBalanceTab(area);
     else if (activeTab === 'pnl') renderPnlTab(area);
     else if (activeTab === 'balancesheet') renderBalanceSheetTab(area);
+    else if (activeTab === 'reportshub') renderReportsHubTab(area);
     else if (activeTab === 'outstanding') renderOutstandingTab(area);
     else if (activeTab === 'yearend') renderYearEndTab(area);
     else if (activeTab === 'masters') renderMastersTab(area);
@@ -1725,6 +1727,170 @@
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
+  }
+
+  // 16. Financial Reports Hub Tab (M3)
+  async function renderReportsHubTab(area) {
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card" style="padding:16px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff">
+          <h3 style="margin:0 0 4px;color:#fff">📊 Comprehensive Tally Financial Reports Hub</h3>
+          <div class="mute sm" style="color:#94a3b8">
+            Access statutory cash &amp; bank registers, direct cash flows, working capital analysis, and financial ratios.
+          </div>
+        </div>
+
+        <div class="grid g4" style="gap:12px">
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <h4 style="margin:0 0 6px">💵 Cash Book</h4>
+              <div class="mute sm">Complete chronological ledger of all cash receipts, counter withdrawals, and balances.</div>
+            </div>
+            <button class="btn sm" id="btnOpenCashBook" style="margin-top:12px">Open Cash Book &rarr;</button>
+          </div>
+
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <h4 style="margin:0 0 6px">🏦 Bank Book</h4>
+              <div class="mute sm">Register of deposits, client RTGS/NEFT inflows, vendor payments, and bank balances.</div>
+            </div>
+            <button class="btn sm" id="btnOpenBankBook" style="margin-top:12px">Open Bank Book &rarr;</button>
+          </div>
+
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <h4 style="margin:0 0 6px">📈 Sales Register</h4>
+              <div class="mute sm">Chronological tax invoice log with customer names, GST breakdowns, and gross sales.</div>
+            </div>
+            <button class="btn sm" id="btnOpenSalesRegister" style="margin-top:12px">Open Sales Register &rarr;</button>
+          </div>
+
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <h4 style="margin:0 0 6px">📉 Purchase Register</h4>
+              <div class="mute sm">Inward supplier bills register with vendor GSTINs, ITC inputs, and gross purchases.</div>
+            </div>
+            <button class="btn sm" id="btnOpenPurchaseRegister" style="margin-top:12px">Open Purchase Register &rarr;</button>
+          </div>
+        </div>
+
+        <div class="grid g3" style="gap:12px">
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 6px">🌊 Cash Flow Statement</h4>
+            <div class="mute sm" style="margin-bottom:12px">Direct method operating, investing, and financing cash movements.</div>
+            <button class="btn sm" id="btnOpenCashFlow">Generate Cash Flow &rarr;</button>
+          </div>
+
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 6px">⚖️ Ratio Analysis</h4>
+            <div class="mute sm" style="margin-bottom:12px">Current ratio, quick ratio, debt-to-equity, and profit margins.</div>
+            <button class="btn sm" id="btnOpenRatios">Calculate Ratios &rarr;</button>
+          </div>
+
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 6px">⏳ AR/AP Ageing Analysis</h4>
+            <div class="mute sm" style="margin-bottom:12px">Receivables &amp; payables aged into 0-30, 31-60, 61-90, and 90+ day buckets.</div>
+            <button class="btn sm" id="btnOpenAgeing">Run Ageing Report &rarr;</button>
+          </div>
+        </div>
+
+        <div id="subReportDisplayArea" style="margin-top:10px"></div>
+      </div>
+    `;
+
+    $('#btnOpenCashBook').onclick = async () => {
+      const area = $('#subReportDisplayArea');
+      area.innerHTML = '<div class="mute sm" style="padding:16px">Loading Cash Book...</div>';
+      try {
+        const data = await apiGet('/api/reports/cash-book');
+        area.innerHTML = `
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 8px">💵 Cash Book Summary</h4>
+            <div class="grid g3" style="gap:10px;margin-bottom:12px">
+              <div class="bd" style="padding:8px">Total Inflow: <b>${rs(data.totalReceipts)}</b></div>
+              <div class="bd" style="padding:8px">Total Outflow: <b>${rs(data.totalPayments)}</b></div>
+              <div class="bd" style="padding:8px">Net Cash: <b>${rs(data.netBalance)}</b></div>
+            </div>
+            <table class="tbl sm" style="width:100%">
+              <thead><tr><th>Date</th><th>Voucher No</th><th>Ledger / Narration</th><th style="text-align:right">Receipt (Dr)</th><th style="text-align:right">Payment (Cr)</th></tr></thead>
+              <tbody>
+                ${data.entries.length === 0 ? '<tr><td colspan="5" class="mute" style="text-align:center">No cash entries found.</td></tr>' :
+                  data.entries.map(e => `<tr><td>${fmtDate(e.date)}</td><td><b>${esc(e.voucherNo)}</b></td><td>${esc(e.narration || e.ledgerName)}</td><td style="text-align:right">${rs(e.debit)}</td><td style="text-align:right">${rs(e.credit)}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } catch (e) { area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+    };
+
+    $('#btnOpenBankBook').onclick = async () => {
+      const area = $('#subReportDisplayArea');
+      area.innerHTML = '<div class="mute sm" style="padding:16px">Loading Bank Book...</div>';
+      try {
+        const data = await apiGet('/api/reports/bank-book');
+        area.innerHTML = `
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 8px">🏦 Bank Book Summary</h4>
+            <div class="grid g3" style="gap:10px;margin-bottom:12px">
+              <div class="bd" style="padding:8px">Total Deposits: <b>${rs(data.totalDeposits)}</b></div>
+              <div class="bd" style="padding:8px">Total Withdrawals: <b>${rs(data.totalWithdrawals)}</b></div>
+              <div class="bd" style="padding:8px">Net Bank Balance: <b>${rs(data.netBalance)}</b></div>
+            </div>
+            <table class="tbl sm" style="width:100%">
+              <thead><tr><th>Date</th><th>Voucher No</th><th>Ledger / Party</th><th style="text-align:right">Deposit (Dr)</th><th style="text-align:right">Withdrawal (Cr)</th></tr></thead>
+              <tbody>
+                ${data.entries.length === 0 ? '<tr><td colspan="5" class="mute" style="text-align:center">No bank transactions found.</td></tr>' :
+                  data.entries.map(e => `<tr><td>${fmtDate(e.date)}</td><td><b>${esc(e.voucherNo)}</b></td><td>${esc(e.partyName || e.ledgerName)}</td><td style="text-align:right">${rs(e.debit)}</td><td style="text-align:right">${rs(e.credit)}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } catch (e) { area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+    };
+
+    $('#btnOpenRatios').onclick = async () => {
+      const area = $('#subReportDisplayArea');
+      area.innerHTML = '<div class="mute sm" style="padding:16px">Calculating financial ratios...</div>';
+      try {
+        const r = await apiGet('/api/reports/ratio-analysis');
+        area.innerHTML = `
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 12px">⚖️ Financial Ratio Analysis</h4>
+            <div class="grid g3" style="gap:12px">
+              <div class="card" style="padding:12px;text-align:center;background:#f8fafc"><div class="mute sm">Current Ratio</div><div style="font-size:1.5rem;font-weight:700">${r.currentRatio}</div></div>
+              <div class="card" style="padding:12px;text-align:center;background:#f8fafc"><div class="mute sm">Quick Ratio</div><div style="font-size:1.5rem;font-weight:700">${r.quickRatio}</div></div>
+              <div class="card" style="padding:12px;text-align:center;background:#f8fafc"><div class="mute sm">Gross Profit %</div><div style="font-size:1.5rem;font-weight:700">${r.gpMargin}%</div></div>
+              <div class="card" style="padding:12px;text-align:center;background:#f8fafc"><div class="mute sm">Net Profit %</div><div style="font-size:1.5rem;font-weight:700">${r.npMargin}%</div></div>
+              <div class="card" style="padding:12px;text-align:center;background:#f8fafc"><div class="mute sm">Return on Assets</div><div style="font-size:1.5rem;font-weight:700">${r.roa}%</div></div>
+              <div class="card" style="padding:12px;text-align:center;background:#f8fafc"><div class="mute sm">Debt to Assets</div><div style="font-size:1.5rem;font-weight:700">${r.debtToAssets}</div></div>
+            </div>
+          </div>
+        `;
+      } catch (e) { area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+    };
+
+    $('#btnOpenAgeing').onclick = async () => {
+      const area = $('#subReportDisplayArea');
+      area.innerHTML = '<div class="mute sm" style="padding:16px">Generating Ageing analysis...</div>';
+      try {
+        const ag = await apiGet('/api/reports/ageing');
+        area.innerHTML = `
+          <div class="card" style="padding:16px">
+            <h4 style="margin:0 0 8px">⏳ AR / AP Ageing Analysis Buckets</h4>
+            <div class="grid g4" style="gap:10px;margin-bottom:12px">
+              <div class="bd" style="padding:8px">0-30 Days: <b>${rs(ag.buckets.b0_30.total)}</b></div>
+              <div class="bd" style="padding:8px">31-60 Days: <b>${rs(ag.buckets.b31_60.total)}</b></div>
+              <div class="bd" style="padding:8px">61-90 Days: <b>${rs(ag.buckets.b61_90.total)}</b></div>
+              <div class="bd" style="padding:8px;background:#fee2e2;color:#b91c1c">90+ Days: <b>${rs(ag.buckets.b90_plus.total)}</b></div>
+            </div>
+          </div>
+        `;
+      } catch (e) { area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+    };
+
+    $('#btnOpenSalesRegister').onclick = () => window.open('/api/reports/sales-register', '_blank');
+    $('#btnOpenPurchaseRegister').onclick = () => window.open('/api/reports/purchase-register', '_blank');
+    $('#btnOpenCashFlow').onclick = () => window.open('/api/reports/cash-flow', '_blank');
   }
 
   // 14. Bill-by-Bill Allocation & AR/AP Outstanding Tab (M2)

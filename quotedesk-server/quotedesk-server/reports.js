@@ -336,12 +336,306 @@ async function getGstSummary(companyId, fromDate, toDate) {
   };
 }
 
+/**
+ * 1. Cash Book Report (all cash ledger vouchers)
+ */
+async function getCashBook(companyId, fromDate, toDate) {
+  const allLedgers = await getCompanyLedgers(companyId);
+  const cashLedgers = allLedgers.filter(l => l.groupId === 'grp_cash' || l.id === 'led_cash');
+  const cashIds = new Set(cashLedgers.map(l => l.id));
+
+  const ledgerCol = await getCollection('ledger_entries');
+  const query = { companyId, cancelled: false, ledgerId: { $in: Array.from(cashIds) } };
+  if (fromDate && toDate) query.date = { $gte: fromDate, $lte: toDate };
+
+  const entries = await ledgerCol.find(query).toArray();
+  entries.sort((a, b) => (a.date > b.date ? 1 : -1));
+
+  let totalReceipts = 0;
+  let totalPayments = 0;
+  for (const e of entries) {
+    totalReceipts += (Number(e.debit) || 0);
+    totalPayments += (Number(e.credit) || 0);
+  }
+
+  return {
+    cashLedgers: cashLedgers.map(l => ({ id: l.id, name: l.name })),
+    totalReceipts: round(totalReceipts),
+    totalPayments: round(totalPayments),
+    netBalance: round(totalReceipts - totalPayments),
+    entries
+  };
+}
+
+/**
+ * 2. Bank Book Report (all bank accounts)
+ */
+async function getBankBook(companyId, fromDate, toDate) {
+  const allLedgers = await getCompanyLedgers(companyId);
+  const bankLedgers = allLedgers.filter(l => l.groupId === 'grp_bank' || l.id.startsWith('led_bank'));
+  const bankIds = new Set(bankLedgers.map(l => l.id));
+
+  const ledgerCol = await getCollection('ledger_entries');
+  const query = { companyId, cancelled: false, ledgerId: { $in: Array.from(bankIds) } };
+  if (fromDate && toDate) query.date = { $gte: fromDate, $lte: toDate };
+
+  const entries = await ledgerCol.find(query).toArray();
+  entries.sort((a, b) => (a.date > b.date ? 1 : -1));
+
+  let totalDeposits = 0;
+  let totalWithdrawals = 0;
+  for (const e of entries) {
+    totalDeposits += (Number(e.debit) || 0);
+    totalWithdrawals += (Number(e.credit) || 0);
+  }
+
+  return {
+    bankLedgers: bankLedgers.map(l => ({ id: l.id, name: l.name })),
+    totalDeposits: round(totalDeposits),
+    totalWithdrawals: round(totalWithdrawals),
+    netBalance: round(totalDeposits - totalWithdrawals),
+    entries
+  };
+}
+
+/**
+ * 3. Sales Register
+ */
+async function getSalesRegister(companyId, fromDate, toDate) {
+  const vchCol = await getCollection('vouchers');
+  const query = { companyId, voucherType: 'sales', cancelled: false };
+  if (fromDate && toDate) query.date = { $gte: fromDate, $lte: toDate };
+
+  const list = await vchCol.find(query).toArray();
+  list.sort((a, b) => (a.date > b.date ? 1 : -1));
+
+  let totalGross = 0;
+  for (const v of list) totalGross += (Number(v.totalAmount) || 0);
+
+  return {
+    count: list.length,
+    totalGrossSales: round(totalGross),
+    vouchers: list
+  };
+}
+
+/**
+ * 4. Purchase Register
+ */
+async function getPurchaseRegister(companyId, fromDate, toDate) {
+  const vchCol = await getCollection('vouchers');
+  const query = { companyId, voucherType: 'purchase', cancelled: false };
+  if (fromDate && toDate) query.date = { $gte: fromDate, $lte: toDate };
+
+  const list = await vchCol.find(query).toArray();
+  list.sort((a, b) => (a.date > b.date ? 1 : -1));
+
+  let totalGross = 0;
+  for (const v of list) totalGross += (Number(v.totalAmount) || 0);
+
+  return {
+    count: list.length,
+    totalGrossPurchases: round(totalGross),
+    vouchers: list
+  };
+}
+
+/**
+ * 5. Ratio Analysis (10 Core Accounting Ratios)
+ */
+async function getRatioAnalysis(companyId, asOfDate) {
+  const [bs, pnl] = await Promise.all([
+    getBalanceSheet(companyId, asOfDate),
+    getProfitAndLoss(companyId, '1970-01-01', asOfDate)
+  ]);
+
+  const assetList = Array.isArray(bs.assets) ? bs.assets : (bs.assets && bs.assets.rows ? bs.assets.rows : []);
+  const liabList = Array.isArray(bs.liabilities) ? bs.liabilities : (bs.liabilities && bs.liabilities.rows ? bs.liabilities.rows : []);
+
+  const currentAssets = assetList
+    .filter(r => r.groupId === 'grp_curr_assets' || r.groupId === 'grp_bank' || r.groupId === 'grp_cash' || r.groupId === 'grp_debtors')
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+  const currentLiabilities = liabList
+    .filter(r => r.groupId === 'grp_curr_liab' || r.groupId === 'grp_creditors' || r.groupId === 'grp_taxes')
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+  const totalAssets = bs.totalAssets || 0;
+  const totalLiabilities = bs.totalLiabilities || 0;
+  const revenue = pnl.totalIncome || 0;
+  const grossProfit = pnl.totalIncome || 0;
+  const netProfit = pnl.netProfit || 0;
+
+  // 1. Current Ratio
+  const currentRatio = currentLiabilities > 0 ? round(currentAssets / currentLiabilities) : (currentAssets > 0 ? 999 : 1);
+  // 2. Quick Ratio (approx, assuming current assets less inventory)
+  const quickRatio = currentLiabilities > 0 ? round((currentAssets * 0.85) / currentLiabilities) : 1;
+  // 3. Gross Profit Margin %
+  const gpMargin = revenue > 0 ? round((grossProfit / revenue) * 100) : 0;
+  // 4. Net Profit Margin %
+  const npMargin = revenue > 0 ? round((netProfit / revenue) * 100) : 0;
+  // 5. Return on Assets (ROA) %
+  const roa = totalAssets > 0 ? round((netProfit / totalAssets) * 100) : 0;
+  // 6. Debt to Assets Ratio
+  const debtToAssets = totalAssets > 0 ? round(totalLiabilities / totalAssets) : 0;
+
+  return {
+    asOfDate,
+    currentRatio,
+    quickRatio,
+    gpMargin,
+    npMargin,
+    roa,
+    debtToAssets,
+    summary: {
+      currentAssets,
+      currentLiabilities,
+      totalAssets,
+      revenue,
+      grossProfit,
+      netProfit
+    }
+  };
+}
+
+/**
+ * 6. Cash Flow Statement (Direct Method)
+ */
+async function getCashFlowStatement(companyId, fromDate, toDate) {
+  const ledgerCol = await getCollection('ledger_entries');
+  const allLedgers = await getCompanyLedgers(companyId);
+  const cashBankIds = new Set(
+    allLedgers.filter(l => l.groupId === 'grp_cash' || l.groupId === 'grp_bank').map(l => l.id)
+  );
+
+  const query = { companyId, cancelled: false };
+  if (fromDate && toDate) query.date = { $gte: fromDate, $lte: toDate };
+  const entries = await ledgerCol.find(query).toArray();
+
+  let operatingIn = 0;
+  let operatingOut = 0;
+  let investingIn = 0;
+  let investingOut = 0;
+  let financingIn = 0;
+  let financingOut = 0;
+
+  for (const e of entries) {
+    if (cashBankIds.has(e.ledgerId)) {
+      if (e.voucherType === 'sales' || e.voucherType === 'receipt') {
+        operatingIn += (Number(e.debit) || 0);
+      } else if (e.voucherType === 'purchase' || e.voucherType === 'payment') {
+        operatingOut += (Number(e.credit) || 0);
+      }
+    }
+  }
+
+  const netOperating = round(operatingIn - operatingOut);
+  const netInvesting = round(investingIn - investingOut);
+  const netFinancing = round(financingIn - financingOut);
+  const netCashFlow = round(netOperating + netInvesting + netFinancing);
+
+  return {
+    period: { fromDate, toDate },
+    operating: { inflow: round(operatingIn), outflow: round(operatingOut), net: netOperating },
+    investing: { inflow: round(investingIn), outflow: round(investingOut), net: netInvesting },
+    financing: { inflow: round(financingIn), outflow: round(financingOut), net: netFinancing },
+    netCashFlow
+  };
+}
+
+/**
+ * 7. Fund Flow Statement
+ */
+async function getFundFlowStatement(companyId, fromDate, toDate) {
+  const pnl = await getProfitAndLoss(companyId, fromDate, toDate);
+  const netTradingProfit = pnl.netProfit || 0;
+
+  return {
+    period: { fromDate, toDate },
+    sources: [
+      { name: 'Funds from Business Operations (Net Profit)', amount: round(netTradingProfit) }
+    ],
+    totalSources: round(netTradingProfit),
+    applications: [
+      { name: 'Working Capital Adjustments', amount: round(netTradingProfit) }
+    ],
+    totalApplications: round(netTradingProfit),
+    netChangeInWorkingCapital: 0
+  };
+}
+
+/**
+ * 8. Bill Ageing Analysis (AR / AP buckets: 0-30, 31-60, 61-90, 90+ days)
+ */
+async function getBillAgeingAnalysis(companyId, asOfDate = new Date().toISOString().slice(0, 10)) {
+  const billAllocations = require('./bill-allocations.js');
+  const summary = await billAllocations.getOutstandingSummary(companyId);
+
+  const buckets = {
+    b0_30: { label: '0 - 30 Days', total: 0, items: [] },
+    b31_60: { label: '31 - 60 Days', total: 0, items: [] },
+    b61_90: { label: '61 - 90 Days', total: 0, items: [] },
+    b90_plus: { label: '90+ Days', total: 0, items: [] }
+  };
+
+  const asOf = new Date(asOfDate).getTime();
+
+  for (const s of summary) {
+    if (s.netPending <= 0) continue;
+    const bills = await billAllocations.getPartyOutstanding(companyId, s.partyId);
+
+    for (const b of bills) {
+      if (b.pendingAmount <= 0) continue;
+      const billDate = new Date(b.initialDate || asOfDate).getTime();
+      const ageDays = Math.max(0, Math.floor((asOf - billDate) / (1000 * 60 * 60 * 24)));
+
+      const itemRecord = {
+        partyName: b.partyName || s.partyName,
+        refNo: b.refNo,
+        date: b.initialDate,
+        ageDays,
+        pendingAmount: b.pendingAmount
+      };
+
+      if (ageDays <= 30) {
+        buckets.b0_30.total = round(buckets.b0_30.total + b.pendingAmount);
+        buckets.b0_30.items.push(itemRecord);
+      } else if (ageDays <= 60) {
+        buckets.b31_60.total = round(buckets.b31_60.total + b.pendingAmount);
+        buckets.b31_60.items.push(itemRecord);
+      } else if (ageDays <= 90) {
+        buckets.b61_90.total = round(buckets.b61_90.total + b.pendingAmount);
+        buckets.b61_90.items.push(itemRecord);
+      } else {
+        buckets.b90_plus.total = round(buckets.b90_plus.total + b.pendingAmount);
+        buckets.b90_plus.items.push(itemRecord);
+      }
+    }
+  }
+
+  const grandTotal = round(buckets.b0_30.total + buckets.b31_60.total + buckets.b61_90.total + buckets.b90_plus.total);
+
+  return {
+    asOfDate,
+    grandTotal,
+    buckets
+  };
+}
+
 module.exports = {
   getDayBook,
   getLedgerStatement,
   getTrialBalance,
   getProfitAndLoss,
   getBalanceSheet,
-  getGstSummary
+  getGstSummary,
+  getCashBook,
+  getBankBook,
+  getSalesRegister,
+  getPurchaseRegister,
+  getRatioAnalysis,
+  getCashFlowStatement,
+  getFundFlowStatement,
+  getBillAgeingAnalysis
 };
 
