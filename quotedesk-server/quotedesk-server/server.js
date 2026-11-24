@@ -4290,6 +4290,240 @@ app.post('/api/procurement/3way-match', auth, async (req, res) => {
   }
 });
 
+// ─── M1: Tally Masters (Stock Groups, Items, Units, Godowns, Price Lists, Cost Centres, Currencies) ───
+const stockGroupsModule = require('./stock-groups.js');
+const stockItemsModule = require('./stock-items.js');
+const unitsModule = require('./units.js');
+const godownsModule = require('./godowns.js');
+const priceListsModule = require('./price-lists.js');
+const costCentresModule = require('./cost-centres.js');
+const currenciesModule = require('./currencies.js');
+
+// --- Stock Groups CRUD ---
+app.get('/api/stock-groups', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await stockGroupsModule.listStockGroups(ctx.companyId));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/stock-groups', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await stockGroupsModule.createStockGroup(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.put('/api/stock-groups/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await stockGroupsModule.updateStockGroup(ctx.companyId, req.params.id, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.delete('/api/stock-groups/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await stockGroupsModule.deleteStockGroup(ctx.companyId, req.params.id));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// --- Stock Items CRUD ---
+app.get('/api/stock-items', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const filters = {};
+    if (req.query.stockGroupId) filters.stockGroupId = req.query.stockGroupId;
+    if (req.query.search) filters.search = req.query.search;
+    res.json(await stockItemsModule.listStockItems(ctx.companyId, filters));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/stock-items/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const item = await stockItemsModule.getStockItem(ctx.companyId, req.params.id);
+    if (!item) return res.status(404).json({ error: 'Stock item not found' });
+    res.json(item);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/stock-items', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await stockItemsModule.createStockItem(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.put('/api/stock-items/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await stockItemsModule.updateStockItem(ctx.companyId, req.params.id, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.delete('/api/stock-items/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await stockItemsModule.deleteStockItem(ctx.companyId, req.params.id));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// --- Units of Measure CRUD ---
+app.get('/api/units', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await unitsModule.listUnits(ctx.companyId));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/units', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await unitsModule.createUnit(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.put('/api/units/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await unitsModule.updateUnit(ctx.companyId, req.params.id, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.delete('/api/units/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await unitsModule.deleteUnit(ctx.companyId, req.params.id));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// --- Godowns / Locations CRUD ---
+app.get('/api/godowns', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await godownsModule.listGodowns(ctx.companyId));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/godowns', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await godownsModule.createGodown(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.put('/api/godowns/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await godownsModule.updateGodown(ctx.companyId, req.params.id, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.delete('/api/godowns/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await godownsModule.deleteGodown(ctx.companyId, req.params.id));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// --- Price Lists CRUD ---
+app.get('/api/price-lists', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await priceListsModule.listPriceLists(ctx.companyId));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/price-lists/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const pl = await priceListsModule.getPriceList(ctx.companyId, req.params.id);
+    if (!pl) return res.status(404).json({ error: 'Price list not found' });
+    res.json(pl);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/price-lists', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await priceListsModule.createPriceList(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.put('/api/price-lists/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await priceListsModule.updatePriceList(ctx.companyId, req.params.id, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.delete('/api/price-lists/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await priceListsModule.deletePriceList(ctx.companyId, req.params.id));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// --- Cost Centres CRUD ---
+app.get('/api/cost-centres', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await costCentresModule.listCostCentres(ctx.companyId));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/cost-centres/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const cc = await costCentresModule.getCostCentre(ctx.companyId, req.params.id);
+    if (!cc) return res.status(404).json({ error: 'Cost centre not found' });
+    res.json(cc);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/cost-centres', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await costCentresModule.createCostCentre(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.put('/api/cost-centres/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await costCentresModule.updateCostCentre(ctx.companyId, req.params.id, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.delete('/api/cost-centres/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await costCentresModule.deleteCostCentre(ctx.companyId, req.params.id));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// --- Currencies CRUD ---
+app.get('/api/currencies', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await currenciesModule.listCurrencies(ctx.companyId));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/currencies', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await currenciesModule.createCurrency(ctx.companyId, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.put('/api/currencies/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await currenciesModule.updateCurrency(ctx.companyId, req.params.id, req.body || {}));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.delete('/api/currencies/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    res.json(await currenciesModule.deleteCurrency(ctx.companyId, req.params.id));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// --- Opening Balances Import & Verify ---
+app.post('/api/accounts/opening-balances/import', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await accountsModule.importOpeningBalances(ctx.companyId, req.body.balances || []);
+    res.json(result);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.get('/api/accounts/opening-balances/verify', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const result = await accountsModule.verifyOpeningBalances(ctx.companyId);
+    res.json(result);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Phase 7: Exports (Tally Prime XML & Zoho Books) & Settings ──────────
 const exportsModule = require('./exports.js');
 

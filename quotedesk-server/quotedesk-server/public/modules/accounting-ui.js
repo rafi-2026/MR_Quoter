@@ -64,6 +64,7 @@
         <button class="chip ${activeTab === 'trialbalance' ? 'on' : ''}" data-acctab="trialbalance">⚖️ Trial Balance</button>
         <button class="chip ${activeTab === 'pnl' ? 'on' : ''}" data-acctab="pnl">📈 Profit &amp; Loss</button>
         <button class="chip ${activeTab === 'balancesheet' ? 'on' : ''}" data-acctab="balancesheet">🏦 Balance Sheet</button>
+        <button class="chip ${activeTab === 'masters' ? 'on' : ''}" data-acctab="masters">📦 Tally Masters</button>
         <button class="chip ${activeTab === 'gst' ? 'on' : ''}" data-acctab="gst">📑 GST Working Sheet</button>
         <button class="chip ${activeTab === 'exports' ? 'on' : ''}" data-acctab="exports">🔄 Tally &amp; Zoho Exports</button>
       </div>
@@ -115,6 +116,7 @@
     else if (activeTab === 'trialbalance') renderTrialBalanceTab(area);
     else if (activeTab === 'pnl') renderPnlTab(area);
     else if (activeTab === 'balancesheet') renderBalanceSheetTab(area);
+    else if (activeTab === 'masters') renderMastersTab(area);
     else if (activeTab === 'gst') renderGstTab(area);
     else if (activeTab === 'exports') renderExportsTab(area);
   }
@@ -1716,6 +1718,246 @@
       $('#btnZohoCoa').onclick = () => {
         window.open('/api/exports/zoho/csv?type=chart_of_accounts', '_blank');
       };
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 13. Tally Masters Hub Tab (M1 Masters)
+  async function renderMastersTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading Tally Masters...</div>`;
+    try {
+      const [stockItems, stockGroups, units, godowns, priceLists, costCentres] = await Promise.all([
+        apiGet('/api/stock-items'),
+        apiGet('/api/stock-groups'),
+        apiGet('/api/units'),
+        apiGet('/api/godowns'),
+        apiGet('/api/price-lists'),
+        apiGet('/api/cost-centres')
+      ]);
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <!-- Quick Master Sub-Header & Stats -->
+          <div class="grid g4" style="gap:10px">
+            <div class="card" style="padding:12px;text-align:center;background:#f8fafc">
+              <div class="mute sm">📦 Stock Items</div>
+              <div style="font-size:1.4rem;font-weight:700;color:#0f172a">${stockItems.length}</div>
+            </div>
+            <div class="card" style="padding:12px;text-align:center;background:#f8fafc">
+              <div class="mute sm">🗂️ Stock Groups</div>
+              <div style="font-size:1.4rem;font-weight:700;color:#0f172a">${stockGroups.length}</div>
+            </div>
+            <div class="card" style="padding:12px;text-align:center;background:#f8fafc">
+              <div class="mute sm">📏 Units of Measure</div>
+              <div style="font-size:1.4rem;font-weight:700;color:#0f172a">${units.length}</div>
+            </div>
+            <div class="card" style="padding:12px;text-align:center;background:#f8fafc">
+              <div class="mute sm">🏢 Godowns / Hubs</div>
+              <div style="font-size:1.4rem;font-weight:700;color:#0f172a">${godowns.length}</div>
+            </div>
+          </div>
+
+          <!-- Section: Stock Items -->
+          <div class="card" style="padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <div>
+                <h4 style="margin:0 0 4px">📦 Inventory Stock Items</h4>
+                <div class="mute sm">Track physical materials, profiles, hardware, HSN/SAC, opening stock, and reorder levels.</div>
+              </div>
+              <button class="btn pri sm" id="btnNewStockItem">+ New Stock Item</button>
+            </div>
+
+            <div style="overflow-x:auto">
+              <table class="tbl sm" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th>Group</th>
+                    <th>HSN</th>
+                    <th>Unit</th>
+                    <th>GST %</th>
+                    <th style="text-align:right">Opening Qty</th>
+                    <th style="text-align:right">Opening Value</th>
+                    <th style="text-align:right">Reorder Lvl</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${stockItems.length === 0 ? '<tr><td colspan="8" class="mute" style="text-align:center;padding:16px">No stock items created yet. Click "+ New Stock Item" to add one.</td></tr>' :
+                    stockItems.map(it => `
+                      <tr>
+                        <td><b>${esc(it.name)}</b> ${it.alias ? `<span class="mute sm">(${esc(it.alias)})</span>` : ''}</td>
+                        <td>${esc(it.stockGroupId || 'Primary')}</td>
+                        <td><code>${esc(it.hsnCode || '-')}</code></td>
+                        <td><span class="bd">${esc(it.unitName || 'Nos')}</span></td>
+                        <td>${it.taxRate ? it.taxRate + '%' : '0%'}</td>
+                        <td style="text-align:right">${it.openingQty || 0}</td>
+                        <td style="text-align:right">${rs((it.openingValuePaise || 0) / 100)}</td>
+                        <td style="text-align:right">${it.reorderLevel || '-'}</td>
+                      </tr>
+                    `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Two Column Grid: Stock Groups & Units -->
+          <div class="grid g2" style="gap:16px">
+            <!-- Stock Groups -->
+            <div class="card" style="padding:16px">
+              <h4 style="margin:0 0 10px">🗂️ Stock Groups</h4>
+              <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px">
+                ${stockGroups.map(g => `
+                  <li style="display:flex;justify-content:space-between;padding:6px 10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;font-size:0.85rem">
+                    <span><b>${esc(g.name)}</b></span>
+                    <span class="mute sm">${g.isDefault ? 'Standard' : 'Custom'}</span>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+
+            <!-- Units of Measure -->
+            <div class="card" style="padding:16px">
+              <h4 style="margin:0 0 10px">📏 Units of Measure</h4>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                ${units.map(u => `
+                  <span class="bd" style="padding:4px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;font-size:0.8rem">
+                    <b>${esc(u.symbol)}</b> <span class="mute sm">(${esc(u.name)})</span>
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <!-- Opening Balances Check & Reconciliation -->
+          <div class="card" style="padding:16px;background:#fafafa;border:1px solid #e2e8f0">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <h4 style="margin:0 0 4px">⚖️ Opening Balance Verification</h4>
+                <div class="mute sm">Verify that total Opening Debits equal Opening Credits across all ledgers.</div>
+              </div>
+              <button class="btn sm" id="btnVerifyOB" style="background:#fff;border:1px solid #cbd5e1">Run Balance Audit</button>
+            </div>
+            <div id="obVerifyResult" style="margin-top:10px;display:none"></div>
+          </div>
+        </div>
+      `;
+
+      // New Stock Item Modal Action
+      const btnNewItem = $('#btnNewStockItem');
+      if (btnNewItem) {
+        btnNewItem.onclick = () => {
+          modal({
+            title: '✨ Add New Inventory Stock Item',
+            html: `
+              <div style="display:flex;flex-direction:column;gap:10px;max-width:540px">
+                <div class="fld">
+                  <label>Item Name *</label>
+                  <input type="text" id="si_name" placeholder="e.g. Aluminium Profile 6063 T5 50x25mm" required>
+                </div>
+                <div class="grid g2" style="gap:10px">
+                  <div class="fld">
+                    <label>Stock Group</label>
+                    <select id="si_group">
+                      ${stockGroups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="fld">
+                    <label>Unit of Measure</label>
+                    <select id="si_unit">
+                      ${units.map(u => `<option value="${u.symbol}">${esc(u.symbol)} - ${esc(u.name)}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+                <div class="grid g2" style="gap:10px">
+                  <div class="fld">
+                    <label>HSN / SAC Code</label>
+                    <input type="text" id="si_hsn" placeholder="e.g. 7604">
+                  </div>
+                  <div class="fld">
+                    <label>GST Rate %</label>
+                    <select id="si_tax">
+                      <option value="18">18% GST (Standard)</option>
+                      <option value="12">12% GST</option>
+                      <option value="28">28% GST</option>
+                      <option value="5">5% GST</option>
+                      <option value="0">0% Exempt</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="grid g3" style="gap:10px">
+                  <div class="fld">
+                    <label>Opening Qty</label>
+                    <input type="number" id="si_op_qty" placeholder="0" min="0" step="any">
+                  </div>
+                  <div class="fld">
+                    <label>Opening Rate (₹)</label>
+                    <input type="number" id="si_op_rate" placeholder="0.00" min="0" step="any">
+                  </div>
+                  <div class="fld">
+                    <label>Reorder Level</label>
+                    <input type="number" id="si_reorder" placeholder="Min stock" min="0">
+                  </div>
+                </div>
+              </div>
+            `,
+            okText: 'Save Stock Item',
+            onOk: async () => {
+              const name = ($('#si_name') && $('#si_name').value.trim()) || '';
+              if (!name) { toast('Stock item name is required', 'bad'); return false; }
+              const payload = {
+                name,
+                stockGroupId: $('#si_group').value,
+                unitName: $('#si_unit').value,
+                hsnCode: $('#si_hsn').value.trim(),
+                taxRate: parseFloat($('#si_tax').value) || 0,
+                openingQty: parseFloat($('#si_op_qty').value) || 0,
+                openingRate: parseFloat($('#si_op_rate').value) || 0,
+                reorderLevel: parseFloat($('#si_reorder').value) || 0
+              };
+              try {
+                await apiPost('/api/stock-items', payload);
+                toast('✅ Stock item saved successfully.');
+                renderMastersTab(area);
+                return true;
+              } catch (e) {
+                toast(e.message, 'bad');
+                return false;
+              }
+            }
+          });
+        };
+      }
+
+      // Opening Balance Audit Button
+      const btnVerify = $('#btnVerifyOB');
+      if (btnVerify) {
+        btnVerify.onclick = async () => {
+          const resArea = $('#obVerifyResult');
+          if (!resArea) return;
+          resArea.style.display = 'block';
+          resArea.innerHTML = '<div class="mute sm">Verifying opening balances...</div>';
+          try {
+            const audit = await apiGet('/api/accounts/opening-balances/verify');
+            if (audit.balanced) {
+              resArea.innerHTML = `
+                <div class="note ok" style="margin:0">
+                  <b>✅ Verified Balanced:</b> Total Dr (${rs(audit.totalDr)}) === Total Cr (${rs(audit.totalCr)}). Double-entry opening equilibrium confirmed!
+                </div>
+              `;
+            } else {
+              resArea.innerHTML = `
+                <div class="note bad" style="margin:0">
+                  <b>⚠️ Imbalance Detected:</b> Total Dr: ${rs(audit.totalDr)} vs Total Cr: ${rs(audit.totalCr)}. Net Difference: ${rs(audit.difference)}. Adjust opening balances in Ledgers tab.
+                </div>
+              `;
+            }
+          } catch (e) {
+            resArea.innerHTML = `<div class="note bad" style="margin:0">${esc(e.message)}</div>`;
+          }
+        };
+      }
+
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }

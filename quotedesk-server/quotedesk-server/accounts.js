@@ -174,11 +174,78 @@ async function createLedger(companyId, data) {
   return ledger;
 }
 
+/**
+ * Bulk import opening balances for ledgers.
+ * @param {string} companyId
+ * @param {Array} balances - [{ledgerId, openingBalance, openingBalanceType}]
+ * @returns {object} { imported, errors }
+ */
+async function importOpeningBalances(companyId, balances = []) {
+  const col = await getCollection('accounts');
+  const imported = [];
+  const errors = [];
+
+  for (const b of balances) {
+    if (!b.ledgerId) {
+      errors.push({ ledgerId: b.ledgerId, error: 'Missing ledgerId' });
+      continue;
+    }
+    const ledger = await col.findOne({ id: b.ledgerId, companyId });
+    if (!ledger) {
+      errors.push({ ledgerId: b.ledgerId, error: 'Ledger not found' });
+      continue;
+    }
+    ledger.openingBalance = Number(b.openingBalance) || 0;
+    ledger.openingBalanceType = b.openingBalanceType || ledger.openingBalanceType || 'Dr';
+    ledger.updatedAt = Date.now();
+    await col.replaceOne({ id: b.ledgerId, companyId }, ledger);
+    imported.push({ ledgerId: b.ledgerId, name: ledger.name, openingBalance: ledger.openingBalance, type: ledger.openingBalanceType });
+  }
+
+  return { imported, errors };
+}
+
+/**
+ * Verify that total opening Dr balances equal total opening Cr balances.
+ * @param {string} companyId
+ * @returns {object} { balanced, totalDr, totalCr, difference, details }
+ */
+async function verifyOpeningBalances(companyId) {
+  const col = await getCollection('accounts');
+  const ledgers = await col.find({ companyId }).toArray();
+
+  let totalDr = 0;
+  let totalCr = 0;
+  const details = [];
+
+  for (const l of ledgers) {
+    const amt = Number(l.openingBalance) || 0;
+    if (amt === 0) continue;
+    if (l.openingBalanceType === 'Dr') {
+      totalDr += amt;
+    } else {
+      totalCr += amt;
+    }
+    details.push({ id: l.id, name: l.name, amount: amt, type: l.openingBalanceType });
+  }
+
+  const diff = Math.abs(totalDr - totalCr);
+  return {
+    balanced: diff < 0.01,
+    totalDr: Math.round(totalDr * 100) / 100,
+    totalCr: Math.round(totalCr * 100) / 100,
+    difference: Math.round(diff * 100) / 100,
+    details
+  };
+}
+
 module.exports = {
   STANDARD_GROUPS,
   DEFAULT_SYSTEM_LEDGERS,
   initCompanyAccounts,
   getCompanyLedgers,
-  createLedger
+  createLedger,
+  importOpeningBalances,
+  verifyOpeningBalances
 };
 
