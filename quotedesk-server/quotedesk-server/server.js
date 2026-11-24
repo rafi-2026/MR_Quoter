@@ -4742,6 +4742,55 @@ app.get('/api/tax/tds-register', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── M6: Banking Plus (Cheque Printing, PDC Register, Payment Advice) ───
+const bankingPlusModule = require('./banking-plus.js');
+
+// 1. Get Cheque Print Layout Coordinates
+app.post('/api/bank/cheque-print/layout', auth, async (req, res) => {
+  try {
+    const { bankKey, payeeName, amount, date, acPayee } = req.body || {};
+    const layout = bankingPlusModule.getChequePrintCoordinates(bankKey, { payeeName, amount, date, acPayee });
+    res.json(layout);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 2. Post-Dated Cheques (PDC) CRUD
+app.get('/api/bank/pdc', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const list = await bankingPlusModule.listPdcCheques(ctx.companyId, {
+      status: req.query.status,
+      type: req.query.type
+    });
+    res.json(list);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/bank/pdc', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const doc = await bankingPlusModule.recordPdcCheque(ctx.companyId, req.body || {});
+    res.json(doc);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.put('/api/bank/pdc/:id/status', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const updated = await bankingPlusModule.updatePdcStatus(ctx.companyId, req.params.id, req.body.status, req.body.notes);
+    res.json(updated);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 3. Payment Advice Data
+app.get('/api/bank/payment-advice/:voucherId', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const advice = await bankingPlusModule.generatePaymentAdvice(ctx.companyId, req.params.voucherId);
+    res.json(advice);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Phase 7: Exports (Tally Prime XML & Zoho Books) & Settings ──────────
 const exportsModule = require('./exports.js');
 

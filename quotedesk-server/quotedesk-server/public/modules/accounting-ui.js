@@ -64,6 +64,7 @@
         <button class="chip ${activeTab === 'trialbalance' ? 'on' : ''}" data-acctab="trialbalance">⚖️ Trial Balance</button>
         <button class="chip ${activeTab === 'pnl' ? 'on' : ''}" data-acctab="pnl">📈 Profit &amp; Loss</button>
         <button class="chip ${activeTab === 'balancesheet' ? 'on' : ''}" data-acctab="balancesheet">🏦 Balance Sheet</button>
+        <button class="chip ${activeTab === 'pdc' ? 'on' : ''}" data-acctab="pdc">🎫 Post-Dated Cheques (PDC)</button>
         <button class="chip ${activeTab === 'stocksummary' ? 'on' : ''}" data-acctab="stocksummary">📦 Stock Summary</button>
         <button class="chip ${activeTab === 'reportshub' ? 'on' : ''}" data-acctab="reportshub">📊 Financial Reports Hub</button>
         <button class="chip ${activeTab === 'outstanding' ? 'on' : ''}" data-acctab="outstanding">💰 Bill Allocation &amp; AR/AP</button>
@@ -120,6 +121,7 @@
     else if (activeTab === 'trialbalance') renderTrialBalanceTab(area);
     else if (activeTab === 'pnl') renderPnlTab(area);
     else if (activeTab === 'balancesheet') renderBalanceSheetTab(area);
+    else if (activeTab === 'pdc') renderPdcTab(area);
     else if (activeTab === 'stocksummary') renderStockSummaryTab(area);
     else if (activeTab === 'reportshub') renderReportsHubTab(area);
     else if (activeTab === 'outstanding') renderOutstandingTab(area);
@@ -1733,6 +1735,202 @@
       $('#btnZohoCoa').onclick = () => {
         window.open('/api/exports/zoho/csv?type=chart_of_accounts', '_blank');
       };
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 18. Post-Dated Cheques (PDC) Register Tab (M6)
+  async function renderPdcTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading Post-Dated Cheques...</div>`;
+    try {
+      const pdcs = await apiGet('/api/bank/pdc');
+      const pendingTotal = pdcs.filter(p => p.status === 'pending').reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" style="padding:16px;background:linear-gradient(135deg,#1e1b4b,#312e81);color:#fff">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <h3 style="margin:0 0 4px;color:#fff">🎫 Post-Dated Cheques (PDC) &amp; Cheque Printing</h3>
+                <div class="mute sm" style="color:#c7d2fe">
+                  Track upcoming customer receipts, supplier dispatches, maturity dates, and format CTS-2010 cheques for printing.
+                </div>
+              </div>
+              <div style="text-align:right">
+                <div class="mute sm" style="color:#c7d2fe">Pending PDC Clearance</div>
+                <div style="font-size:1.6rem;font-weight:700;color:#fff">${rs(pendingTotal)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <button class="btn pri sm" id="btnNewPdcEntry">+ Record New PDC</button>
+            <button class="btn sm" id="btnChequePrintConfig" style="border:1px solid #cbd5e1">🖨️ Cheque Print Tool</button>
+          </div>
+
+          <div class="card" style="padding:16px">
+            <div style="overflow-x:auto">
+              <table class="tbl sm" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Cheque No</th>
+                    <th>Type</th>
+                    <th>Party Name</th>
+                    <th>Bank Name</th>
+                    <th>Maturity Date</th>
+                    <th style="text-align:right">Amount</th>
+                    <th style="text-align:center">Status</th>
+                    <th style="text-align:center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pdcs.length === 0 ? '<tr><td colspan="8" class="mute" style="text-align:center;padding:16px">No Post-Dated Cheques recorded.</td></tr>' :
+                    pdcs.map(p => `
+                      <tr>
+                        <td><b>${esc(p.chequeNo)}</b></td>
+                        <td><span class="bd">${p.type === 'receipt' ? 'Customer In' : 'Vendor Out'}</span></td>
+                        <td><b>${esc(p.partyName)}</b></td>
+                        <td>${esc(p.bankName || '-')}</td>
+                        <td>${fmtDate(p.chequeDate)}</td>
+                        <td style="text-align:right;font-weight:700">${rs(p.amount)}</td>
+                        <td style="text-align:center">
+                          <span class="bd" style="background:${p.status === 'cleared' ? '#dcfce7;color:#15803d' : (p.status === 'pending' ? '#fef3c7;color:#b45309' : '#fee2e2;color:#b91c1c')}">
+                            ${p.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td style="text-align:center">
+                          ${p.status === 'pending' ? `<button class="btn sm xs" onclick="window.markPdcCleared('${p.id}')">Clear</button>` : '-'}
+                        </td>
+                      </tr>
+                    `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      window.markPdcCleared = async (id) => {
+        try {
+          await apiPut(`/api/bank/pdc/${id}/status`, { status: 'cleared', notes: 'Cleared at bank' });
+          toast('✅ PDC marked as Cleared');
+          renderPdcTab(area);
+        } catch (e) { toast(e.message, 'bad'); }
+      };
+
+      $('#btnNewPdcEntry').onclick = () => {
+        modal({
+          title: '✨ Record Post-Dated Cheque (PDC)',
+          html: `
+            <div style="display:flex;flex-direction:column;gap:10px;max-width:520px">
+              <div class="grid g2" style="gap:10px">
+                <div class="fld">
+                  <label>PDC Type</label>
+                  <select id="pdc_type">
+                    <option value="receipt">Customer Receipt (Inward)</option>
+                    <option value="payment">Vendor Payment (Outward)</option>
+                  </select>
+                </div>
+                <div class="fld">
+                  <label>Cheque Number *</label>
+                  <input type="text" id="pdc_num" placeholder="e.g. 783921" required>
+                </div>
+              </div>
+              <div class="fld">
+                <label>Party Name *</label>
+                <input type="text" id="pdc_party" placeholder="Client or Supplier Name" required>
+              </div>
+              <div class="grid g2" style="gap:10px">
+                <div class="fld">
+                  <label>Drawn on Bank</label>
+                  <input type="text" id="pdc_bank" placeholder="e.g. HDFC Bank">
+                </div>
+                <div class="fld">
+                  <label>Cheque Due / Maturity Date *</label>
+                  <input type="date" id="pdc_date" required>
+                </div>
+              </div>
+              <div class="fld">
+                <label>Cheque Amount (₹) *</label>
+                <input type="number" id="pdc_amt" placeholder="0.00" min="1" step="any" required>
+              </div>
+            </div>
+          `,
+          okText: 'Save PDC',
+          onOk: async () => {
+            const chequeNo = ($('#pdc_num') && $('#pdc_num').value.trim()) || '';
+            const partyName = ($('#pdc_party') && $('#pdc_party').value.trim()) || '';
+            const chequeDate = ($('#pdc_date') && $('#pdc_date').value) || '';
+            const amount = parseFloat($('#pdc_amt') && $('#pdc_amt').value) || 0;
+            if (!chequeNo || !partyName || !chequeDate || amount <= 0) {
+              toast('All required fields must be filled', 'bad');
+              return false;
+            }
+            try {
+              await apiPost('/api/bank/pdc', {
+                type: $('#pdc_type').value,
+                chequeNo,
+                partyName,
+                bankName: $('#pdc_bank').value.trim(),
+                chequeDate,
+                amount
+              });
+              toast('✅ Post-Dated Cheque recorded');
+              renderPdcTab(area);
+              return true;
+            } catch (e) { toast(e.message, 'bad'); return false; }
+          }
+        });
+      };
+
+      $('#btnChequePrintConfig').onclick = () => {
+        modal({
+          title: '🖨️ CTS-2010 Cheque Printing Formatter',
+          html: `
+            <div style="display:flex;flex-direction:column;gap:10px;max-width:540px">
+              <div class="fld">
+                <label>Select Bank Alignment Template</label>
+                <select id="cp_bank">
+                  <option value="hdfc">HDFC Bank (CTS-2010)</option>
+                  <option value="sbi">State Bank of India (SBI)</option>
+                  <option value="default">Standard CTS-2010 Universal</option>
+                </select>
+              </div>
+              <div class="fld">
+                <label>Payee Name</label>
+                <input type="text" id="cp_payee" placeholder="e.g. Apex Facades Pvt Ltd">
+              </div>
+              <div class="grid g2" style="gap:10px">
+                <div class="fld">
+                  <label>Cheque Date</label>
+                  <input type="date" id="cp_date" value="${new Date().toISOString().slice(0, 10)}">
+                </div>
+                <div class="fld">
+                  <label>Amount (₹)</label>
+                  <input type="number" id="cp_amt" placeholder="e.g. 150000">
+                </div>
+              </div>
+              <div id="cp_preview" style="padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;font-family:monospace;font-size:0.8rem;white-space:pre-wrap;display:none"></div>
+            </div>
+          `,
+          okText: 'Preview Cheque Coordinates',
+          onOk: async () => {
+            const payeeName = $('#cp_payee').value.trim();
+            const amount = parseFloat($('#cp_amt').value) || 0;
+            const date = $('#cp_date').value;
+            const bankKey = $('#cp_bank').value;
+            try {
+              const res = await apiPost('/api/bank/cheque-print/layout', { bankKey, payeeName, amount, date });
+              const p = $('#cp_preview');
+              p.style.display = 'block';
+              p.innerText = `Bank: ${res.template}\nCrossing: ${res.crossing}\nDate (Box): ${res.dateBox}\nPayee: ${res.payeeName}\nWords: ${res.amountWords}\nNumber: ${res.amountNumber}`;
+              return false; // keep modal open to inspect
+            } catch (e) { toast(e.message, 'bad'); return false; }
+          }
+        });
+      };
+
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
