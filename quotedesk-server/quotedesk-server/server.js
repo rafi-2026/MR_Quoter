@@ -4641,6 +4641,57 @@ app.get('/api/reports/ageing', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── M4: Inventory & Valuation Routes ───
+const inventoryModule = require('./inventory.js');
+
+// 1. Get Full Stock Summary Statement
+app.get('/api/inventory/summary', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const summary = await inventoryModule.getStockSummary(ctx.companyId, {
+      godownId: req.query.godownId,
+      asOfDate: req.query.asOfDate
+    });
+    res.json(summary);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Get Real-Time Stock On Hand for a Specific Item
+app.get('/api/inventory/stock-on-hand/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const onHand = await inventoryModule.getStockOnHand(ctx.companyId, req.params.id, req.query.godownId, req.query.asOfDate);
+    res.json(onHand);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Post a Stock Movement (Inward or Outward)
+app.post('/api/inventory/movements', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const doc = await inventoryModule.recordStockMovement(ctx.companyId, req.body || {});
+    res.json(doc);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// 4. FIFO Valuation for Stock Item
+app.get('/api/inventory/valuation/fifo/:id', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const val = await inventoryModule.valuateStockFIFO(ctx.companyId, req.params.id);
+    res.json(val);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 5. Reorder Level Alerts
+app.get('/api/inventory/reorder-alerts', auth, async (req, res) => {
+  try {
+    const ctx = getDocUserCtx(req);
+    const alerts = await inventoryModule.getReorderAlerts(ctx.companyId);
+    res.json(alerts);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── Phase 7: Exports (Tally Prime XML & Zoho Books) & Settings ──────────
 const exportsModule = require('./exports.js');
 

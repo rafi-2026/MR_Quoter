@@ -20,7 +20,7 @@ import * as currencies from '../../currencies.js';
 import * as accounts from '../../accounts.js';
 
 describe('M1: Masters & Foundation Tests', () => {
-  const companyId = 'test_m1_company';
+  const companyId = 'test_m1_company_' + Math.random().toString(36).slice(2, 8);
 
   describe('Paise Safe Money Math', () => {
     it('converts rupees to paise and back with precision', () => {

@@ -64,6 +64,7 @@
         <button class="chip ${activeTab === 'trialbalance' ? 'on' : ''}" data-acctab="trialbalance">⚖️ Trial Balance</button>
         <button class="chip ${activeTab === 'pnl' ? 'on' : ''}" data-acctab="pnl">📈 Profit &amp; Loss</button>
         <button class="chip ${activeTab === 'balancesheet' ? 'on' : ''}" data-acctab="balancesheet">🏦 Balance Sheet</button>
+        <button class="chip ${activeTab === 'stocksummary' ? 'on' : ''}" data-acctab="stocksummary">📦 Stock Summary</button>
         <button class="chip ${activeTab === 'reportshub' ? 'on' : ''}" data-acctab="reportshub">📊 Financial Reports Hub</button>
         <button class="chip ${activeTab === 'outstanding' ? 'on' : ''}" data-acctab="outstanding">💰 Bill Allocation &amp; AR/AP</button>
         <button class="chip ${activeTab === 'yearend' ? 'on' : ''}" data-acctab="yearend">🔒 Year-End Close</button>
@@ -119,6 +120,7 @@
     else if (activeTab === 'trialbalance') renderTrialBalanceTab(area);
     else if (activeTab === 'pnl') renderPnlTab(area);
     else if (activeTab === 'balancesheet') renderBalanceSheetTab(area);
+    else if (activeTab === 'stocksummary') renderStockSummaryTab(area);
     else if (activeTab === 'reportshub') renderReportsHubTab(area);
     else if (activeTab === 'outstanding') renderOutstandingTab(area);
     else if (activeTab === 'yearend') renderYearEndTab(area);
@@ -1724,6 +1726,87 @@
       $('#btnZohoCoa').onclick = () => {
         window.open('/api/exports/zoho/csv?type=chart_of_accounts', '_blank');
       };
+    } catch (e) {
+      area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
+    }
+  }
+
+  // 17. Stock Summary Statement & Valuation Tab (M4)
+  async function renderStockSummaryTab(area) {
+    area.innerHTML = `<div class="mute" style="padding:24px;text-align:center">Loading real-time Stock Summary Statement...</div>`;
+    try {
+      const summary = await apiGet('/api/inventory/summary');
+      const alerts = await apiGet('/api/inventory/reorder-alerts');
+
+      area.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <!-- Summary Header & KPIs -->
+          <div class="card" style="padding:16px;background:linear-gradient(135deg,#064e3b,#065f46);color:#fff">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <h3 style="margin:0 0 4px;color:#fff">📦 Tally Stock Summary Statement</h3>
+                <div class="mute sm" style="color:#a7f3d0">
+                  Real-time double-entry inventory ledger with FIFO valuation, inward/outward movement tracking, and reorder alerts.
+                </div>
+              </div>
+              <div style="text-align:right">
+                <div class="mute sm" style="color:#a7f3d0">Total Inventory Valuation</div>
+                <div style="font-size:1.6rem;font-weight:700;color:#fff">${rs(summary.totalStockValue)}</div>
+              </div>
+            </div>
+          </div>
+
+          ${alerts.length > 0 ? `
+            <div class="note bad" style="margin:0">
+              <b>⚠️ Reorder Level Warning:</b> ${alerts.length} material(s) have fallen below minimum safety stock levels:
+              <b>${alerts.map(a => esc(a.stockItemName) + ' (' + a.closingQty + ' left)').join(', ')}</b>. Initiate Purchase Orders.
+            </div>
+          ` : ''}
+
+          <!-- Stock Summary Table -->
+          <div class="card" style="padding:16px">
+            <div style="overflow-x:auto">
+              <table class="tbl sm" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>Item Description</th>
+                    <th>HSN</th>
+                    <th>Unit</th>
+                    <th style="text-align:right">Opening</th>
+                    <th style="text-align:right">Inward</th>
+                    <th style="text-align:right">Outward</th>
+                    <th style="text-align:right">Closing Stock</th>
+                    <th style="text-align:right">Avg Rate</th>
+                    <th style="text-align:right">Closing Valuation</th>
+                    <th style="text-align:center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${summary.items.length === 0 ? '<tr><td colspan="10" class="mute" style="text-align:center;padding:16px">No inventory items found. Add items in Tally Masters tab.</td></tr>' :
+                    summary.items.map(s => `
+                      <tr>
+                        <td><b>${esc(s.stockItemName)}</b></td>
+                        <td><code>${esc(s.hsnCode || '-')}</code></td>
+                        <td><span class="bd">${esc(s.unitName || 'Nos')}</span></td>
+                        <td style="text-align:right">${s.openingQty || 0}</td>
+                        <td style="text-align:right;color:#15803d">+${s.totalInQty || 0}</td>
+                        <td style="text-align:right;color:#b91c1c">-${s.totalOutQty || 0}</td>
+                        <td style="text-align:right;font-weight:700">${s.closingQty}</td>
+                        <td style="text-align:right">${rs(s.avgRate)}</td>
+                        <td style="text-align:right;font-weight:700">${rs(s.closingValue)}</td>
+                        <td style="text-align:center">
+                          <span class="bd" style="background:${s.isBelowReorder ? '#fee2e2;color:#b91c1c' : '#dcfce7;color:#15803d'}">
+                            ${s.isBelowReorder ? 'Below Reorder' : 'Healthy Stock'}
+                          </span>
+                        </td>
+                      </tr>
+                    `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
     } catch (e) {
       area.innerHTML = `<div class="note bad">${esc(e.message)}</div>`;
     }
