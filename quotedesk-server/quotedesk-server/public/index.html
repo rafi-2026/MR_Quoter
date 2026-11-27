@@ -2399,12 +2399,15 @@
       position: fixed;
       inset: 0;
       z-index: 999999;
-      background: #000000;
+      background: radial-gradient(circle at center, #111422 0%, #060810 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.85s;
       overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
     }
 
     .intro-video-overlay.fade-out {
@@ -2416,8 +2419,12 @@
     .intro-video-el {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      max-width: 100vw;
+      max-height: 100vh;
+      max-height: 100dvh;
+      object-fit: contain;
       display: block;
+      margin: auto;
     }
 
     .intro-skip-btn {
@@ -2474,6 +2481,22 @@
     .intro-sound-toggle:hover {
       background: rgba(0, 0, 0, 0.65);
       border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    @media (max-width: 600px) {
+      .intro-skip-btn {
+        bottom: 18px;
+        right: 18px;
+        padding: 7px 14px;
+        font-size: 0.76rem;
+      }
+
+      .intro-sound-toggle {
+        top: 18px;
+        right: 18px;
+        padding: 6px 10px;
+        font-size: 0.72rem;
+      }
     }
 
     /* Subtle light grid background */
