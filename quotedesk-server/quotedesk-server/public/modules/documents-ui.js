@@ -1267,7 +1267,7 @@
     }).join('');
 
     if (!isLocked) {
-      $('input, select', tbody).forEach(inp => {
+      $$('input, select', tbody).forEach(inp => {
         inp.oninput = () => {
           const tr = inp.closest('tr');
           if (tr) {
@@ -1292,7 +1292,7 @@
         };
       });
 
-      $('[data-delline]', tbody).forEach(btn => {
+      $$('[data-delline]', tbody).forEach(btn => {
         btn.onclick = () => {
           collectFormLines();
           const lid = btn.dataset.delline;
