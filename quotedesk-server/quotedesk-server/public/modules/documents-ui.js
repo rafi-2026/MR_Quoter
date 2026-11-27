@@ -694,15 +694,13 @@
 
     m.innerHTML = `
       <div class="ph">
-        <div>
-          <a href="#/documents" class="sm">&lsaquo; Back to all documents</a>
+        <div class="ph-title-wrap">
+          <a href="#/documents" class="ph-btn-back">&lsaquo; Back</a>
           <h1>${DOC_ICONS[d.docType] || '📄'} ${esc(d.no)} ${statusBadge(d.status)}</h1>
-          <div class="mute sm">
-            <b>${esc(typeLabel)}</b> &middot; ${revBadge} &middot; Created on ${fmtDate(d.date)}
-            ${d.sourceDocNo ? `&middot; Linked to Quote <b>${esc(d.sourceDocNo)}</b>` : ''}
-            ${d.revReason ? `<br><span style="color:#0284c7"><b>Revision Note:</b> ${esc(d.revReason)}</span>` : ''}
-            ${d.superseded ? `<br><span style="color:#dc2626;font-weight:700">⚠️ This revision has been replaced by a newer revision.</span>` : ''}
-          </div>
+          <span class="mute sm" style="font-size:0.78rem">
+            <b>${esc(typeLabel)}</b> &middot; ${revBadge} &middot; ${fmtDate(d.date)}
+            ${d.sourceDocNo ? `&middot; Linked: <b>${esc(d.sourceDocNo)}</b>` : ''}
+          </span>
         </div>
         <div class="acts" id="docDetailActs"></div>
       </div>
@@ -1088,6 +1086,9 @@
     const acts = [];
     const sideHidden = document.querySelector('.qg') && document.querySelector('.qg').classList.contains('side-hidden');
     acts.push(`<button class="btn sm" id="btnToggleDocSide" style="background:${sideHidden ? '#2563eb' : '#f1f5f9'};color:${sideHidden ? '#fff' : '#334155'};border:1px solid ${sideHidden ? '#1d4ed8' : '#cbd5e1'};font-weight:600" title="${sideHidden ? 'Show summary and controls' : 'Expand full screen editor'}">${sideHidden ? '◧ Show Summary' : '◫ Full View'}</button>`);
+    if (!isLocked) {
+      acts.push(`<button class="btn sm" id="actSaveDraftDoc" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;font-weight:600">💾 Save &amp; Draft</button>`);
+    }
     acts.push(`<button class="btn sm ghost" id="actViewPrint" title="Printable Preview">👁 View / Print</button>`);
     acts.push(`<button class="btn sm ghost" id="actDownloadPdf" title="Download PDF">📥 PDF</button>`);
     acts.push(`<button class="btn sm ghost" id="actMailDoc" title="Email Document">✉ Email</button>`);
@@ -1102,6 +1103,14 @@
     }
 
     el.innerHTML = acts.join('');
+
+    const btnSaveDraft = $('#actSaveDraftDoc');
+    if (btnSaveDraft) {
+      btnSaveDraft.onclick = () => {
+        const btnSaveMain = $('#btnSaveDocLines');
+        if (btnSaveMain) btnSaveMain.click();
+      };
+    }
 
     const btnTogSide = $('#btnToggleDocSide');
     if (btnTogSide) {

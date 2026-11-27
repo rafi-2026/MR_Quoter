@@ -373,25 +373,66 @@
       overflow-x: hidden;
     }
 
-    /* ── Sticky frosted-glass top bar (iPhone-style) ── */
+    /* ── Sticky frosted-glass top bar (Compact & Clean) ── */
     .ph {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      padding: 18px 0 14px;
+      gap: 12px;
+      padding: 8px 30px;
       flex-wrap: wrap;
       position: sticky;
       top: 0;
       z-index: 30;
-      background: rgba(255, 255, 255, 0.72);
-      backdrop-filter: blur(18px) saturate(180%);
-      -webkit-backdrop-filter: blur(18px) saturate(180%);
-      border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-      box-shadow: 0 2px 16px rgba(15, 23, 42, 0.06);
-      margin: 0 -30px 20px;
-      padding-left: 30px;
-      padding-right: 30px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: 0 1px 6px rgba(15, 23, 42, 0.04);
+      margin: 0 -30px 12px;
+    }
+
+    .ph-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ph-title-wrap h1 {
+      font-size: 1.25rem !important;
+      margin: 0 !important;
+      line-height: 1.2;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ph-btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+
+    .ph-btn-back:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .ph .acts {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
 
     /* push page content inside .main to have its own padding */
@@ -10388,7 +10429,7 @@
         snap.labour_rate_per_sqm !== currentCosting.labour_rate_per_sqm
       );
 
-      m.innerHTML = `<div class="ph"><div><a href="#/quotes" class="sm">&lsaquo; All quotes</a><h1>${esc(q.no)} ${statusBadge(q.status)}</h1><div class="mute sm">Created by ${esc(userName(q.createdBy))} on ${fmtDate(new Date(q.createdAt).toISOString().slice(0, 10))}${q.rev ? ' &middot; Revision ' + q.rev : ''}${q.superseded ? ' &middot; Replaced by a newer revision' : ''}</div></div><div class="acts" id="topActs"></div></div>
+      m.innerHTML = `<div class="ph"><div class="ph-title-wrap"><a href="#/quotes" class="ph-btn-back">&lsaquo; Back</a><h1>${esc(q.no)} ${statusBadge(q.status)}</h1><span class="mute sm" style="font-size:0.78rem">Rev ${q.rev || 0} &middot; ${fmtDate(new Date(q.createdAt).toISOString().slice(0, 10))} &middot; ${esc(userName(q.createdBy))}</span></div><div class="acts" id="topActs"></div></div>
   ${ratesChanged ? `<div class="note" style="margin-bottom:14px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;display:flex;align-items:center;justify-content:space-between"><div><b>⚠️ Costing Settings Changed:</b> The aluminium or labour rate in Settings was changed since this draft was saved.</div><button type="button" class="btn sm pri" data-act="recalcQuoteRates">Recalculate All Lines</button></div>` : ''}
   ${ro && !q.superseded ? `<div class="note" style="margin-bottom:14px">${q.status === 'pending' ? 'This quote is waiting for approval and cannot be edited.' : ['approved', 'sent', 'won', 'lost'].includes(q.status) ? 'This quote is locked. To change it, create a revision.' : 'You cannot edit this quote.'}</div>` : ''}
   ${q.status === 'rejected' && q.reviewNote ? `<div class="note" style="margin-bottom:14px;background:var(--bad-l);border-color:#e3b4b4"><b>Rejected:</b> ${esc(q.reviewNote)}</div>` : ''}
@@ -10773,7 +10814,10 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
       const q = Q, b = (a, t, c) => `<button class="btn ${c || ''}" data-act="${a}">${t}</button>`; let h = '';
       const sideHidden = document.querySelector('.qg') && document.querySelector('.qg').classList.contains('side-hidden');
       h += `<button class="btn sm" data-act="toggleQuoteSide" id="btnToggleQuoteSide" style="background:${sideHidden ? '#2563eb' : '#f1f5f9'};color:${sideHidden ? '#fff' : '#334155'};border:1px solid ${sideHidden ? '#1d4ed8' : '#cbd5e1'};font-weight:600" title="${sideHidden ? 'Show summary and controls' : 'Expand full screen editor'}">${sideHidden ? '◧ Show Summary' : '◫ Full View'}</button>`;
-      if (['draft', 'rejected'].includes(q.status) && canEdit(q)) h += b('submit', canApprove() ? 'Finalise' : 'Submit for approval', 'pri') + b('delQuote', 'Delete', 'bad');
+      if (['draft', 'rejected'].includes(q.status) && canEdit(q)) {
+        h += `<button class="btn sm" data-act="saveDraftQuote" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;font-weight:600">💾 Save Draft</button>`;
+        h += b('submit', canApprove() ? 'Finalise' : 'Submit for approval', 'pri') + b('delQuote', 'Delete', 'bad');
+      }
       if (q.status === 'pending') { if (canApprove()) h += b('approve', 'Approve', 'pri') + b('reject', 'Reject', 'bad'); if (q.createdBy === me.id || canApprove()) h += b('withdraw', 'Withdraw to draft') }
       if (q.status === 'approved' && canWrite()) h += b('markSent', 'Mark as sent', 'pri');
       if (q.status === 'sent' && canWrite()) h += b('markWon', 'Mark won', 'pri') + b('markLost', 'Mark lost');
@@ -11120,6 +11164,12 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
         if (!qg) return;
         qg.classList.toggle('side-hidden');
         drawActs();
+      },
+      saveDraftQuote() {
+        if (!Q) return;
+        touch();
+        persist(true);
+        toast('Quotation saved as draft.', 'ok');
       },
       addSize() { picker('size') }, addBoq() { picker('boq') },
       addSec() { addLine({ id: uid(), type: 'section', title: '' }) },
