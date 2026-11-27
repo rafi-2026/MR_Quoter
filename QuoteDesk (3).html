@@ -2920,11 +2920,36 @@
       grid-template-columns: minmax(0, 1fr) 330px;
       gap: 18px;
       align-items: start;
+      transition: grid-template-columns 0.25s ease;
+    }
+
+    .qg.side-hidden {
+      grid-template-columns: minmax(0, 1fr) 0px !important;
+      gap: 0px !important;
+    }
+
+    .qg.side-hidden > aside.qside,
+    .qg.side-hidden > .qside {
+      display: none !important;
     }
 
     .qside {
       position: sticky;
-      top: 80px
+      top: 80px;
+      transition: all 0.25s ease;
+    }
+
+    .btn-toggle-side {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-toggle-side:hover {
+      transform: translateY(-1px);
     }
 
     @media(max-width:1150px) {
@@ -10746,6 +10771,8 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
     }
     function drawActs() {
       const q = Q, b = (a, t, c) => `<button class="btn ${c || ''}" data-act="${a}">${t}</button>`; let h = '';
+      const sideHidden = document.querySelector('.qg') && document.querySelector('.qg').classList.contains('side-hidden');
+      h += `<button class="btn sm" data-act="toggleQuoteSide" id="btnToggleQuoteSide" style="background:${sideHidden ? '#2563eb' : '#f1f5f9'};color:${sideHidden ? '#fff' : '#334155'};border:1px solid ${sideHidden ? '#1d4ed8' : '#cbd5e1'};font-weight:600" title="${sideHidden ? 'Show summary and controls' : 'Expand full screen editor'}">${sideHidden ? '◧ Show Summary' : '◫ Full View'}</button>`;
       if (['draft', 'rejected'].includes(q.status) && canEdit(q)) h += b('submit', canApprove() ? 'Finalise' : 'Submit for approval', 'pri') + b('delQuote', 'Delete', 'bad');
       if (q.status === 'pending') { if (canApprove()) h += b('approve', 'Approve', 'pri') + b('reject', 'Reject', 'bad'); if (q.createdBy === me.id || canApprove()) h += b('withdraw', 'Withdraw to draft') }
       if (q.status === 'approved' && canWrite()) h += b('markSent', 'Mark as sent', 'pri');
@@ -11087,6 +11114,12 @@ ${q.gst ? `<div class="mute sm" style="margin-top:4px">${t.inter ? 'IGST applied
             }
           }
         });
+      },
+      toggleQuoteSide() {
+        const qg = document.querySelector('.qg');
+        if (!qg) return;
+        qg.classList.toggle('side-hidden');
+        drawActs();
       },
       addSize() { picker('size') }, addBoq() { picker('boq') },
       addSec() { addLine({ id: uid(), type: 'section', title: '' }) },

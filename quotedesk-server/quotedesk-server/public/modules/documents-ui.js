@@ -1086,6 +1086,8 @@
     if (!el) return;
 
     const acts = [];
+    const sideHidden = document.querySelector('.qg') && document.querySelector('.qg').classList.contains('side-hidden');
+    acts.push(`<button class="btn sm" id="btnToggleDocSide" style="background:${sideHidden ? '#2563eb' : '#f1f5f9'};color:${sideHidden ? '#fff' : '#334155'};border:1px solid ${sideHidden ? '#1d4ed8' : '#cbd5e1'};font-weight:600" title="${sideHidden ? 'Show summary and controls' : 'Expand full screen editor'}">${sideHidden ? '◧ Show Summary' : '◫ Full View'}</button>`);
     acts.push(`<button class="btn sm ghost" id="actViewPrint" title="Printable Preview">👁 View / Print</button>`);
     acts.push(`<button class="btn sm ghost" id="actDownloadPdf" title="Download PDF">📥 PDF</button>`);
     acts.push(`<button class="btn sm ghost" id="actMailDoc" title="Email Document">✉ Email</button>`);
@@ -1100,6 +1102,17 @@
     }
 
     el.innerHTML = acts.join('');
+
+    const btnTogSide = $('#btnToggleDocSide');
+    if (btnTogSide) {
+      btnTogSide.onclick = () => {
+        const qg = document.querySelector('.qg');
+        if (qg) {
+          qg.classList.toggle('side-hidden');
+          renderDetailActs(d, isLocked);
+        }
+      };
+    }
 
     const btnVp = $('#actViewPrint');
     if (btnVp) btnVp.onclick = () => {
